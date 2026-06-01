@@ -23,7 +23,7 @@ from typing import Callable, TextIO
 
 from opentelemetry.trace import Span
 
-from . import linear, model, progress, prompt, runlog, telemetry, worker, worktree
+from . import flow, linear, model, progress, prompt, runlog, telemetry, worker, worktree
 from .limits import Limits, check_cycle
 from .linear import DependencyCycleError
 from .repos import RepoResolutionError, Repos
@@ -423,6 +423,11 @@ def _drain_one_issue(
         issue_span.set_attribute("issue.total", total)
         print(f"drain-cycle: picked {identifier}: {issue['title']}", file=sys.stderr)
 
+        flow_name = flow.resolve(issue)
+        if flow_name is not None:
+            issue_span.set_attribute("issue.flow", flow_name)
+            issue_span.set_attribute("issue.responder_run_count", 0)
+
         started_at = _now_iso()
         try:
             target_repo = repos.resolve(issue)
@@ -443,6 +448,7 @@ def _drain_one_issue(
                 final_linear_state=state_name,
                 worktree_path=_UNRESOLVED_WORKTREE_DISPLAY,
                 halt_reason=halt_reason,
+                flow=flow_name,
             )
             issue_span.set_attribute("issue.final_linear_state", state_name)
             telemetry.mark_error(issue_span, "err-repo-resolution", halt_reason)
@@ -484,6 +490,7 @@ def _drain_one_issue(
                     final_linear_state=state_name,
                     worktree_path=str(planned_path),
                     halt_reason=halt_reason,
+                    flow=flow_name,
                 )
                 issue_span.set_attribute("issue.final_linear_state", state_name)
                 issue_span.set_attribute("issue.resumed", True)
@@ -529,6 +536,7 @@ def _drain_one_issue(
                 final_linear_state=state_name,
                 worktree_path=str(planned_path),
                 halt_reason=halt_reason,
+                flow=flow_name,
             )
             issue_span.set_attribute("issue.final_linear_state", state_name)
             telemetry.mark_error(issue_span, "err-setup-failed", halt_reason)
@@ -630,6 +638,11 @@ def _drain_one_issue(
                 )
             return _cb
 
+        # Verify-flow verdict and responder data — populated by M2+ roles.
+        outcome_verdict: dict | None = None
+        prep_verdict: dict | None = None
+        responder_runs: list[dict] = []
+
         try:
             result = worker.run_issue(
                 claude_cmd=_CLAUDE_CMD,
@@ -677,10 +690,20 @@ def _drain_one_issue(
                 final_linear_state=effective_state,
                 worktree_path=str(worktree_path),
                 halt_reason=halt_reason,
+                flow=flow_name,
+                outcome_verdict=outcome_verdict,
+                prep_verdict=prep_verdict,
+                responder_runs=responder_runs,
                 **_worker_log_fields(result),
             )
             issue_span.set_attribute("issue.exit_code", result.exit_code)
             issue_span.set_attribute("issue.final_linear_state", effective_state)
+            if outcome_verdict is not None:
+                issue_span.set_attribute("issue.outcome_verdict", outcome_verdict["result"])
+            if prep_verdict is not None:
+                issue_span.set_attribute("issue.prep_verdict", prep_verdict["result"])
+            if flow_name is not None:
+                issue_span.set_attribute("issue.responder_run_count", len(responder_runs))
             telemetry.mark_error(issue_span, "err-per-issue-breach", halt_reason)
             print(halt_reason, file=sys.stderr)
             return 1, pane_id
@@ -715,8 +738,18 @@ def _drain_one_issue(
                 final_linear_state=post_spawn_state,
                 worktree_path=str(worktree_path),
                 halt_reason=remove_error,
+                flow=flow_name,
+                outcome_verdict=outcome_verdict,
+                prep_verdict=prep_verdict,
+                responder_runs=responder_runs,
                 **_worker_log_fields(result),
             )
+            if outcome_verdict is not None:
+                issue_span.set_attribute("issue.outcome_verdict", outcome_verdict["result"])
+            if prep_verdict is not None:
+                issue_span.set_attribute("issue.prep_verdict", prep_verdict["result"])
+            if flow_name is not None:
+                issue_span.set_attribute("issue.responder_run_count", len(responder_runs))
             if stack:
                 print(f"drain-cycle: {identifier} done; worktree preserved for stack assembly.", file=sys.stderr)
             elif remove_error is None:
@@ -746,9 +779,19 @@ def _drain_one_issue(
             final_linear_state=effective_state,
             worktree_path=str(worktree_path),
             halt_reason=halt_reason,
+            flow=flow_name,
+            outcome_verdict=outcome_verdict,
+            prep_verdict=prep_verdict,
+            responder_runs=responder_runs,
             **_worker_log_fields(result),
         )
         issue_span.set_attribute("issue.final_linear_state", effective_state)
+        if outcome_verdict is not None:
+            issue_span.set_attribute("issue.outcome_verdict", outcome_verdict["result"])
+        if prep_verdict is not None:
+            issue_span.set_attribute("issue.prep_verdict", prep_verdict["result"])
+        if flow_name is not None:
+            issue_span.set_attribute("issue.responder_run_count", len(responder_runs))
         telemetry.mark_error(issue_span, "err-issue-not-done", halt_reason)
         print(halt_reason, file=sys.stderr)
         return 1, pane_id
