@@ -1,0 +1,64 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "385d91452d33",
+  "session_id": "905b4632-e0d8-4446-a47a-05cb1bb26150",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-01T06:48:50.5802Z",
+  "branch": "ABA-303",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "docs/repos.example.yml",
+    "drain_cycle/cli.py",
+    "drain_cycle/orchestrator.py",
+    "drain_cycle/prompt.py",
+    "drain_cycle/repos.py",
+    "tests/test_prompt.py",
+    "tests/test_repos.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "eade4d39157c",
+  "token_usage": {
+    "input_tokens": 229,
+    "cache_creation_tokens": 245319,
+    "cache_read_tokens": 3645957,
+    "output_tokens": 10732,
+    "api_call_count": 28
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-01T06:48:50.571307Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 16,
+    "total_committed": 0,
+    "total_lines_changed": 16,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 177,
+      "user_lines_removed": 15,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/repos.example.yml": 7,
+        "drain_cycle/cli.py": 11,
+        "drain_cycle/orchestrator.py": 7,
+        "drain_cycle/prompt.py": 11,
+        "drain_cycle/repos.py": 33,
+        "tests/test_prompt.py": 29,
+        "tests/test_repos.py": 79
+      },
+      "user_removed_per_file": {
+        "drain_cycle/cli.py": 8,
+        "drain_cycle/orchestrator.py": 4,
+        "drain_cycle/prompt.py": 2,
+        "drain_cycle/repos.py": 1
+      }
+    }
+  ]
+}
