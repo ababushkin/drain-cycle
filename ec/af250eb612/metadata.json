@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "ecaf250eb612",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/orchestrator.py",
+    "drain_cycle/watch_format.py",
+    "tests/test_orchestrator_watch.py",
+    "tests/test_watch_format.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ec/af250eb612/0/metadata.json",
+      "transcript": "/ec/af250eb612/0/full.jsonl",
+      "content_hash": "/ec/af250eb612/0/content_hash.txt",
+      "prompt": "/ec/af250eb612/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 19559,
+    "cache_creation_tokens": 149773,
+    "cache_read_tokens": 2408215,
+    "output_tokens": 22170,
+    "api_call_count": 34
+  }
+}
