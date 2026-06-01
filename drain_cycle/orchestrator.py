@@ -285,7 +285,7 @@ def run(
     limits: Limits | None = None,
     *,
     watch: bool = False,
-    stack: bool = False,
+    no_stack: bool = False,
 ) -> int:
     """Drain the current cycle inside the ``drain.cycle`` root span.
 
@@ -296,7 +296,7 @@ def run(
     if limits is None:
         limits = Limits()
     with telemetry.tracer.start_as_current_span("drain.cycle") as cycle_span:
-        return _run(repos, limits, cycle_span, watch=watch, stack=stack)
+        return _run(repos, limits, cycle_span, watch=watch, no_stack=no_stack)
 
 
 def _run(
@@ -305,7 +305,7 @@ def _run(
     cycle_span: Span,
     *,
     watch: bool = False,
-    stack: bool = False,
+    no_stack: bool = False,
 ) -> int:
     debug = _debug_enabled()
     cycle_id = linear.current_cycle_id()
@@ -364,7 +364,7 @@ def _run(
             debug=debug,
             watch=watch,
             in_tmux=in_tmux,
-            stack=stack,
+            no_stack=no_stack,
             last_branch_per_repo=last_branch_per_repo,
         )
         if halt_code is not None:
@@ -404,7 +404,7 @@ def _drain_one_issue(
     debug: bool,
     watch: bool = False,
     in_tmux: bool = False,
-    stack: bool = False,
+    no_stack: bool = False,
     last_branch_per_repo: dict[str, str] | None = None,
 ) -> tuple[int | None, str | None]:
     """Drain a single issue end to end inside a ``drain.issue`` span.
@@ -502,6 +502,7 @@ def _drain_one_issue(
                 print(halt_reason, file=sys.stderr)
                 return 1, None
 
+        stack = target_repo.name not in repos.push_to_main_repos and not no_stack
         base = (
             last_branch_per_repo.get(target_repo.name, worktree.BASE_BRANCH)
             if stack and last_branch_per_repo is not None

@@ -24,3 +24,10 @@ repos:
 #   - .claude
 #   - .mcp.json
 #   - .entire
+
+# Optional. Repos that should push to main instead of stacking PRs. By default,
+# drained issues push to a PR and stack them. List repo names here to opt out
+# of stacking and push directly to main (e.g., drain-cycle itself). A run can
+# also disable stacking for all repos with the --no-stack flag.
+# push_to_main_repos:
+#   - drain-cycle

@@ -311,3 +311,82 @@ def test_resolve_raises_when_resolved_path_does_not_exist(tmp_path: Path) -> Non
         match=f"^resolved path {missing} does not exist$",
     ):
         r.resolve(issue)
+
+
+def test_load_defaults_push_to_main_repos_when_key_absent(tmp_path: Path) -> None:
+    target = tmp_path / "target"
+    target.mkdir()
+    config = _write_config(
+        tmp_path,
+        f"""
+        repos:
+          target: {target}
+        """,
+    )
+    loaded = repos.load(config)
+    assert loaded.push_to_main_repos == ()
+
+
+def test_load_parses_push_to_main_repos_list(tmp_path: Path) -> None:
+    target = tmp_path / "target"
+    target.mkdir()
+    config = _write_config(
+        tmp_path,
+        f"""
+        repos:
+          alpha: {target}
+          beta: {target}
+        push_to_main_repos:
+          - alpha
+          - beta
+        """,
+    )
+    loaded = repos.load(config)
+    assert loaded.push_to_main_repos == ("alpha", "beta")
+
+
+def test_load_raises_config_error_when_push_to_main_repos_not_list(
+    tmp_path: Path,
+) -> None:
+    config = _write_config(
+        tmp_path,
+        f"""
+        repos:
+          target: {tmp_path}
+        push_to_main_repos: alpha
+        """,
+    )
+    with pytest.raises(repos.RepoConfigError, match="must be a list"):
+        repos.load(config)
+
+
+def test_load_raises_config_error_when_push_to_main_repos_entry_not_string(
+    tmp_path: Path,
+) -> None:
+    config = _write_config(
+        tmp_path,
+        f"""
+        repos:
+          target: {tmp_path}
+        push_to_main_repos:
+          - 42
+        """,
+    )
+    with pytest.raises(repos.RepoConfigError, match="must be a non-empty string"):
+        repos.load(config)
+
+
+def test_load_raises_config_error_when_push_to_main_repos_entry_empty_string(
+    tmp_path: Path,
+) -> None:
+    config = _write_config(
+        tmp_path,
+        f"""
+        repos:
+          target: {tmp_path}
+        push_to_main_repos:
+          - ""
+        """,
+    )
+    with pytest.raises(repos.RepoConfigError, match="must be a non-empty string"):
+        repos.load(config)

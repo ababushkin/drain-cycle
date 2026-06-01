@@ -68,6 +68,7 @@ class Repos:
 
     mapping: dict[str, Path]
     worktree_config_paths: tuple[str, ...] = DEFAULT_WORKTREE_CONFIG_PATHS
+    push_to_main_repos: tuple[str, ...] = ()
 
     def resolve(self, issue: dict[str, Any]) -> Path:
         labels = [
@@ -128,6 +129,30 @@ def _parse_worktree_config_paths(value: Any) -> tuple[str, ...]:
     return tuple(entries)
 
 
+def _parse_push_to_main_repos(value: Any) -> tuple[str, ...]:
+    """Validate the optional ``push_to_main_repos`` key.
+
+    ``None`` (key absent) yields the default (empty tuple). A present value
+    must be a list of repo names matching entries in the ``repos:`` block.
+    Every failure raises ``RepoConfigError`` naming the offending entry.
+    """
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise RepoConfigError(
+            f"{_CONFIG_DISPLAY} 'push_to_main_repos' must be a list"
+        )
+    entries: list[str] = []
+    for entry in value:
+        if not isinstance(entry, str) or not entry.strip():
+            raise RepoConfigError(
+                f"{_CONFIG_DISPLAY} 'push_to_main_repos' entry {entry!r}: "
+                "must be a non-empty string"
+            )
+        entries.append(entry)
+    return tuple(entries)
+
+
 def load(path: Path | None = None) -> Repos:
     """Read ``repos.yml`` and return a validated ``Repos``.
 
@@ -169,4 +194,11 @@ def load(path: Path | None = None) -> Repos:
     worktree_config_paths = _parse_worktree_config_paths(
         data.get("worktree_config_paths")
     )
-    return Repos(mapping=mapping, worktree_config_paths=worktree_config_paths)
+    push_to_main_repos = _parse_push_to_main_repos(
+        data.get("push_to_main_repos")
+    )
+    return Repos(
+        mapping=mapping,
+        worktree_config_paths=worktree_config_paths,
+        push_to_main_repos=push_to_main_repos,
+    )

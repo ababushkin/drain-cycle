@@ -142,7 +142,7 @@ def test_graphite_submit_receives_main_then_first_branch(
     monkeypatch.setattr(graphite, "ensure_review_high_label", lambda worktree: None)
     monkeypatch.setattr(graphite, "add_label", lambda pr_number, label, worktree: None)
 
-    exit_code = orchestrator.run(_stub_repos(repo), stack=True)
+    exit_code = orchestrator.run(_stub_repos(repo))
 
     assert exit_code == 0
     assert len(submit_calls) == 2
@@ -217,7 +217,7 @@ def test_review_high_label_applied_correctly(
     monkeypatch.setattr(graphite, "ensure_review_high_label", fake_ensure)
     monkeypatch.setattr(graphite, "add_label", fake_add)
 
-    exit_code = orchestrator.run(_stub_repos(repo), stack=True)
+    exit_code = orchestrator.run(_stub_repos(repo))
 
     assert exit_code == 0
     if expect_high:
@@ -267,7 +267,7 @@ def test_graphite_failure_halts_cycle_and_preserves_worktree(
 
     monkeypatch.setattr(graphite, "submit", failing_submit)
 
-    exit_code = orchestrator.run(_stub_repos(repo), stack=True)
+    exit_code = orchestrator.run(_stub_repos(repo))
 
     assert exit_code == 1
 

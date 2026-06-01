@@ -44,18 +44,20 @@ def _load_secrets() -> None:
 
 
 _USAGE = (
-    "usage: drain-cycle [--watch|-w]       drain the current Linear cycle\n"
-    "       drain-cycle grade              print health read from run logs\n"
-    "       drain-cycle grade-draft <issue> write per-ticket grade draft\n"
-    "       drain-cycle status             show status of the active run\n"
+    "usage: drain-cycle [--watch|-w] [--no-stack]  drain the current Linear cycle\n"
+    "       drain-cycle grade                       print health read from run logs\n"
+    "       drain-cycle grade-draft <issue>         write per-ticket grade draft\n"
+    "       drain-cycle status                      show status of the active run\n"
     "       drain-cycle --help\n"
     "\n"
     "options:\n"
-    "  --watch, -w   open a tmux split-pane per issue running the live\n"
-    "                claude session (requires running inside tmux)"
+    "  --watch, -w      open a tmux split-pane per issue running the live\n"
+    "                   claude session (requires running inside tmux)\n"
+    "  --no-stack       push to main instead of stacking PRs (default: stack)"
 )
 
 _WATCH_FLAGS = frozenset(["--watch", "-w"])
+_NO_STACK_FLAGS = frozenset(["--no-stack"])
 
 
 def main() -> None:
@@ -69,9 +71,10 @@ def main() -> None:
     argv = sys.argv[1:]
 
     # Drain invocation: zero or more flags, no subcommand.
-    # Currently only --watch/-w is recognised.
-    remaining = [a for a in argv if a not in _WATCH_FLAGS]
+    # Currently --watch/-w and --no-stack are recognised.
+    remaining = [a for a in argv if a not in _WATCH_FLAGS and a not in _NO_STACK_FLAGS]
     watch = any(a in _WATCH_FLAGS for a in argv)
+    no_stack = any(a in _NO_STACK_FLAGS for a in argv)
 
     if not remaining:
         if watch and not os.environ.get("TMUX"):
@@ -86,7 +89,7 @@ def main() -> None:
         except (repos.RepoConfigError, limits.LimitsConfigError) as exc:
             print(f"drain-cycle: {exc}", file=sys.stderr)
             sys.exit(1)
-        sys.exit(orchestrator.run(loaded_repos, loaded_limits, watch=watch))
+        sys.exit(orchestrator.run(loaded_repos, loaded_limits, watch=watch, no_stack=no_stack))
 
     if remaining == ["grade"] and not watch:
         sys.exit(grade.run(grade.default_runs_dir()))
