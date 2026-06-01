@@ -23,7 +23,7 @@ from typing import Callable, TextIO
 
 from opentelemetry.trace import Span
 
-from . import linear, model, progress, prompt, runlog, telemetry, worker, worktree
+from . import graphite, handoff, linear, model, progress, prompt, runlog, telemetry, worker, worktree
 from .limits import Limits, check_cycle
 from .linear import DependencyCycleError
 from .repos import RepoResolutionError, Repos
@@ -307,6 +307,7 @@ def _run(repos: Repos, limits: Limits, cycle_span: Span, *, watch: bool = False)
 
     in_tmux = bool(os.environ.get("TMUX"))
     current_pane_id: str | None = None
+    last_branch_per_repo: dict[str, str] = {}
 
     total = len(plan.order)
     for index, issue in enumerate(plan.order):
@@ -326,6 +327,7 @@ def _run(repos: Repos, limits: Limits, cycle_span: Span, *, watch: bool = False)
             debug=debug,
             watch=watch,
             in_tmux=in_tmux,
+            last_branch_per_repo=last_branch_per_repo,
         )
         if halt_code is not None:
             return halt_code  # type: ignore[return-value]
@@ -364,6 +366,7 @@ def _drain_one_issue(
     debug: bool,
     watch: bool = False,
     in_tmux: bool = False,
+    last_branch_per_repo: dict[str, str],
 ) -> tuple[int | None, str | None]:
     """Drain a single issue end to end inside a ``drain.issue`` span.
 
@@ -646,6 +649,50 @@ def _drain_one_issue(
 
         if is_done:
             issue_span.set_attribute("issue.final_linear_state", post_spawn_state)
+
+            # Read the agent's handoff findings and determine PR review priority.
+            findings = handoff.read(worktree_path)
+            review_high = (
+                "review:high" in issue["labels"]
+                or bool(findings.critical)
+                or bool(findings.required)
+            )
+
+            # Assemble into the per-repo Graphite stack. Any gt/gh failure is
+            # stop-the-line: the next issue would otherwise chain onto an
+            # uncertain push state. Leave the worktree on disk for recovery.
+            parent_branch = (
+                last_branch_per_repo.get(target_repo.name) or worktree.BASE_BRANCH
+            )
+            graphite_error: str | None = None
+            try:
+                pr_info = graphite.submit(worktree_path, parent=parent_branch)
+                if review_high:
+                    graphite.ensure_review_high_label(worktree_path)
+                    graphite.add_label(pr_info.number, "review:high", worktree_path)
+                last_branch_per_repo[target_repo.name] = identifier
+            except RuntimeError as exc:
+                graphite_error = str(exc)
+
+            if graphite_error is not None:
+                halt_reason = (
+                    f"{_halt_message(identifier, post_spawn_state, worktree_path)}"
+                    f" — graphite: {graphite_error}"
+                )
+                log.append_entry(
+                    issue_identifier=identifier,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    exit_code=result.exit_code,
+                    final_linear_state=post_spawn_state,
+                    worktree_path=str(worktree_path),
+                    halt_reason=halt_reason,
+                    **_worker_log_fields(result),
+                )
+                telemetry.mark_error(issue_span, "err-graphite", halt_reason)
+                print(halt_reason, file=sys.stderr)
+                return 1, pane_id
+
             remove_error: str | None = None
             try:
                 worktree.remove(target_repo, worktree_path)
