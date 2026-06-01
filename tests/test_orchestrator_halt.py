@@ -232,6 +232,7 @@ def test_orchestrator_runlog_records_halted_issue_with_non_done_state(
         "num_turns",
         "session_id",
         "is_error",
+        "flow",
     }
     assert set(entry.keys()) == required_keys
     assert entry["issue_identifier"] == first["identifier"]

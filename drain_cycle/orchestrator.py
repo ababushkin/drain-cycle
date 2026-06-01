@@ -23,7 +23,7 @@ from typing import Callable, TextIO
 
 from opentelemetry.trace import Span
 
-from . import linear, model, progress, prompt, runlog, telemetry, worker, worktree
+from . import flow, linear, model, progress, prompt, runlog, telemetry, worker, worktree
 from .limits import Limits, check_cycle
 from .linear import DependencyCycleError
 from .repos import RepoResolutionError, Repos
@@ -424,6 +424,7 @@ def _drain_one_issue(
         print(f"drain-cycle: picked {identifier}: {issue['title']}", file=sys.stderr)
 
         started_at = _now_iso()
+        worker_flow = flow.resolve(issue)
         try:
             target_repo = repos.resolve(issue)
         except RepoResolutionError as exc:
@@ -443,6 +444,7 @@ def _drain_one_issue(
                 final_linear_state=state_name,
                 worktree_path=_UNRESOLVED_WORKTREE_DISPLAY,
                 halt_reason=halt_reason,
+                flow=worker_flow,
             )
             issue_span.set_attribute("issue.final_linear_state", state_name)
             telemetry.mark_error(issue_span, "err-repo-resolution", halt_reason)
@@ -484,6 +486,7 @@ def _drain_one_issue(
                     final_linear_state=state_name,
                     worktree_path=str(planned_path),
                     halt_reason=halt_reason,
+                    flow=worker_flow,
                 )
                 issue_span.set_attribute("issue.final_linear_state", state_name)
                 issue_span.set_attribute("issue.resumed", True)
@@ -529,6 +532,7 @@ def _drain_one_issue(
                 final_linear_state=state_name,
                 worktree_path=str(planned_path),
                 halt_reason=halt_reason,
+                flow=worker_flow,
             )
             issue_span.set_attribute("issue.final_linear_state", state_name)
             telemetry.mark_error(issue_span, "err-setup-failed", halt_reason)
@@ -677,6 +681,7 @@ def _drain_one_issue(
                 final_linear_state=effective_state,
                 worktree_path=str(worktree_path),
                 halt_reason=halt_reason,
+                flow=worker_flow,
                 **_worker_log_fields(result),
             )
             issue_span.set_attribute("issue.exit_code", result.exit_code)
@@ -715,6 +720,7 @@ def _drain_one_issue(
                 final_linear_state=post_spawn_state,
                 worktree_path=str(worktree_path),
                 halt_reason=remove_error,
+                flow=worker_flow,
                 **_worker_log_fields(result),
             )
             if stack:
@@ -746,6 +752,7 @@ def _drain_one_issue(
             final_linear_state=effective_state,
             worktree_path=str(worktree_path),
             halt_reason=halt_reason,
+            flow=worker_flow,
             **_worker_log_fields(result),
         )
         issue_span.set_attribute("issue.final_linear_state", effective_state)

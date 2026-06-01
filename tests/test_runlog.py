@@ -108,6 +108,7 @@ def test_append_entry_persists_two_entries_in_order_with_required_fields(
         "num_turns",
         "session_id",
         "is_error",
+        "flow",
     }
     assert set(first.keys()) == required_keys
     assert set(second.keys()) == required_keys
@@ -230,3 +231,34 @@ def test_two_runlogs_same_cycle_id_write_to_distinct_files(
     # Both files share the cycle_id, so a downstream merger can group
     # them without reading the filename.
     assert first_payload["cycle_id"] == second_payload["cycle_id"] == "re-run-cycle"
+
+
+def test_flow_field_round_trips(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``flow`` is persisted verbatim: ``"verify"`` survives, absent → null."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    log = runlog.RunLog(cycle_id="flow-cycle")
+    log.append_entry(
+        issue_identifier="ABA-V",
+        started_at="2026-05-22T10:00:00+00:00",
+        finished_at="2026-05-22T10:05:00+00:00",
+        exit_code=0,
+        final_linear_state="Done",
+        worktree_path="/tmp/repo/.worktrees/ABA-V",
+        flow="verify",
+    )
+    log.append_entry(
+        issue_identifier="ABA-W",
+        started_at="2026-05-22T10:05:00+00:00",
+        finished_at="2026-05-22T10:10:00+00:00",
+        exit_code=0,
+        final_linear_state="Done",
+        worktree_path="/tmp/repo/.worktrees/ABA-W",
+    )
+
+    payload = json.loads(log.path.read_text())
+    verify_entry, plain_entry = payload["entries"]
+    assert verify_entry["flow"] == "verify"
+    assert plain_entry["flow"] is None

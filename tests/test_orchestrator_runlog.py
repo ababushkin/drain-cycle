@@ -133,6 +133,7 @@ def test_orchestrator_writes_runlog_with_one_entry_per_successful_issue(
         "num_turns",
         "session_id",
         "is_error",
+        "flow",
     }
     for entry in payload["entries"]:
         assert set(entry.keys()) == required_keys
@@ -147,6 +148,8 @@ def test_orchestrator_writes_runlog_with_one_entry_per_successful_issue(
         assert start <= finish
         # Worktree path is recorded as the absolute path the orchestrator used.
         assert entry["worktree_path"] == str(repo / ".worktrees" / entry["issue_identifier"])
+        # Issues have no verify label → flow is null.
+        assert entry["flow"] is None
 
 
 def test_runlog_done_entry_carries_worker_usage_from_stream(
@@ -208,6 +211,71 @@ def test_runlog_done_entry_carries_worker_usage_from_stream(
     # Per-invocation aggregates roll up the single entry.
     assert payload["cycle_cost_usd"] == 0.42
     assert payload["cycle_tokens_cumulative"] == 439
+
+
+def test_verify_labelled_issue_produces_flow_verify_in_runlog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End-to-end: an issue with the ``verify`` label writes ``flow: 'verify'``
+    to its run-log entry; an issue without the label writes ``flow: null``."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    verify_issue = {
+        "id": "id-ABA-V",
+        "identifier": "ABA-V",
+        "title": "Verify issue",
+        "description": "",
+        "sortOrder": 1.0,
+        "state": {"type": "unstarted", "name": "Todo"},
+        "labels": ["repo:test-repo", "verify"],
+    }
+    plain_issue = {
+        "id": "id-ABA-P",
+        "identifier": "ABA-P",
+        "title": "Plain issue",
+        "description": "",
+        "sortOrder": 2.0,
+        "state": {"type": "unstarted", "name": "Todo"},
+        "labels": ["repo:test-repo"],
+    }
+    raw_issues = [verify_issue, plain_issue]
+    issues_by_id = {i["id"]: i for i in raw_issues}
+    done_marker = tmp_path / "done-identifiers.txt"
+
+    def fake_pending_issues(cycle_id: str):
+        completed = _completed_identifiers(done_marker)
+        return linear._plan(
+            [i for i in raw_issues if i["identifier"] not in completed]
+        )
+
+    def fake_get_issue(issue_id: str) -> dict:
+        issue = issues_by_id[issue_id]
+        if issue["identifier"] in _completed_identifiers(done_marker):
+            return {**issue, "state": {"type": "completed", "name": "Done"}}
+        return issue
+
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "flow-cycle")
+    monkeypatch.setattr(linear, "pending_issues", fake_pending_issues)
+    monkeypatch.setattr(linear, "get_issue", fake_get_issue)
+    monkeypatch.setattr(linear, "set_state", lambda issue_id, state_name: None)
+
+    fake_claude = _write_fake_claude_script(tmp_path, done_marker)
+    monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
+
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}))
+    assert exit_code == 0
+
+    runs_dir = tmp_path / ".drain-cycle" / "runs"
+    payload = json.loads(next(runs_dir.glob("flow-cycle-*.json")).read_text())
+    v_entry, p_entry = payload["entries"]
+    assert v_entry["issue_identifier"] == "ABA-V"
+    assert v_entry["flow"] == "verify"
+    assert p_entry["issue_identifier"] == "ABA-P"
+    assert p_entry["flow"] is None
 
 
 def _completed_identifiers(marker: Path) -> set[str]:

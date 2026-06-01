@@ -46,6 +46,7 @@ Schema:
           "num_turns":          null | <int>,
           "session_id":         null | "<uuid>",
           "is_error":           null | <bool>,
+          "flow":               null | "verify",
         },
         ...
       ],
@@ -161,6 +162,7 @@ class RunLog:
         num_turns: int | None = None,
         session_id: str | None = None,
         is_error: bool | None = None,
+        flow: str | None = None,
     ) -> None:
         if duration_seconds is None:
             duration_seconds = (
@@ -183,6 +185,7 @@ class RunLog:
                 "num_turns": num_turns,
                 "session_id": session_id,
                 "is_error": is_error,
+                "flow": flow,
             }
         )
         self._persist()
