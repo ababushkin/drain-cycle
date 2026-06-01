@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "8fc6f7840289",
+  "strategy": "manual-commit",
+  "branch": "ABA-302",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "conftest.py",
+    "drain_cycle/graphite.py",
+    "drain_cycle/handoff.py",
+    "drain_cycle/orchestrator.py",
+    "tests/test_orchestrator_graphite.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/8f/c6f7840289/0/metadata.json",
+      "transcript": "/8f/c6f7840289/0/full.jsonl",
+      "content_hash": "/8f/c6f7840289/0/content_hash.txt",
+      "prompt": "/8f/c6f7840289/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 82,
+    "cache_creation_tokens": 138039,
+    "cache_read_tokens": 9181611,
+    "output_tokens": 49208,
+    "api_call_count": 75
+  }
+}

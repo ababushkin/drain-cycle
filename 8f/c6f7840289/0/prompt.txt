@@ -1,0 +1,45 @@
+# Assemble one stacked PR per repo and flag what needs review
+
+**Depends on:** [ABA-301](https://linear.app/ababushkin/issue/ABA-301/make-worktrees-stack-ready-and-add-the-agent-handoff-file). The core of the feature; blocks the override and docs tickets.
+
+## What
+
+After an issue reaches Done, the orchestrator adopts its branch into the per-repo Graphite stack, opens the PR, and labels it `review:high` when the agent's code review found Critical or Required findings **or** the issue carries a `review:high` Linear label.
+
+## Why
+
+This is the payoff: the operator opens Graphite and sees one stack per repo, in the order they planned (drag-order + topological sort), with the riskiest PRs flagged for attention first. The orchestrator owns this step because it alone holds the global review order — each agent sees only its own issue.
+
+## How (mechanical)
+
+* Use the command sequence proven in [ABA-300](https://linear.app/ababushkin/issue/ABA-300/spike-prove-the-graphite-pr-stacking-sequence-gate).
+* Add `drain_cycle/graphite.py`, mirroring `worktree.py`'s subprocess + telemetry-span style (`drain.graphite.*` spans; reuse the capture-stderr → `RuntimeError` pattern at `drain_cycle/worktree.py:82`): `submit(worktree, parent, body) -> PrInfo(url, number)`.
+* In the `is_done` block of `_drain_one_issue` (`drain_cycle/orchestrator.py:405`), before `worktree.remove`:
+  * read the handoff (`handoff.read`);
+  * `graphite.submit(parent=last_branch_per_repo.get(repo.name) or "main")`;
+  * `review_high = "review:high" in issue["labels"] or findings.critical or findings.required` — `issue["labels"]` already renders the grouped label as `"review:high"` (see `linear._label_name`), so no new Linear query is needed;
+  * apply the GitHub `review:high` label when true;
+  * set `last_branch_per_repo[repo.name] = identifier`.
+* A `gt`/`gh` failure halts the cycle (stop-the-line): write stderr + the run-log, exit non-zero, leave the worktree for recovery — the next issue would otherwise chain onto an uncertain push state.
+
+## Acceptance criteria
+
+- [ ] For two same-repo issues, `graphite.submit` receives parent `main` then issue-1's branch — the stack chains in review order. (orchestrator test, subprocess mocked)
+- [ ] `review:high` is applied exactly when the Linear label is present OR findings report Critical/Required, and never otherwise. (parametrized test over all four label × findings combinations)
+- [ ] A simulated `gt submit` failure halts the cycle, records the failure in the run-log, and leaves the worktree on disk. (test)
+- [ ] A live two-issue single-repo drain produces two correctly-ordered stacked PRs in Graphite/GitHub.
+- [ ] `pytest` passes.
+
+---
+
+Execution instructions:
+- Working directory: /Users/anton/src/drain-cycle/.worktrees/ABA-302
+- Base branch: main
+- Completion sequence for issue ABA-302 (run in this order, before marking Done):
+  1. Run `/code-review-and-quality` against the working-tree changes.
+  2. Fix any Critical or Required findings. Lower-severity findings are at your discretion.
+  3. Commit and push to main.
+  4. Post a short review-summary comment on the Linear issue via `mcp__claude_ai_Linear__save_comment` (count of findings by severity, fixed vs deferred).
+  5. Transition issue to Done via `mcp__claude_ai_Linear__save_issue` (state: "Done").
+
+before marking Done: run /code-review-and-quality on the working-tree changes, fix Critical/Required findings, commit + push, then post a review-summary comment on the issue and transition to Done.
