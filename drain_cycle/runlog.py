@@ -51,6 +51,10 @@ Schema:
           "prep_verdict":       null | {"result": "<str>", "route": "human-review"|"auto-merge", "reasoning": "<str>"},
           "responder_runs":     [],
           "shape_task_invoked": null | <bool>,
+          "pr_url":             null | "<https://github.com/…/pull/N>",
+          "pr_number":          null | <int>,
+          "review_high":        null | <bool>,
+          "parent_branch":      null | "<branch-name>",
         },
         ...
       ],
@@ -75,6 +79,14 @@ across turns; ``usage.peak_context`` is the largest single-turn context.
 These fields are additive — ``grade.py`` reads only ``cycle_id`` and
 ``entries[].final_linear_state`` / ``exit_code``, so existing run logs
 without them grade unchanged.
+
+``pr_url``, ``pr_number``, ``review_high``, and ``parent_branch`` are
+also additive: set to ``null`` on entries for which no GitHub PR was
+found (pre-PR workflow, halted issues, or ``gh`` unavailable). When
+present, the orchestrator also posts a comment on the Linear issue with
+the PR link (``linear.add_comment``). ``review_high`` mirrors the
+``review:high`` GitHub label the worker applies when it flags an issue
+for operator attention.
 
 ``cycle_cost_usd`` and ``cycle_tokens_cumulative`` are per-invocation
 totals over ``entries`` (entries with ``null`` cost or usage contribute
@@ -171,6 +183,10 @@ class RunLog:
         prep_verdict: dict[str, Any] | None = None,
         responder_runs: list[dict[str, Any]] | None = None,
         shape_task_invoked: bool | None = None,
+        pr_url: str | None = None,
+        pr_number: int | None = None,
+        review_high: bool | None = None,
+        parent_branch: str | None = None,
     ) -> None:
         if duration_seconds is None:
             duration_seconds = (
@@ -198,6 +214,10 @@ class RunLog:
                 "prep_verdict": prep_verdict,
                 "responder_runs": responder_runs if responder_runs is not None else [],
                 "shape_task_invoked": shape_task_invoked,
+                "pr_url": pr_url,
+                "pr_number": pr_number,
+                "review_high": review_high,
+                "parent_branch": parent_branch,
             }
         )
         self._persist()

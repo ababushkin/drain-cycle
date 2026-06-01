@@ -24,8 +24,10 @@ Linear is authoritative for status. Local task lists are fine for within-session
 
 1. **Review** — Run `/code-review-and-quality` against the working-tree changes.
 2. **Fix** — Address any Critical or Required findings. Lower-severity findings are at the agent's discretion (fix or note in the summary comment).
-3. **Commit + push** — Commit the reviewed version and push to main. (This repo pushes directly to main; PRs only when the owner asks.) An issue isn't Done if work only exists locally.
-4. **Summary comment** — Post a short comment on the Linear issue via `mcp__claude_ai_Linear__save_comment` with the review summary (count of findings by severity, plus what was fixed vs deferred).
+3. **Commit + push** — The path here branches by how the issue is being executed:
+   - **Direct mode** (interactive session, not spawned by drain-cycle): commit the reviewed version and push to main. This repo pushes directly to main; PRs only when the owner asks. An issue isn't Done if work only exists locally.
+   - **Drain mode** (spawned by the drain-cycle orchestrator in a worktree): commit to the issue branch **without pushing** and write `.drain-handoff.json` (PR title, body, findings) — the worker prompt carries the exact steps. The orchestrator assembles the branch into the per-repo Graphite stack, submits the PR, and posts the PR link back to the Linear issue after the issue is confirmed Done — the agent does not run `gt`/`gh` and does not post the PR link itself.
+4. **Summary comment** — Post a short comment on the Linear issue via `mcp__claude_ai_Linear__save_comment` with the review summary (count of findings by severity, plus what was fixed vs deferred). In drain mode the orchestrator appends the PR link as a separate comment; the agent's comment is the review summary only.
 5. **Done** — Transition to Done via `mcp__claude_ai_Linear__save_issue`.
 
 Status updates happen at the moment of state change — not batched at end of session.

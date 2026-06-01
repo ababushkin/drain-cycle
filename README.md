@@ -199,6 +199,15 @@ A key you omit keeps its default; a number overrides it; `null` turns that guard
 
 Every invocation writes one JSON file: `~/.drain-cycle/runs/<cycle-id>-<run-timestamp>.json`. One entry per attempted issue, including timestamps, exit code, final Linear state, worktree path, per-issue token usage and cost, and `halt_reason` on the halting entry. The file also carries per-cycle totals (`cycle_tokens_cumulative`, `cycle_cost_usd`, `cycle_duration_seconds`) and a `cycle_halt_reason` when a cycle-wide cap stopped the run. Use it to gauge how cleanly your runs complete and what they cost — see [`drain_cycle/runlog.py`](drain_cycle/runlog.py) for the schema.
 
+### PR links
+
+When a stack-mode issue reaches Done, the orchestrator assembles its branch into the per-repo Graphite stack and submits the PR itself (the worker only commits and writes `.drain-handoff.json`). On a successful submit it:
+
+- Records `pr_url`, `pr_number`, `review_high`, and `parent_branch` in the run-log entry.
+- Posts a comment on the Linear issue with the PR link (and a `review:high` flag if the PR carries that label).
+
+For push-to-main repos and halted issues the fields are `null` and no comment is posted. A `gt`/`gh` failure during assembly is stop-the-line (the worktree is preserved for recovery); a Linear comment failure is logged and the drain continues. See [`docs/design-decisions.md`](docs/design-decisions.md) §16 and §18.
+
 ### Debug capture
 
 Workers spawn in an isolated worktree. drain-cycle symlinks the repo's project-scoped config (`.claude/`, `.mcp.json`, and any extra paths you configure — see Install) into each worktree, so a worker loads the same settings, hooks, agents, and skills as an interactive session at the repo root, including project-scoped hooks like entire.io's checkpointing. [`docs/design-decisions.md`](docs/design-decisions.md) §10 documents the mechanism.

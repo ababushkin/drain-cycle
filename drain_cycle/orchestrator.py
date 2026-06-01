@@ -724,6 +724,8 @@ def _drain_one_issue(
         if is_done:
             issue_span.set_attribute("issue.final_linear_state", post_spawn_state)
             submitted_pr: graphite.PrInfo | None = None
+            review_high: bool | None = None
+            parent_branch: str | None = None
             if stack and last_branch_per_repo is not None:
                 # Read the agent's handoff and determine PR review priority.
                 hd = handoff.read(worktree_path)
@@ -781,6 +783,20 @@ def _drain_one_issue(
                     print(halt_reason, file=sys.stderr)
                     return 1, pane_id
 
+            # Post the PR link back to the Linear issue. Informational only:
+            # a comment failure never halts the drain.
+            if submitted_pr is not None:
+                comment_lines = [f"PR: {submitted_pr.url}"]
+                if review_high:
+                    comment_lines.append("review:high — flagged for operator review")
+                try:
+                    linear.add_comment(issue["id"], "\n".join(comment_lines))
+                except Exception as exc:
+                    print(
+                        f"drain-cycle: {identifier}: Linear PR comment failed: {exc}",
+                        file=sys.stderr,
+                    )
+
             remove_error: str | None = None
             try:
                 worktree.merge_entire_sessions(worktree_path, target_repo)
@@ -806,6 +822,10 @@ def _drain_one_issue(
                 prep_verdict=prep_verdict,
                 responder_runs=responder_runs,
                 shape_task_invoked=is_verify,
+                pr_url=submitted_pr.url if submitted_pr is not None else None,
+                pr_number=submitted_pr.number if submitted_pr is not None else None,
+                review_high=review_high,
+                parent_branch=parent_branch if submitted_pr is not None else None,
                 **_worker_log_fields(result),
             )
             if outcome_verdict is not None:

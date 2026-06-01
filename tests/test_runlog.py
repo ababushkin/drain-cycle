@@ -113,6 +113,10 @@ def test_append_entry_persists_two_entries_in_order_with_required_fields(
         "prep_verdict",
         "responder_runs",
         "shape_task_invoked",
+        "pr_url",
+        "pr_number",
+        "review_high",
+        "parent_branch",
     }
     assert set(first.keys()) == required_keys
     assert set(second.keys()) == required_keys
@@ -166,6 +170,49 @@ def test_append_entry_persists_two_entries_in_order_with_required_fields(
     # The raw JSON text carries `null` (not "null"), so consumers that
     # treat the string "null" specially are not misled.
     assert '"halt_reason": null' in log.path.read_text()
+
+
+def test_append_entry_pr_fields_round_trip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR fields are recorded verbatim when passed, and default to null."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    log = runlog.RunLog(cycle_id="stub-cycle")
+    log.append_entry(
+        issue_identifier="ABA-X",
+        started_at="2026-05-22T10:00:00+00:00",
+        finished_at="2026-05-22T10:05:00+00:00",
+        exit_code=0,
+        final_linear_state="Done",
+        worktree_path="/tmp/repo/.worktrees/ABA-X",
+        pr_url="https://github.com/owner/repo/pull/42",
+        pr_number=42,
+        review_high=True,
+        parent_branch="main",
+    )
+    log.append_entry(
+        issue_identifier="ABA-Y",
+        started_at="2026-05-22T10:05:00+00:00",
+        finished_at="2026-05-22T10:10:00+00:00",
+        exit_code=1,
+        final_linear_state="Todo",
+        worktree_path="/tmp/repo/.worktrees/ABA-Y",
+    )
+
+    payload = json.loads(log.path.read_text())
+    first, second = payload["entries"]
+
+    assert first["pr_url"] == "https://github.com/owner/repo/pull/42"
+    assert first["pr_number"] == 42
+    assert first["review_high"] is True
+    assert first["parent_branch"] == "main"
+
+    # PR fields default to null when not passed.
+    assert second["pr_url"] is None
+    assert second["pr_number"] is None
+    assert second["review_high"] is None
+    assert second["parent_branch"] is None
 
 
 def test_debug_path_sits_beside_run_log_named_per_issue(

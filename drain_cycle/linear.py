@@ -306,6 +306,23 @@ def set_state(issue_id: str, state_name: str) -> None:
         )
 
 
+def add_comment(issue_id: str, body: str) -> None:
+    """Post a comment on a Linear issue."""
+    data = _post(
+        """
+        mutation CommentCreate($input: CommentCreateInput!) {
+          commentCreate(input: $input) {
+            success
+          }
+        }
+        """,
+        {"input": {"issueId": issue_id, "body": body}},
+        operation="add_comment",
+    )
+    if not data["commentCreate"]["success"]:
+        raise RuntimeError(f"Linear commentCreate failed for issue {issue_id!r}")
+
+
 def _resolve_state_id(state_name: str) -> str:
     data = _post(
         """
