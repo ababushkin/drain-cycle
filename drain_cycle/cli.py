@@ -25,7 +25,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from . import grade, limits, orchestrator, repos, telemetry
+from . import grade, grade_draft, limits, orchestrator, repos, telemetry
 
 _REPO_ENV = Path(__file__).resolve().parent.parent / ".env"
 
@@ -44,9 +44,10 @@ def _load_secrets() -> None:
 
 
 _USAGE = (
-    "usage: drain-cycle [--watch|-w]  drain the current Linear cycle\n"
-    "       drain-cycle grade         print health read from run logs\n"
-    "       drain-cycle status        show status of the active run\n"
+    "usage: drain-cycle [--watch|-w]       drain the current Linear cycle\n"
+    "       drain-cycle grade              print health read from run logs\n"
+    "       drain-cycle grade-draft <issue> write per-ticket grade draft\n"
+    "       drain-cycle status             show status of the active run\n"
     "       drain-cycle --help\n"
     "\n"
     "options:\n"
@@ -89,6 +90,12 @@ def main() -> None:
 
     if remaining == ["grade"] and not watch:
         sys.exit(grade.run(grade.default_runs_dir()))
+    if (
+        len(remaining) == 2
+        and remaining[0] == "grade-draft"
+        and not watch
+    ):
+        sys.exit(grade_draft.run(remaining[1]))
     if remaining == ["status"] and not watch:
         from . import status
         sys.exit(status.run())

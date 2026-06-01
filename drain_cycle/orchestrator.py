@@ -23,7 +23,7 @@ from typing import Callable, TextIO
 
 from opentelemetry.trace import Span
 
-from . import flow, linear, model, progress, prompt, runlog, telemetry, worker, worktree
+from . import flow, grade_draft, linear, model, progress, prompt, runlog, telemetry, worker, worktree
 from .limits import Limits, check_cycle
 from .linear import DependencyCycleError
 from .repos import RepoResolutionError, Repos
@@ -750,6 +750,19 @@ def _drain_one_issue(
                 issue_span.set_attribute("issue.prep_verdict", prep_verdict["result"])
             if flow_name is not None:
                 issue_span.set_attribute("issue.responder_run_count", len(responder_runs))
+            try:
+                draft_path = grade_draft.write_draft_from_entry(
+                    identifier, log.entries[-1]
+                )
+                print(
+                    f"drain-cycle: {identifier}: grade draft → {draft_path}",
+                    file=sys.stderr,
+                )
+            except Exception as exc:
+                print(
+                    f"drain-cycle: {identifier}: grade-draft write failed (non-fatal): {exc}",
+                    file=sys.stderr,
+                )
             if stack:
                 print(f"drain-cycle: {identifier} done; worktree preserved for stack assembly.", file=sys.stderr)
             elif remove_error is None:
