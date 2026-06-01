@@ -340,6 +340,86 @@ def test_ensure_link_project_config_idempotent_on_reuse(tmp_path: Path) -> None:
     assert Path(os.readlink(handle.path / ".claude")) == repo.resolve() / ".claude"
 
 
+def test_add_with_custom_base_forks_off_that_branch(tmp_path: Path) -> None:
+    """``add(repo, identifier, base=branch)`` creates a worktree whose HEAD
+    is the tip of ``branch``, not ``main``."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+
+    # Create a feature branch with an extra commit.
+    subprocess.run(
+        ["git", "checkout", "-b", "feature-base"], cwd=repo, check=True, capture_output=True
+    )
+    (repo / "feature.txt").write_text("feature work\n")
+    subprocess.run(["git", "add", "feature.txt"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "feature commit"], cwd=repo, check=True, capture_output=True
+    )
+    feature_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(
+        ["git", "checkout", "main"], cwd=repo, check=True, capture_output=True
+    )
+
+    wt = worktree.add(repo, "ABA-OFF-FEATURE", base="feature-base")
+
+    # The worktree HEAD should be the tip of feature-base.
+    wt_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=wt,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert wt_sha == feature_sha
+
+
+def test_ensure_with_custom_base_forks_off_that_branch(tmp_path: Path) -> None:
+    """``ensure`` passes the ``base`` through to ``add`` when creating a fresh
+    worktree, so the new branch starts at the given base."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+
+    # Extra commit on a branch we'll use as the base.
+    subprocess.run(
+        ["git", "checkout", "-b", "stack-base"], cwd=repo, check=True, capture_output=True
+    )
+    (repo / "stack.txt").write_text("stack\n")
+    subprocess.run(["git", "add", "stack.txt"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "stack commit"], cwd=repo, check=True, capture_output=True
+    )
+    base_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(
+        ["git", "checkout", "main"], cwd=repo, check=True, capture_output=True
+    )
+
+    handle = worktree.ensure(repo, "ABA-STACK", base="stack-base")
+    assert handle.resumed is False
+
+    wt_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=handle.path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert wt_sha == base_sha
+
+
 def test_remove_preserves_symlink_target(tmp_path: Path) -> None:
     """Removing the worktree deletes the symlink, not the repo's real dir."""
     repo = tmp_path / "repo"

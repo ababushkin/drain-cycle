@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from drain_cycle.prompt import _TAIL, build
+from drain_cycle.prompt import _STACK_TAIL, _TAIL, build
 
 
 def _fixture_issue() -> dict:
@@ -138,3 +138,57 @@ def test_empty_description_does_not_break_rendering(tmp_path: Path) -> None:
         _TAIL,
     )
     assert title_idx < preamble_idx < tail_idx
+
+
+def test_stack_false_is_byte_identical_to_default(tmp_path: Path) -> None:
+    """``stack=False`` (the default) leaves the prompt byte-identical to
+    a call with no ``stack`` kwarg — existing call sites are unaffected."""
+    issue = _fixture_issue()
+    worktree = tmp_path / ".worktrees" / issue["identifier"]
+
+    default = build(issue, worktree)
+    explicit_false = build(issue, worktree, stack=False)
+
+    assert default == explicit_false
+
+
+def test_stack_true_omits_push_and_includes_handoff_instruction(
+    tmp_path: Path,
+) -> None:
+    """``stack=True`` replaces the push-to-main steps with commit-only and
+    handoff-file instructions, and uses the stack tail."""
+    issue = _fixture_issue()
+    worktree = tmp_path / ".worktrees" / issue["identifier"]
+    rendered = build(issue, worktree, stack=True)
+
+    assert "push to main" not in rendered
+    assert ".drain-handoff.json" in rendered
+    assert "pr_title" in rendered
+    assert "pr_body" in rendered
+    assert "## What" in rendered
+    assert "## Why" in rendered
+    assert "## What to review" in rendered
+
+    # Stack tail is used, not the normal tail.
+    assert _STACK_TAIL in rendered
+    assert _TAIL not in rendered
+
+    # Stack tail is still the last non-empty line.
+    non_empty = [line for line in rendered.splitlines() if line.strip()]
+    assert non_empty[-1] == _STACK_TAIL
+
+
+def test_stack_true_four_segments_in_order(tmp_path: Path) -> None:
+    """Stack prompt still keeps title → body → preamble → tail ordering."""
+    issue = _fixture_issue()
+    worktree = tmp_path / ".worktrees" / issue["identifier"]
+    rendered = build(issue, worktree, stack=True)
+
+    title_idx, body_idx, preamble_idx, tail_idx = _positions(
+        rendered,
+        f"# {issue['title']}",
+        issue["description"],
+        "Execution instructions:",
+        _STACK_TAIL,
+    )
+    assert title_idx < body_idx < preamble_idx < tail_idx

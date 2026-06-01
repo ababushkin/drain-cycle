@@ -256,7 +256,13 @@ def _debug_enabled() -> bool:
     return bool(os.environ.get(_DEBUG_ENV_VAR))
 
 
-def run(repos: Repos, limits: Limits | None = None, *, watch: bool = False) -> int:
+def run(
+    repos: Repos,
+    limits: Limits | None = None,
+    *,
+    watch: bool = False,
+    stack: bool = False,
+) -> int:
     """Drain the current cycle inside the ``drain.cycle`` root span.
 
     The span wrapper is thin so the body keeps its shape; per-issue work nests
@@ -266,10 +272,17 @@ def run(repos: Repos, limits: Limits | None = None, *, watch: bool = False) -> i
     if limits is None:
         limits = Limits()
     with telemetry.tracer.start_as_current_span("drain.cycle") as cycle_span:
-        return _run(repos, limits, cycle_span, watch=watch)
+        return _run(repos, limits, cycle_span, watch=watch, stack=stack)
 
 
-def _run(repos: Repos, limits: Limits, cycle_span: Span, *, watch: bool = False) -> int:
+def _run(
+    repos: Repos,
+    limits: Limits,
+    cycle_span: Span,
+    *,
+    watch: bool = False,
+    stack: bool = False,
+) -> int:
     debug = _debug_enabled()
     cycle_id = linear.current_cycle_id()
     cycle_span.set_attribute("drain.cycle_id", cycle_id)
@@ -307,6 +320,7 @@ def _run(repos: Repos, limits: Limits, cycle_span: Span, *, watch: bool = False)
 
     in_tmux = bool(os.environ.get("TMUX"))
     current_pane_id: str | None = None
+    last_branch_per_repo: dict[str, str] = {}
 
     total = len(plan.order)
     for index, issue in enumerate(plan.order):
@@ -326,6 +340,8 @@ def _run(repos: Repos, limits: Limits, cycle_span: Span, *, watch: bool = False)
             debug=debug,
             watch=watch,
             in_tmux=in_tmux,
+            stack=stack,
+            last_branch_per_repo=last_branch_per_repo,
         )
         if halt_code is not None:
             return halt_code  # type: ignore[return-value]
@@ -364,6 +380,8 @@ def _drain_one_issue(
     debug: bool,
     watch: bool = False,
     in_tmux: bool = False,
+    stack: bool = False,
+    last_branch_per_repo: dict[str, str] | None = None,
 ) -> tuple[int | None, str | None]:
     """Drain a single issue end to end inside a ``drain.issue`` span.
 
@@ -449,8 +467,13 @@ def _drain_one_issue(
                 print(halt_reason, file=sys.stderr)
                 return 1, None
 
+        base = (
+            last_branch_per_repo.get(target_repo.name, worktree.BASE_BRANCH)
+            if stack and last_branch_per_repo is not None
+            else worktree.BASE_BRANCH
+        )
         try:
-            handle = worktree.ensure(target_repo, identifier)
+            handle = worktree.ensure(target_repo, identifier, base)
             worktree_path = handle.path
             # A worktree checks out only tracked files, so gitignored
             # project config (.claude/, .mcp.json) is absent. Symlink it in
@@ -488,7 +511,7 @@ def _drain_one_issue(
             print(halt_reason, file=sys.stderr)
             return 1, None
 
-        agent_prompt = prompt.build(issue, worktree_path, resumed=handle.resumed)
+        agent_prompt = prompt.build(issue, worktree_path, resumed=handle.resumed, stack=stack)
         issue_span.set_attribute("issue.resumed", handle.resumed)
         worker_model = model.resolve(issue)
         issue_span.set_attribute("issue.model", worker_model)
@@ -646,16 +669,19 @@ def _drain_one_issue(
 
         if is_done:
             issue_span.set_attribute("issue.final_linear_state", post_spawn_state)
+            if stack and last_branch_per_repo is not None:
+                last_branch_per_repo[target_repo.name] = identifier
             remove_error: str | None = None
-            try:
-                worktree.remove(target_repo, worktree_path)
-            except RuntimeError as exc:
-                remove_error = str(exc)
-                issue_span.set_attribute("worktree.remove_error", remove_error)
-                print(
-                    f"drain-cycle: {identifier}: worktree teardown failed: {exc}",
-                    file=sys.stderr,
-                )
+            if not stack:
+                try:
+                    worktree.remove(target_repo, worktree_path)
+                except RuntimeError as exc:
+                    remove_error = str(exc)
+                    issue_span.set_attribute("worktree.remove_error", remove_error)
+                    print(
+                        f"drain-cycle: {identifier}: worktree teardown failed: {exc}",
+                        file=sys.stderr,
+                    )
             # Append unconditionally for every attempted issue.
             log.append_entry(
                 issue_identifier=identifier,
@@ -667,7 +693,9 @@ def _drain_one_issue(
                 halt_reason=remove_error,
                 **_worker_log_fields(result),
             )
-            if remove_error is None:
+            if stack:
+                print(f"drain-cycle: {identifier} done; worktree preserved for stack assembly.", file=sys.stderr)
+            elif remove_error is None:
                 print(f"drain-cycle: {identifier} done; worktree removed.", file=sys.stderr)
             return None, pane_id
 

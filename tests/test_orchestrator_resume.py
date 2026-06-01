@@ -204,11 +204,11 @@ def test_resume_reuses_preserved_worktree_and_signals_resumed_prompt(
     build_calls: list[dict] = []
     real_build = prompt.build
 
-    def recording_build(issue_arg, worktree_arg, *, resumed=False):
+    def recording_build(issue_arg, worktree_arg, *, resumed=False, stack=False):
         build_calls.append(
             {"identifier": issue_arg["identifier"], "resumed": resumed}
         )
-        return real_build(issue_arg, worktree_arg, resumed=resumed)
+        return real_build(issue_arg, worktree_arg, resumed=resumed, stack=stack)
 
     monkeypatch.setattr(prompt, "build", recording_build)
 

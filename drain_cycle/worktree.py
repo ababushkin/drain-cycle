@@ -40,8 +40,8 @@ class WorktreeHandle:
     resumed: bool
 
 
-def add(repo: Path, identifier: str) -> Path:
-    """Create a worktree branched off ``main`` for ``identifier``.
+def add(repo: Path, identifier: str, base: str = BASE_BRANCH) -> Path:
+    """Create a worktree branched off ``base`` for ``identifier``.
 
     Returns the absolute path to the new worktree.
     """
@@ -50,14 +50,15 @@ def add(repo: Path, identifier: str) -> Path:
         span.set_attribute("worktree.identifier", identifier)
         span.set_attribute("worktree.repo", repo.name)
         span.set_attribute("worktree.path", str(worktree_path))
+        span.set_attribute("worktree.base", base)
         _run_git(
-            ["worktree", "add", "-b", identifier, str(worktree_path), BASE_BRANCH],
+            ["worktree", "add", "-b", identifier, str(worktree_path), base],
             cwd=repo,
         )
     return worktree_path
 
 
-def ensure(repo: Path, identifier: str) -> WorktreeHandle:
+def ensure(repo: Path, identifier: str, base: str = BASE_BRANCH) -> WorktreeHandle:
     """Reuse a preserved worktree if one is already registered, else add.
 
     A worktree registered at ``repo/.worktrees/<identifier>`` is reused
@@ -77,7 +78,7 @@ def ensure(repo: Path, identifier: str) -> WorktreeHandle:
             span.set_attribute("worktree.resumed", True)
             return WorktreeHandle(path=worktree_path, resumed=True)
         span.set_attribute("worktree.resumed", False)
-    return WorktreeHandle(path=add(repo, identifier), resumed=False)
+    return WorktreeHandle(path=add(repo, identifier, base), resumed=False)
 
 
 def link_project_config(

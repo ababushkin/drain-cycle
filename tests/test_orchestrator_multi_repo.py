@@ -130,6 +130,107 @@ def _lines(path: Path) -> list[str]:
     return [line for line in path.read_text().splitlines() if line]
 
 
+def _write_committing_claude(tmp_path: Path, marker: Path) -> Path:
+    """Fake ``claude -p`` that makes a git commit in its worktree and records
+    its identifier so ``fake_get_issue`` can mark it Done."""
+    script = tmp_path / "fake-claude-commit.sh"
+    script.write_text(
+        "#!/bin/sh\n"
+        'id="$(basename "$PWD")"\n'
+        'git config user.email "test@example.com"\n'
+        'git config user.name "Test"\n'
+        'echo "work" > work.txt\n'
+        "git add work.txt\n"
+        'git commit -m "work for $id"\n'
+        f'printf "%s\\n" "$id" >> "{marker}"\n'
+    )
+    script.chmod(0o755)
+    return script
+
+
+def _git_log_hashes(path: Path) -> list[str]:
+    """Return commit hashes reachable from HEAD in ``path``."""
+    result = subprocess.run(
+        ["git", "log", "--format=%H"],
+        cwd=path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip().splitlines()
+
+
+def test_stack_mode_chains_same_repo_issues_and_forks_different_repo_off_main(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """In stack mode, same-repo issues chain: issue 2's worktree contains
+    issue 1's commit in its history. A different-repo issue still forks
+    off main and has no cross-repo commits."""
+    repo_a = tmp_path / "repo-a"
+    repo_b = tmp_path / "repo-b"
+    repo_a.mkdir()
+    repo_b.mkdir()
+    _init_repo(repo_a)
+    _init_repo(repo_b)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    # Two issues in repo-a, one in repo-b. sort_order drives execution order.
+    first = _issue("ABA-1", repo_name="alpha", sort_order=1.0)
+    second = _issue("ABA-2", repo_name="alpha", sort_order=2.0)
+    other = _issue("ABA-3", repo_name="beta", sort_order=3.0)
+    raw_issues = [first, second, other]
+    issues_by_id = {i["id"]: i for i in raw_issues}
+    marker = tmp_path / "done.txt"
+
+    def fake_pending_issues(cycle_id: str):
+        completed = {line for line in _lines(marker)}
+        return linear._plan(
+            [i for i in raw_issues if i["identifier"] not in completed]
+        )
+
+    def fake_get_issue(issue_id: str) -> dict:
+        identifier = issues_by_id[issue_id]["identifier"]
+        completed = {line for line in _lines(marker)}
+        if identifier in completed:
+            return {
+                **issues_by_id[issue_id],
+                "state": {"type": "completed", "name": "Done"},
+            }
+        return issues_by_id[issue_id]
+
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "cycle-id")
+    monkeypatch.setattr(linear, "pending_issues", fake_pending_issues)
+    monkeypatch.setattr(linear, "get_issue", fake_get_issue)
+    monkeypatch.setattr(linear, "set_state", lambda issue_id, name: None)
+
+    fake_claude = _write_committing_claude(tmp_path, marker)
+    monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
+
+    exit_code = orchestrator.run(
+        repos.Repos(mapping={"alpha": repo_a, "beta": repo_b}),
+        stack=True,
+    )
+    assert exit_code == 0
+
+    # Worktrees are preserved in stack mode.
+    wt_1 = repo_a / ".worktrees" / "ABA-1"
+    wt_2 = repo_a / ".worktrees" / "ABA-2"
+    wt_3 = repo_b / ".worktrees" / "ABA-3"
+    assert wt_1.is_dir()
+    assert wt_2.is_dir()
+    assert wt_3.is_dir()
+
+    hashes_1 = _git_log_hashes(wt_1)
+    hashes_2 = _git_log_hashes(wt_2)
+    hashes_3 = _git_log_hashes(wt_3)
+
+    # ABA-1's tip commit appears in ABA-2's history (chain).
+    assert hashes_1[0] in hashes_2
+
+    # ABA-3 (different repo) does not contain ABA-1's commit.
+    assert hashes_1[0] not in hashes_3
+
+
 # ---------------------------------------------------------------------------
 # Resolution-halt path. One parametrised test per error variant.
 # ---------------------------------------------------------------------------
