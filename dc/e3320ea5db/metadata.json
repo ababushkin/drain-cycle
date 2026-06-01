@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "dce3320ea5db",
+  "strategy": "manual-commit",
+  "branch": "ABA-304",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "AGENTS.md",
+    "README.md",
+    "docs/design-decisions.md",
+    "drain_cycle/linear.py",
+    "drain_cycle/orchestrator.py",
+    "drain_cycle/runlog.py",
+    "tests/test_orchestrator_halt.py",
+    "tests/test_orchestrator_runlog.py",
+    "tests/test_runlog.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/dc/e3320ea5db/0/metadata.json",
+      "transcript": "/dc/e3320ea5db/0/full.jsonl",
+      "content_hash": "/dc/e3320ea5db/0/content_hash.txt",
+      "prompt": "/dc/e3320ea5db/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 65,
+    "cache_creation_tokens": 116654,
+    "cache_read_tokens": 6618194,
+    "output_tokens": 34102,
+    "api_call_count": 62
+  }
+}
