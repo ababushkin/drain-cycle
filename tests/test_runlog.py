@@ -108,9 +108,19 @@ def test_append_entry_persists_two_entries_in_order_with_required_fields(
         "num_turns",
         "session_id",
         "is_error",
+        "outcome_verdict",
+        "prep_verdict",
+        "responder_runs",
     }
     assert set(first.keys()) == required_keys
     assert set(second.keys()) == required_keys
+
+    # Write targets for future verifier/preparer/responder roles: present but
+    # unpopulated until those roles are wired.
+    for entry in (first, second):
+        assert entry["outcome_verdict"] is None
+        assert entry["prep_verdict"] is None
+        assert entry["responder_runs"] == []
 
     # Worker fields round-trip on the entry that carried them.
     assert first["model"] == "claude-opus-4-7"

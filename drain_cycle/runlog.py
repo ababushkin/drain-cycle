@@ -46,6 +46,24 @@ Schema:
           "num_turns":          null | <int>,
           "session_id":         null | "<uuid>",
           "is_error":           null | <bool>,
+          "outcome_verdict":    null | {
+            "result":    "pass" | "fail",
+            "findings":  [...],
+            "invoked_at": "<iso-8601 UTC>",
+          },
+          "prep_verdict":       null | {
+            "result":    "<string>",
+            "route":     "<string>",
+            "reasoning": "<string>",
+          },
+          "responder_runs":     [
+            {
+              "comment_ids": [...],
+              "invoked_at":  "<iso-8601 UTC>",
+              "result":      "<string>",
+            },
+            ...
+          ],
         },
         ...
       ],
@@ -183,6 +201,9 @@ class RunLog:
                 "num_turns": num_turns,
                 "session_id": session_id,
                 "is_error": is_error,
+                "outcome_verdict": None,
+                "prep_verdict": None,
+                "responder_runs": [],
             }
         )
         self._persist()
