@@ -12,6 +12,32 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+_VERIFY_FLOW_LABEL = "verify"
+
+
+def is_verify_flow(issue: dict[str, Any]) -> bool:
+    """Return True when the issue carries the ``verify`` label."""
+    return _VERIFY_FLOW_LABEL in issue.get("labels", [])
+
+
+def _shape_task_directive(identifier: str) -> str:
+    """Shape-task preamble for verify-flow worker sessions.
+
+    Instructs the worker to check for an existing Task Shaper output
+    block in the Linear issue body before invoking ``/shape:task``. The
+    check-first approach handles both fresh sessions (block absent →
+    invoke) and §14 resumes (block present → reuse).
+    """
+    return (
+        f"Shaping step (run before implementing): fetch the Linear issue body "
+        f"for {identifier} and check for a Task Shaper output block "
+        "(delimited by `<!-- TASK-SHAPER-START -->` and `<!-- TASK-SHAPER-END -->`). "
+        "If the block is present, use it as your implementation guide and skip "
+        "re-running `/shape:task`. If the block is absent, run "
+        f"`/shape:task {identifier}` first and use its output as your "
+        "implementation guide.\n\n"
+    )
+
 
 _TAIL = (
     "before marking Done: run /code-review-and-quality on the working-tree "
@@ -44,10 +70,13 @@ def _resume_directive(identifier: str) -> str:
     )
 
 
-def _normal_preamble(identifier: str, worktree: Path, resume_segment: str) -> str:
+def _normal_preamble(
+    identifier: str, worktree: Path, resume_segment: str, shape_task_segment: str
+) -> str:
     return (
         "---\n\n"
         f"{resume_segment}"
+        f"{shape_task_segment}"
         "Execution instructions:\n"
         f"- Working directory: {worktree}\n"
         "- Base branch: main\n"
@@ -65,10 +94,13 @@ def _normal_preamble(identifier: str, worktree: Path, resume_segment: str) -> st
     )
 
 
-def _stack_preamble(identifier: str, worktree: Path, resume_segment: str) -> str:
+def _stack_preamble(
+    identifier: str, worktree: Path, resume_segment: str, shape_task_segment: str
+) -> str:
     return (
         "---\n\n"
         f"{resume_segment}"
+        f"{shape_task_segment}"
         "Execution instructions:\n"
         f"- Working directory: {worktree}\n"
         "- Base branch: main\n"
@@ -104,12 +136,13 @@ def build(
     identifier = issue.get("identifier", "")
 
     resume_segment = _resume_directive(identifier) if resumed else ""
+    shape_task_segment = _shape_task_directive(identifier) if is_verify_flow(issue) else ""
 
     if stack:
-        preamble = _stack_preamble(identifier, worktree, resume_segment)
+        preamble = _stack_preamble(identifier, worktree, resume_segment, shape_task_segment)
         tail = _STACK_TAIL
     else:
-        preamble = _normal_preamble(identifier, worktree, resume_segment)
+        preamble = _normal_preamble(identifier, worktree, resume_segment, shape_task_segment)
         tail = _TAIL
 
     return (

@@ -429,6 +429,8 @@ def _drain_one_issue(
             issue_span.set_attribute("issue.responder_run_count", 0)
 
         started_at = _now_iso()
+        is_verify = prompt.is_verify_flow(issue)
+        issue_span.set_attribute("issue.verify_flow", is_verify)
         try:
             target_repo = repos.resolve(issue)
         except RepoResolutionError as exc:
@@ -449,6 +451,7 @@ def _drain_one_issue(
                 worktree_path=_UNRESOLVED_WORKTREE_DISPLAY,
                 halt_reason=halt_reason,
                 flow=flow_name,
+                shape_task_invoked=is_verify,
             )
             issue_span.set_attribute("issue.final_linear_state", state_name)
             telemetry.mark_error(issue_span, "err-repo-resolution", halt_reason)
@@ -491,6 +494,7 @@ def _drain_one_issue(
                     worktree_path=str(planned_path),
                     halt_reason=halt_reason,
                     flow=flow_name,
+                    shape_task_invoked=is_verify,
                 )
                 issue_span.set_attribute("issue.final_linear_state", state_name)
                 issue_span.set_attribute("issue.resumed", True)
@@ -537,6 +541,7 @@ def _drain_one_issue(
                 worktree_path=str(planned_path),
                 halt_reason=halt_reason,
                 flow=flow_name,
+                shape_task_invoked=is_verify,
             )
             issue_span.set_attribute("issue.final_linear_state", state_name)
             telemetry.mark_error(issue_span, "err-setup-failed", halt_reason)
@@ -694,6 +699,7 @@ def _drain_one_issue(
                 outcome_verdict=outcome_verdict,
                 prep_verdict=prep_verdict,
                 responder_runs=responder_runs,
+                shape_task_invoked=is_verify,
                 **_worker_log_fields(result),
             )
             issue_span.set_attribute("issue.exit_code", result.exit_code)
@@ -742,6 +748,7 @@ def _drain_one_issue(
                 outcome_verdict=outcome_verdict,
                 prep_verdict=prep_verdict,
                 responder_runs=responder_runs,
+                shape_task_invoked=is_verify,
                 **_worker_log_fields(result),
             )
             if outcome_verdict is not None:
@@ -796,6 +803,7 @@ def _drain_one_issue(
             outcome_verdict=outcome_verdict,
             prep_verdict=prep_verdict,
             responder_runs=responder_runs,
+            shape_task_invoked=is_verify,
             **_worker_log_fields(result),
         )
         issue_span.set_attribute("issue.final_linear_state", effective_state)

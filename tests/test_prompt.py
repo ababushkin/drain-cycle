@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from drain_cycle.prompt import _STACK_TAIL, _TAIL, build
+from drain_cycle.prompt import _STACK_TAIL, _TAIL, build, is_verify_flow
 
 
 def _fixture_issue() -> dict:
@@ -176,6 +176,80 @@ def test_stack_true_omits_push_and_includes_handoff_instruction(
     # Stack tail is still the last non-empty line.
     non_empty = [line for line in rendered.splitlines() if line.strip()]
     assert non_empty[-1] == _STACK_TAIL
+
+
+def test_verify_flow_detection(tmp_path: Path) -> None:
+    """``is_verify_flow`` returns True only when the issue carries the ``verify`` label."""
+    issue = _fixture_issue()
+    assert not is_verify_flow(issue)
+
+    issue["labels"] = ["verify"]
+    assert is_verify_flow(issue)
+
+    issue["labels"] = ["repo:my-repo", "verify", "model:sonnet"]
+    assert is_verify_flow(issue)
+
+    issue["labels"] = ["repo:my-repo", "model:sonnet"]
+    assert not is_verify_flow(issue)
+
+    issue["labels"] = []
+    assert not is_verify_flow(issue)
+
+
+def test_verify_flow_prompt_includes_shape_task_directive(tmp_path: Path) -> None:
+    """A verify-labelled issue gets a shaping-step segment that precedes
+    the execution instructions and names the issue identifier."""
+    issue = {**_fixture_issue(), "labels": ["verify"]}
+    worktree = tmp_path / ".worktrees" / issue["identifier"]
+    rendered = build(issue, worktree)
+
+    # Shape-task segment is present and references the identifier.
+    assert "/shape:task" in rendered
+    assert issue["identifier"] in rendered
+    assert "TASK-SHAPER-START" in rendered
+
+    # Segment appears before "Execution instructions:" and tail stays last.
+    shape_idx, exec_idx, tail_idx = _positions(
+        rendered,
+        "Shaping step",
+        "Execution instructions:",
+        _TAIL,
+    )
+    assert shape_idx < exec_idx < tail_idx
+
+    non_empty = [line for line in rendered.splitlines() if line.strip()]
+    assert non_empty[-1] == _TAIL
+
+
+def test_non_verify_flow_prompt_omits_shape_task_directive(tmp_path: Path) -> None:
+    """Issues without the ``verify`` label must not include the shaping step."""
+    issue = _fixture_issue()
+    worktree = tmp_path / ".worktrees" / issue["identifier"]
+    rendered = build(issue, worktree)
+
+    assert "/shape:task" not in rendered
+    assert "Shaping step" not in rendered
+    assert "TASK-SHAPER-START" not in rendered
+
+
+def test_verify_flow_resumed_prompt_ordering(tmp_path: Path) -> None:
+    """Resumed verify-flow prompt: resume directive < shape-task directive <
+    execution instructions < tail."""
+    issue = {**_fixture_issue(), "labels": ["verify"]}
+    worktree = tmp_path / ".worktrees" / issue["identifier"]
+    rendered = build(issue, worktree, resumed=True)
+
+    resume_idx, shape_idx, exec_idx, tail_idx = _positions(
+        rendered,
+        "Resuming issue",
+        "Shaping step",
+        "Execution instructions:",
+        _TAIL,
+    )
+    assert resume_idx < shape_idx < exec_idx < tail_idx
+
+    non_empty = [line for line in rendered.splitlines() if line.strip()]
+    assert non_empty[-1] == _TAIL
 
 
 def test_stack_true_four_segments_in_order(tmp_path: Path) -> None:

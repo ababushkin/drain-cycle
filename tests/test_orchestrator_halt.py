@@ -236,6 +236,7 @@ def test_orchestrator_runlog_records_halted_issue_with_non_done_state(
         "outcome_verdict",
         "prep_verdict",
         "responder_runs",
+        "shape_task_invoked",
     }
     assert set(entry.keys()) == required_keys
     assert entry["issue_identifier"] == first["identifier"]
