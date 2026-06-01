@@ -1,0 +1,51 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "b1a67470d011",
+  "session_id": "c18cf498-dfc9-45cc-a095-8cbd8afeeedb",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-01T05:53:04.639771Z",
+  "branch": "ABA-301",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/worktree.py",
+    "drain_cycle/handoff.py",
+    "drain_cycle/prompt.py",
+    "drain_cycle/orchestrator.py",
+    "tests/test_prompt.py",
+    "tests/test_handoff.py",
+    "tests/test_orchestrator_multi_repo.py",
+    "tests/test_worktree.py",
+    "tests/test_orchestrator_resume.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "3564e8e29055",
+  "token_usage": {
+    "input_tokens": 67,
+    "cache_creation_tokens": 97709,
+    "cache_read_tokens": 5051920,
+    "output_tokens": 29224,
+    "api_call_count": 62
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-01T05:53:04.621554Z",
+    "agent_lines": 485,
+    "agent_removed": 32,
+    "human_added": 65,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 550,
+    "total_lines_changed": 582,
+    "agent_percentage": 88.8316151202749,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}

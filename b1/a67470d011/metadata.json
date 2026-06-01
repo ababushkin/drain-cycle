@@ -5,7 +5,15 @@
   "branch": "ABA-301",
   "checkpoints_count": 0,
   "files_touched": [
-    "drain_cycle/worktree.py"
+    "drain_cycle/handoff.py",
+    "drain_cycle/orchestrator.py",
+    "drain_cycle/prompt.py",
+    "drain_cycle/worktree.py",
+    "tests/test_handoff.py",
+    "tests/test_orchestrator_multi_repo.py",
+    "tests/test_orchestrator_resume.py",
+    "tests/test_prompt.py",
+    "tests/test_worktree.py"
   ],
   "sessions": [
     {
@@ -13,13 +21,19 @@
       "transcript": "/b1/a67470d011/0/full.jsonl",
       "content_hash": "/b1/a67470d011/0/content_hash.txt",
       "prompt": "/b1/a67470d011/0/prompt.txt"
+    },
+    {
+      "metadata": "/b1/a67470d011/1/metadata.json",
+      "transcript": "/b1/a67470d011/1/full.jsonl",
+      "content_hash": "/b1/a67470d011/1/content_hash.txt",
+      "prompt": "/b1/a67470d011/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 7807,
-    "cache_creation_tokens": 122444,
-    "cache_read_tokens": 4939982,
-    "output_tokens": 26441,
-    "api_call_count": 51
+    "input_tokens": 7874,
+    "cache_creation_tokens": 220153,
+    "cache_read_tokens": 9991902,
+    "output_tokens": 55665,
+    "api_call_count": 113
   }
 }
