@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "e639a706e9bc",
+  "strategy": "manual-commit",
+  "branch": "ABA-327",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/orchestrator.py",
+    "drain_cycle/prompt.py",
+    "drain_cycle/runlog.py",
+    "tests/test_orchestrator_halt.py",
+    "tests/test_orchestrator_runlog.py",
+    "tests/test_prompt.py",
+    "tests/test_runlog.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/e6/39a706e9bc/0/metadata.json",
+      "transcript": "/e6/39a706e9bc/0/full.jsonl",
+      "content_hash": "/e6/39a706e9bc/0/content_hash.txt",
+      "prompt": "/e6/39a706e9bc/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 52,
+    "cache_creation_tokens": 93852,
+    "cache_read_tokens": 3991009,
+    "output_tokens": 27207,
+    "api_call_count": 47
+  }
+}

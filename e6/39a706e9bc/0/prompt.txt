@@ -1,0 +1,43 @@
+# Worker session invokes `/shape:task` before implementation on `verify`-flow tickets
+
+## What
+
+The drain-cycle worker session for `verify`-flow tickets invokes `/shape:task` as the first step before any implementation begins, and includes the Task Shaper output in the implementer's prompt context.
+
+## Why
+
+Without this wiring, the Task Shaper skill exists but is never invoked by the worker — the role doesn't participate in the drain flow and the AC enrichment never reaches the implementer.
+
+## Assumptions
+
+* The worker session can prepend a shaping step before handing off to the implementer.
+* The Task Shaper output format is stable (the `/shape:task` skill issue is done first).
+* Non-verify-flow drains are unchanged.
+* On a §14 resume, the worker checks the Linear issue body for an existing Task Shaper output block; if found, it uses that block as context and skips re-invoking `/shape:task`. This is the mechanism that makes [ABA-326](https://linear.app/ababushkin/issue/ABA-326/task-shaper-output-written-to-linear-issue-body-for-durable-context)'s dual-write the durable artefact. See design decision §17.
+
+## Key Risks
+
+* The shaping step adds latency and token cost per ticket; if material, `limits.yml` overrides may be needed (addressed in M5).
+* If `/shape:task` surfaces irresolvable AC gaps, the skill flags them and returns (it does not hang or halt the worker). The worker passes the flagged gaps through to the implementer's context — the implementer proceeds with explicit awareness of the gaps rather than silently.
+
+## Definition of Done
+
+* A `verify`-labelled drain invokes `/shape:task` before the implementer begins.
+* The implementer's prompt context includes the Task Shaper output.
+* A non-verify-flow drain does not invoke `/shape:task`.
+* The run-log entry includes evidence that the shaping step ran.
+* A resumed verify-flow drain (§14) skips the `/shape:task` invocation if a Task Shaper output block already exists in the Linear issue body, and uses the existing block as implementer context.
+
+---
+
+Execution instructions:
+- Working directory: /Users/anton/src/drain-cycle/.worktrees/ABA-327
+- Base branch: main
+- Completion sequence for issue ABA-327 (run in this order, before marking Done):
+  1. Run `/code-review-and-quality` against the working-tree changes.
+  2. Fix any Critical or Required findings. Lower-severity findings are at your discretion.
+  3. Commit and push to main.
+  4. Post a short review-summary comment on the Linear issue via `mcp__claude_ai_Linear__save_comment` (count of findings by severity, fixed vs deferred).
+  5. Transition issue to Done via `mcp__claude_ai_Linear__save_issue` (state: "Done").
+
+before marking Done: run /code-review-and-quality on the working-tree changes, fix Critical/Required findings, commit + push, then post a review-summary comment on the issue and transition to Done.
