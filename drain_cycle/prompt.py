@@ -20,10 +20,10 @@ _TAIL = (
 )
 
 _STACK_TAIL = (
-    "before finishing: run /code-review-and-quality on the working-tree "
+    "before marking Done: run /code-review-and-quality on the working-tree "
     "changes, fix Critical/Required findings, commit to the issue branch "
-    "without pushing, then write .drain-handoff.json with the PR body and "
-    "review findings."
+    "without pushing, write .drain-handoff.json, then post a review-summary "
+    "comment on the issue and transition to Done."
 )
 
 
@@ -72,7 +72,8 @@ def _stack_preamble(identifier: str, worktree: Path, resume_segment: str) -> str
         "Execution instructions:\n"
         f"- Working directory: {worktree}\n"
         "- Base branch: main\n"
-        f"- Completion sequence for issue {identifier} (run in this order):\n"
+        f"- Completion sequence for issue {identifier} (run in this order, "
+        "before marking Done):\n"
         "  1. Run `/code-review-and-quality` against the working-tree changes.\n"
         "  2. Fix any Critical or Required findings. Lower-severity findings "
         "are at your discretion.\n"
@@ -83,6 +84,11 @@ def _stack_preamble(identifier: str, worktree: Path, resume_segment: str) -> str
         "sections\n"
         '     - `findings`: `{"critical": N, "required": N}` counts from the '
         "review\n"
+        "  5. Post a short review-summary comment on the Linear issue via "
+        "`mcp__claude_ai_Linear__save_comment` (count of findings by severity, "
+        "fixed vs deferred).\n"
+        "  6. Transition issue to Done via `mcp__claude_ai_Linear__save_issue` "
+        '(state: "Done").\n'
     )
 
 
