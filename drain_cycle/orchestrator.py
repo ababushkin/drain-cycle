@@ -23,7 +23,7 @@ from typing import Callable, TextIO
 
 from opentelemetry.trace import Span
 
-from . import flow, grade_draft, linear, model, progress, prompt, runlog, telemetry, worker, worktree
+from . import flow, grade_draft, graphite, handoff, linear, model, progress, prompt, runlog, telemetry, worker, worktree
 from .limits import Limits, check_cycle
 from .linear import DependencyCycleError
 from .repos import RepoResolutionError, Repos
@@ -722,20 +722,75 @@ def _drain_one_issue(
 
         if is_done:
             issue_span.set_attribute("issue.final_linear_state", post_spawn_state)
+            submitted_pr: graphite.PrInfo | None = None
             if stack and last_branch_per_repo is not None:
-                last_branch_per_repo[target_repo.name] = identifier
-            remove_error: str | None = None
-            if not stack:
+                # Read the agent's handoff and determine PR review priority.
+                hd = handoff.read(worktree_path)
+                findings = hd.findings if hd is not None else {}
+                review_high = (
+                    "review:high" in issue["labels"]
+                    or bool(findings.get("critical"))
+                    or bool(findings.get("required"))
+                )
+
+                # Assemble into the per-repo Graphite stack. Any gt/gh failure is
+                # stop-the-line: the next issue would otherwise chain onto an
+                # uncertain push state. Leave the worktree on disk for recovery.
+                parent_branch = (
+                    last_branch_per_repo.get(target_repo.name) or worktree.BASE_BRANCH
+                )
+                graphite_error: str | None = None
                 try:
-                    worktree.merge_entire_sessions(worktree_path, target_repo)
-                    worktree.remove(target_repo, worktree_path)
-                except RuntimeError as exc:
-                    remove_error = str(exc)
-                    issue_span.set_attribute("worktree.remove_error", remove_error)
-                    print(
-                        f"drain-cycle: {identifier}: worktree teardown failed: {exc}",
-                        file=sys.stderr,
+                    submitted_pr = graphite.submit(
+                        worktree_path,
+                        parent=parent_branch,
+                        title=hd.pr_title if hd is not None else "",
+                        body=hd.pr_body if hd is not None else "",
                     )
+                    if review_high:
+                        graphite.ensure_review_high_label(worktree_path)
+                        graphite.add_label(
+                            submitted_pr.number, "review:high", worktree_path
+                        )
+                    last_branch_per_repo[target_repo.name] = identifier
+                except RuntimeError as exc:
+                    graphite_error = str(exc)
+
+                if graphite_error is not None:
+                    halt_reason = (
+                        f"{_halt_message(identifier, post_spawn_state, worktree_path)}"
+                        f" — graphite: {graphite_error}"
+                    )
+                    log.append_entry(
+                        issue_identifier=identifier,
+                        started_at=started_at,
+                        finished_at=finished_at,
+                        exit_code=result.exit_code,
+                        final_linear_state=post_spawn_state,
+                        worktree_path=str(worktree_path),
+                        halt_reason=halt_reason,
+                        flow=flow_name,
+                        outcome_verdict=outcome_verdict,
+                        prep_verdict=prep_verdict,
+                        responder_runs=responder_runs,
+                        shape_task_invoked=is_verify,
+                        **_worker_log_fields(result),
+                    )
+                    telemetry.mark_error(issue_span, "err-graphite", halt_reason)
+                    print(halt_reason, file=sys.stderr)
+                    return 1, pane_id
+
+            remove_error: str | None = None
+            try:
+                worktree.merge_entire_sessions(worktree_path, target_repo)
+                worktree.remove(target_repo, worktree_path)
+            except RuntimeError as exc:
+                remove_error = str(exc)
+                issue_span.set_attribute("worktree.remove_error", remove_error)
+                print(
+                    f"drain-cycle: {identifier}: worktree teardown failed: {exc}",
+                    file=sys.stderr,
+                )
             # Append unconditionally for every attempted issue.
             log.append_entry(
                 issue_identifier=identifier,
@@ -771,8 +826,11 @@ def _drain_one_issue(
                     f"drain-cycle: {identifier}: grade-draft write failed (non-fatal): {exc}",
                     file=sys.stderr,
                 )
-            if stack:
-                print(f"drain-cycle: {identifier} done; worktree preserved for stack assembly.", file=sys.stderr)
+            if submitted_pr is not None:
+                print(
+                    f"drain-cycle: {identifier} done; PR {submitted_pr.url}.",
+                    file=sys.stderr,
+                )
             elif remove_error is None:
                 print(f"drain-cycle: {identifier} done; worktree removed.", file=sys.stderr)
             return None, pane_id
