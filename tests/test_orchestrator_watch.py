@@ -1,8 +1,10 @@
 """Watch mode: tmux pane lifecycle and the claude-in-pane FIFO wiring.
 
 In watch mode the pane *is* the claude session: the orchestrator runs
-``claude ... | tee <fifo>`` in a split pane and reads the same stream-json
-bytes off the FIFO. These tests mock tmux; where the external (pane) path is
+``claude ... | tee <fifo> | <formatter>`` in a split pane and reads the same
+stream-json bytes off the FIFO. The formatter renders the pane copy
+human-readable; ``tee`` stays upstream so the FIFO branch is byte-for-byte
+unaffected. These tests mock tmux; where the external (pane) path is
 meant to succeed, a fake-pane writer thread opens the FIFO and streams a
 ``result`` event (standing in for the pane's claude), so the orchestrator
 takes the FIFO path rather than spawning a subprocess.
@@ -198,6 +200,11 @@ def test_watch_runs_claude_in_pane_via_fifo(
         assert "--output-format" in pipeline and "stream-json" in pipeline
         assert "| tee " in pipeline
         assert "tail -f" not in pipeline
+        # The pane copy is routed through the formatter stage (after tee),
+        # so the operator sees human-readable activity rather than raw JSON.
+        # tee stays upstream, so the FIFO branch is unaffected.
+        assert "drain_cycle.watch_format" in pipeline
+        assert pipeline.index("| tee ") < pipeline.index("drain_cycle.watch_format")
 
     # No intermediate watch log artifact is left behind.
     runs_dir = tmp_path / ".drain-cycle" / "runs"

@@ -56,14 +56,37 @@ this bound only guards a pane that never started (tmux accepted the
 split-window but the command died), so the drain never wedges on a dead FIFO."""
 
 
+def _watch_formatter_stage() -> str:
+    """The pane-visible pipe stage that renders stream-json human-readable.
+
+    ``<python> -u -m drain_cycle.watch_format`` reads the operator's copy and
+    writes formatted activity; ``-u`` keeps it unbuffered so the pane updates
+    live. ``sys.executable`` is the interpreter drain-cycle itself runs under,
+    so for the editable uv-tool install it is the venv that has ``drain_cycle``
+    importable.
+
+    The whole thing is a brace group with ``|| cat`` so the FIFO branch stays
+    truly independent of the formatter. A bare ``tee <fifo> | formatter`` is
+    *not* independent: if the formatter can't launch or dies, ``tee`` takes
+    SIGPIPE on its stdout and exits, closing the FIFO write end and truncating
+    drain-cycle's parse. The brace-group subshell holds the pipe's read end
+    open across the formatter→``cat`` transition, so ``tee`` never sees a
+    readerless pipe — worst case the pane falls back to raw JSON via ``cat``.
+    """
+    py = shlex.quote(sys.executable)
+    return f"{{ {py} -u -m drain_cycle.watch_format || cat; }}"
+
+
 def _open_watch_pane(argv: list[str], cwd: Path) -> tuple[str, Path] | None:
     """Open a tmux split-pane running ``argv`` piped through ``tee`` into a FIFO.
 
-    The pane *is* the ``claude`` session: ``argv | tee <fifo>`` lets the
-    operator watch the live stream-json scroll in the pane while the same
-    bytes flow through the FIFO to drain-cycle's reader. ``exec ${SHELL}``
-    after the pipeline keeps the pane alive for scrollback once ``claude``
-    exits (``tee`` still closes the FIFO write end, so the reader reaches EOF).
+    The pane *is* the ``claude`` session: ``argv | tee <fifo> | <formatter>``
+    splits the stream — the FIFO branch carries byte-for-byte stream-json to
+    drain-cycle's reader, while the pane copy flows through the formatter (see
+    ``_watch_formatter_stage``) so the operator sees human-readable activity
+    rather than raw JSON. ``exec ${SHELL}`` after the pipeline keeps the pane
+    alive for scrollback once ``claude`` exits (``tee`` still closes the FIFO
+    write end, so the reader reaches EOF).
 
     ``split-window -P -F "#{pane_id}"`` prints the new pane's ID directly so we
     capture the session pane, not the operator's active pane; ``-c`` runs it in
@@ -80,6 +103,7 @@ def _open_watch_pane(argv: list[str], cwd: Path) -> tuple[str, Path] | None:
     pipeline = (
         " ".join(shlex.quote(a) for a in argv)
         + f" | tee {shlex.quote(str(fifo_path))}"
+        + f" | {_watch_formatter_stage()}"
         + "; exec ${SHELL:-/bin/sh}"
     )
     try:
