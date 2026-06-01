@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "b1a67470d011",
+  "strategy": "manual-commit",
+  "branch": "ABA-301",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/worktree.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b1/a67470d011/0/metadata.json",
+      "transcript": "/b1/a67470d011/0/full.jsonl",
+      "content_hash": "/b1/a67470d011/0/content_hash.txt",
+      "prompt": "/b1/a67470d011/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 7807,
+    "cache_creation_tokens": 122444,
+    "cache_read_tokens": 4939982,
+    "output_tokens": 26441,
+    "api_call_count": 51
+  }
+}
