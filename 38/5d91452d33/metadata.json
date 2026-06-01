@@ -3,7 +3,7 @@
   "checkpoint_id": "385d91452d33",
   "strategy": "manual-commit",
   "branch": "ABA-303",
-  "checkpoints_count": 0,
+  "checkpoints_count": 1,
   "files_touched": [
     "docs/repos.example.yml",
     "drain_cycle/cli.py",
@@ -19,13 +19,19 @@
       "transcript": "/38/5d91452d33/0/full.jsonl",
       "content_hash": "/38/5d91452d33/0/content_hash.txt",
       "prompt": "/38/5d91452d33/0/prompt.txt"
+    },
+    {
+      "metadata": "/38/5d91452d33/1/metadata.json",
+      "transcript": "/38/5d91452d33/1/full.jsonl",
+      "content_hash": "/38/5d91452d33/1/content_hash.txt",
+      "prompt": "/38/5d91452d33/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 229,
-    "cache_creation_tokens": 245319,
-    "cache_read_tokens": 3645957,
-    "output_tokens": 10732,
-    "api_call_count": 28
+    "input_tokens": 704,
+    "cache_creation_tokens": 485877,
+    "cache_read_tokens": 11930874,
+    "output_tokens": 29772,
+    "api_call_count": 87
   }
 }
