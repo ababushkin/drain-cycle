@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "ac6b530a9107",
+  "strategy": "manual-commit",
+  "branch": "ABA-307",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "docs/adrs/0001-integration-test-architecture.md",
+    "docs/integration-test-architecture.md",
+    "drain_cycle/linear.py",
+    "tests/test_linear_api_url.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ac/6b530a9107/0/metadata.json",
+      "transcript": "/ac/6b530a9107/0/full.jsonl",
+      "content_hash": "/ac/6b530a9107/0/content_hash.txt",
+      "prompt": "/ac/6b530a9107/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 21,
+    "cache_creation_tokens": 85309,
+    "cache_read_tokens": 1093459,
+    "output_tokens": 10681,
+    "api_call_count": 18
+  }
+}
