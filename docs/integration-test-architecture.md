@@ -105,7 +105,7 @@ Solid = control / data flow over HTTP or subprocess. Dashed (accent) = MCP stdio
 
 ## Approach
 
-**Parent HTTP mock + Linear-MCP shim + real `claude -p` + in-process driver.** The spawned session is real claude every time; only the Linear surface is mocked. Three pillars.
+**Parent HTTP mock + Linear-MCP shim + real `claude -p` + in-process driver.** The spawned session is real claude every time; only the Linear surface is mocked. Three pillars. The architectural decision — chosen approach, rejected alternatives, and revisit conditions — is recorded in [`docs/adrs/0001-integration-test-architecture.md`](adrs/0001-integration-test-architecture.md).
 
 **Alternatives rejected** (draft for the ADR slice):
 
