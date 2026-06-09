@@ -118,7 +118,7 @@ def remove(repo: Path, worktree_path: Path) -> None:
     with telemetry.tracer.start_as_current_span("drain.worktree.remove") as span:
         span.set_attribute("worktree.repo", repo.name)
         span.set_attribute("worktree.path", str(worktree_path))
-        _run_git(["worktree", "remove", str(worktree_path)], cwd=repo)
+        _run_git(["worktree", "remove", "--force", str(worktree_path)], cwd=repo)
 
 
 def _is_registered_worktree(repo: Path, worktree_path: Path) -> bool:
