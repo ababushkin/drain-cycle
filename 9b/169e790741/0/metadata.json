@@ -1,0 +1,70 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "9b169e790741",
+  "session_id": "606a8a53-c1df-4110-a061-50c5b05f0c26",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-09T01:51:36.8586Z",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "drain_cycle/worktree.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-4-6",
+  "turn_id": "a21cb2413e57",
+  "token_usage": {
+    "input_tokens": 42,
+    "cache_creation_tokens": 23968,
+    "cache_read_tokens": 1264550,
+    "output_tokens": 4890,
+    "api_call_count": 34
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-09T01:51:36.852805Z",
+    "agent_lines": 1,
+    "agent_removed": 1,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1,
+    "total_lines_changed": 2,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 742,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/initiative-multi-agent-collaboration.html": 742
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 743,
+      "agent_lines_removed": 1
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 743,
+      "agent_lines_removed": 1
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 743,
+      "agent_lines_removed": 1
+    }
+  ]
+}

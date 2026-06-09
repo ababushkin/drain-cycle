@@ -1,0 +1,12 @@
+The .entire symlink is untracked, and git worktree remove refuses to delete a worktree with any untracked files unless --force is passed. The
+  drain-cycle script doesn't use --force, so it bails on exit 128.
+
+  The fix would be to either have drain-cycle pass --force, or pre-clean known harmless untracked files (like .entire) before attempting removal.
+
+---
+
+i noticed even with the symlinked .entire directory, the session data is not being sent to entire.io so there's still something missing
+
+---
+
+so what did you change/fix and where did you do it
