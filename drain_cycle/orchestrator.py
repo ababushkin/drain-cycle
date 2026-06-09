@@ -727,6 +727,7 @@ def _drain_one_issue(
             remove_error: str | None = None
             if not stack:
                 try:
+                    worktree.merge_entire_sessions(worktree_path, target_repo)
                     worktree.remove(target_repo, worktree_path)
                 except RuntimeError as exc:
                     remove_error = str(exc)

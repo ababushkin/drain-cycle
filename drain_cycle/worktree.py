@@ -133,6 +133,25 @@ def link_project_config(
     return created
 
 
+def merge_entire_sessions(worktree_path: Path, repo: Path) -> None:
+    """Merge session dirs from a worktree-local ``.entire/`` into the repo-root one.
+
+    Called just before removal so entire.io session data written by the
+    worker isn't lost. No-op if the worktree's ``.entire`` is a symlink
+    (already points at the repo root) or if the repo has no ``.entire/``.
+    """
+    worktree_entire = worktree_path / ".entire"
+    if not worktree_entire.is_dir() or os.path.islink(worktree_entire):
+        return
+    repo_entire = repo.resolve() / ".entire"
+    if not repo_entire.exists():
+        return
+    for item in worktree_entire.iterdir():
+        dest = repo_entire / item.name
+        if not dest.exists():
+            shutil.move(str(item), str(dest))
+
+
 def remove(repo: Path, worktree_path: Path) -> None:
     """Remove a worktree previously created by :func:`add`."""
     with telemetry.tracer.start_as_current_span("drain.worktree.remove") as span:
