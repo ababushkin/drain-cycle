@@ -1,0 +1,13 @@
+yes
+
+---
+
+do i even need this worktre_config _path? i don't really want to file a bug for an issue unles i need this fix
+
+---
+
+so until entire.io fix this problem, i won't get session data?
+
+---
+
+for now i do want the workaround, i'll think about it filing it

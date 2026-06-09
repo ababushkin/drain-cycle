@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "8dfc90d9706c",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "drain_cycle/orchestrator.py",
+    "drain_cycle/worktree.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/8d/fc90d9706c/0/metadata.json",
+      "transcript": "/8d/fc90d9706c/0/full.jsonl",
+      "content_hash": "/8d/fc90d9706c/0/content_hash.txt",
+      "prompt": "/8d/fc90d9706c/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 33,
+    "cache_creation_tokens": 9714,
+    "cache_read_tokens": 1681354,
+    "output_tokens": 3686,
+    "api_call_count": 22
+  }
+}
