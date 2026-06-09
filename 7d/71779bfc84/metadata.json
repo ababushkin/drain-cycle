@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "7d71779bfc84",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "drain_cycle/worktree.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/7d/71779bfc84/0/metadata.json",
+      "transcript": "/7d/71779bfc84/0/full.jsonl",
+      "content_hash": "/7d/71779bfc84/0/content_hash.txt",
+      "prompt": "/7d/71779bfc84/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 29,
+    "cache_creation_tokens": 8885,
+    "cache_read_tokens": 1499473,
+    "output_tokens": 7307,
+    "api_call_count": 23
+  }
+}
