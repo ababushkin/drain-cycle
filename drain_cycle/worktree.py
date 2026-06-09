@@ -14,6 +14,7 @@ missing ``main``) rather than just a non-zero exit code.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -97,7 +98,16 @@ def link_project_config(
     without that config) or if something already occupies that path in the
     worktree (a tracked entry git checked out, or a pre-existing link). The
     check uses ``os.path.lexists`` so a dangling link counts as present and is
-    never clobbered. Returns the links created.
+    never clobbered.
+
+    Exception: if the worktree path is a real directory (not a symlink), it
+    was likely created by a tool running in the worktree before the symlink
+    could be planted (e.g. entire.io creating ``.entire/`` on first run). In
+    that case, merge any files from the worktree directory into ``source``
+    (without overwriting existing files), remove the directory, and replace it
+    with a symlink so future writes land in the shared location.
+
+    Returns the links created.
     """
     created: list[Path] = []
     repo = repo.resolve()
@@ -106,7 +116,17 @@ def link_project_config(
         if not source.exists():
             continue
         link = worktree_path / name
-        if os.path.lexists(link):
+        if os.path.islink(link):
+            continue
+        if link.is_dir() and _is_gitignored(worktree_path, name):
+            # Migrate: move files not already in source, then replace with symlink.
+            for item in link.iterdir():
+                dest = source / item.name
+                if not dest.exists():
+                    shutil.move(str(item), str(dest))
+            shutil.rmtree(link)
+        elif os.path.lexists(link):
+            # A tracked or otherwise pre-existing entry we won't clobber.
             continue
         os.symlink(source, link)
         created.append(link)
@@ -119,6 +139,17 @@ def remove(repo: Path, worktree_path: Path) -> None:
         span.set_attribute("worktree.repo", repo.name)
         span.set_attribute("worktree.path", str(worktree_path))
         _run_git(["worktree", "remove", "--force", str(worktree_path)], cwd=repo)
+
+
+def _is_gitignored(repo: Path, name: str) -> bool:
+    """Return ``True`` if ``name`` is gitignored in ``repo``."""
+    result = subprocess.run(
+        ["git", "check-ignore", "-q", name],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+    )
+    return result.returncode == 0
 
 
 def _is_registered_worktree(repo: Path, worktree_path: Path) -> bool:
