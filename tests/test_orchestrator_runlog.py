@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from drain_cycle import linear, orchestrator, repos
+from drain_cycle import graphite, handoff, linear, orchestrator, repos
 
 
 def _issue(
@@ -224,8 +224,8 @@ def test_runlog_done_entry_carries_worker_usage_from_stream(
 def test_done_entry_records_pr_fields_and_posts_linear_comment(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """When _find_pr returns a PR, the run-log entry carries the PR fields
-    and a Linear comment is posted with the PR link."""
+    """When stack assembly submits a PR, the run-log entry carries the PR
+    fields and a Linear comment is posted with the PR link."""
     repo = tmp_path / "repo"
     repo.mkdir()
     _init_repo(repo)
@@ -254,14 +254,25 @@ def test_done_entry_records_pr_fields_and_posts_linear_comment(
     monkeypatch.setattr(linear, "get_issue", fake_get_issue)
     monkeypatch.setattr(linear, "set_state", lambda issue_id, state_name: None)
 
-    # Stub _find_pr to return a fake PR.
-    fake_pr = {
-        "pr_url": "https://github.com/owner/repo/pull/7",
-        "pr_number": 7,
-        "review_high": True,
-        "parent_branch": "main",
-    }
-    monkeypatch.setattr(orchestrator, "_find_pr", lambda repo, branch: fake_pr)
+    # Stub the assembler to return a fake PR; handoff findings drive review:high.
+    fake_pr = graphite.PrInfo(url="https://github.com/owner/repo/pull/7", number=7)
+
+    def fake_submit(
+        worktree: Path, *, parent: str, title: str = "", body: str = ""
+    ) -> graphite.PrInfo:
+        return fake_pr
+
+    monkeypatch.setattr(graphite, "submit", fake_submit)
+    monkeypatch.setattr(graphite, "ensure_review_high_label", lambda worktree: None)
+    monkeypatch.setattr(graphite, "add_label", lambda pr_number, label, worktree: None)
+    monkeypatch.setattr(
+        handoff, "read",
+        lambda path: handoff.HandoffData(
+            pr_title="Test PR",
+            pr_body="## What\nbody",
+            findings={"critical": 1, "required": 0},
+        ),
+    )
 
     # Capture add_comment calls.
     posted_comments: list[tuple[str, str]] = []

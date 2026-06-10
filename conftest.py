@@ -30,3 +30,9 @@ def _default_graphite_noop(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(_graphite, "submit", _noop_submit)
     monkeypatch.setattr(_graphite, "ensure_review_high_label", lambda worktree: None)
     monkeypatch.setattr(_graphite, "add_label", lambda pr_number, label, worktree: None)
+
+    # The PR-link comment fires on every stack-mode Done; never let a test
+    # reach the real Linear API. Tests that assert on comments override this.
+    import drain_cycle.linear as _linear
+
+    monkeypatch.setattr(_linear, "add_comment", lambda issue_id, body: None)

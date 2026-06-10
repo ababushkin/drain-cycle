@@ -148,10 +148,10 @@ def _write_committing_claude(tmp_path: Path, marker: Path) -> Path:
     return script
 
 
-def _git_log_hashes(path: Path) -> list[str]:
-    """Return commit hashes reachable from HEAD in ``path``."""
+def _git_log_hashes(path: Path, ref: str = "HEAD") -> list[str]:
+    """Return commit hashes reachable from ``ref`` in ``path``."""
     result = subprocess.run(
-        ["git", "log", "--format=%H"],
+        ["git", "log", "--format=%H", ref],
         cwd=path,
         check=True,
         capture_output=True,
@@ -163,9 +163,9 @@ def _git_log_hashes(path: Path) -> list[str]:
 def test_stack_mode_chains_same_repo_issues_and_forks_different_repo_off_main(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """In stack mode, same-repo issues chain: issue 2's worktree contains
-    issue 1's commit in its history. A different-repo issue still forks
-    off main and has no cross-repo commits."""
+    """In stack mode (the default), same-repo issues chain: issue 2's branch
+    contains issue 1's commit in its history. A different-repo issue still
+    forks off main and has no cross-repo commits."""
     repo_a = tmp_path / "repo-a"
     repo_b = tmp_path / "repo-b"
     repo_a.mkdir()
@@ -208,21 +208,17 @@ def test_stack_mode_chains_same_repo_issues_and_forks_different_repo_off_main(
 
     exit_code = orchestrator.run(
         repos.Repos(mapping={"alpha": repo_a, "beta": repo_b}),
-        stack=True,
     )
     assert exit_code == 0
 
-    # Worktrees are preserved in stack mode.
-    wt_1 = repo_a / ".worktrees" / "ABA-1"
-    wt_2 = repo_a / ".worktrees" / "ABA-2"
-    wt_3 = repo_b / ".worktrees" / "ABA-3"
-    assert wt_1.is_dir()
-    assert wt_2.is_dir()
-    assert wt_3.is_dir()
+    # Worktrees are torn down after assembly; the issue branches carry the chain.
+    assert not (repo_a / ".worktrees" / "ABA-1").exists()
+    assert not (repo_a / ".worktrees" / "ABA-2").exists()
+    assert not (repo_b / ".worktrees" / "ABA-3").exists()
 
-    hashes_1 = _git_log_hashes(wt_1)
-    hashes_2 = _git_log_hashes(wt_2)
-    hashes_3 = _git_log_hashes(wt_3)
+    hashes_1 = _git_log_hashes(repo_a, "ABA-1")
+    hashes_2 = _git_log_hashes(repo_a, "ABA-2")
+    hashes_3 = _git_log_hashes(repo_b, "ABA-3")
 
     # ABA-1's tip commit appears in ABA-2's history (chain).
     assert hashes_1[0] in hashes_2

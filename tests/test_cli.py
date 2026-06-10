@@ -80,8 +80,10 @@ def test_load_secrets_home_env_wins_over_repo_env(
 def _stub_no_op_orchestrator(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
     calls: list[dict] = []
 
-    def fake_run(loaded_repos, loaded_limits, *, watch: bool = False) -> int:
-        calls.append({"watch": watch})
+    def fake_run(
+        loaded_repos, loaded_limits, *, watch: bool = False, no_stack: bool = False
+    ) -> int:
+        calls.append({"watch": watch, "no_stack": no_stack})
         return 0
 
     monkeypatch.setattr(orchestrator, "run", fake_run)
@@ -111,7 +113,7 @@ def test_no_args_dispatches_to_orchestrator(monkeypatch: pytest.MonkeyPatch) -> 
         cli.main()
 
     assert exc.value.code == 0
-    assert calls == [{"watch": False}]
+    assert calls == [{"watch": False, "no_stack": False}]
 
 
 def test_grade_subcommand_dispatches_to_grade_run(
@@ -280,7 +282,7 @@ def test_watch_flag_passes_watch_true_to_orchestrator(
         cli.main()
 
     assert exc.value.code == 0
-    assert calls == [{"watch": True}]
+    assert calls == [{"watch": True, "no_stack": False}]
 
 
 def test_watch_flag_prints_warning_when_tmux_not_set(
