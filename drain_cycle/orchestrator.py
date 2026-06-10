@@ -23,7 +23,7 @@ from typing import Callable, TextIO
 
 from opentelemetry.trace import Span
 
-from . import flow, grade_draft, graphite, handoff, linear, model, progress, prompt, runlog, telemetry, worker, worktree
+from . import console, flow, grade_draft, graphite, handoff, linear, model, progress, prompt, runlog, telemetry, worker, worktree
 from .limits import Limits, check_cycle
 from .linear import DependencyCycleError
 from .repos import RepoResolutionError, Repos
@@ -46,6 +46,24 @@ rather than a misleading fake path."""
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _emit_summary(log: runlog.RunLog, *, total: int, halted_on: str | None) -> None:
+    done = sum(1 for e in log.entries if e.get("final_linear_state") == "Done")
+    next_steps = [] if halted_on is None else [
+        "inspect the run log for halt context",
+        "fix and re-run drain-cycle to resume",
+    ]
+    console.completion_summary(
+        issues_done=done,
+        issues_total=total,
+        halted_on=halted_on,
+        cost_usd=log.cycle_cost_usd() or None,
+        tokens=log.cycle_tokens_cumulative(),
+        elapsed_seconds=log.cycle_duration_seconds(),
+        run_log_path=str(log.path),
+        next_steps=next_steps,
+    )
 
 
 _WATCH_FIFO_TIMEOUT_SECONDS = 10.0
@@ -317,7 +335,8 @@ def _run(
         halt_reason = f"Halt: {exc}"
         log.set_cycle_halt(halt_reason)
         telemetry.mark_error(cycle_span, "err-dependency-cycle", halt_reason)
-        print(halt_reason, file=sys.stderr)
+        console.halt(halt_reason)
+        _emit_summary(log, total=0, halted_on=halt_reason)
         return 1
 
     cycle_span.set_attribute("drain.issues_planned", len(plan.order))
@@ -325,21 +344,25 @@ def _run(
 
     if not plan.order and not plan.deferred:
         cycle_span.set_attribute("drain.outcome", "nothing-to-do")
-        print(f"Cycle {cycle_id} has no Todo/Backlog issues — nothing to do.")
+        console.orch(f"Cycle {cycle_id} has no Todo/Backlog issues — nothing to do.")
         return 0
+
+    console.startup_plan(
+        cycle_id,
+        [(i["identifier"], i["title"], model.resolve(i)) for i in plan.order],
+    )
 
     for deferred in plan.deferred:
         issue = deferred["issue"]
         blocker_id = deferred["blocker_identifier"]
         blocker_state = deferred["blocker_state_type"]
-        print(
-            f"drain-cycle: deferred {issue['identifier']}"
-            f" — blocked by {blocker_id} ({blocker_state})",
-            file=sys.stderr,
+        console.orch(
+            f"deferred {issue['identifier']} — blocked by {blocker_id} ({blocker_state})"
         )
 
     if not plan.order:
         cycle_span.set_attribute("drain.outcome", "all-deferred")
+        _emit_summary(log, total=0, halted_on=None)
         return 0
 
     in_tmux = bool(os.environ.get("TMUX"))
@@ -368,6 +391,7 @@ def _run(
             last_branch_per_repo=last_branch_per_repo,
         )
         if halt_code is not None:
+            _emit_summary(log, total=total, halted_on=issue["identifier"])
             return halt_code  # type: ignore[return-value]
 
         # Cycle-wide circuit breaker: every issue may stay under its own
@@ -384,11 +408,13 @@ def _run(
             halt_reason = f"Halt: {cycle_breach.describe()}"
             log.set_cycle_halt(halt_reason)
             telemetry.mark_error(cycle_span, "err-cycle-breach", halt_reason)
-            print(halt_reason, file=sys.stderr)
+            console.halt(halt_reason)
+            _emit_summary(log, total=total, halted_on=halt_reason)
             return 1
 
     # Final pane is left open for scrollback (intentionally not killed here).
     cycle_span.set_attribute("drain.outcome", "drained")
+    _emit_summary(log, total=total, halted_on=None)
     return 0
 
 
@@ -421,7 +447,7 @@ def _drain_one_issue(
         issue_span.set_attribute("issue.title", issue["title"])
         issue_span.set_attribute("issue.index", index + 1)
         issue_span.set_attribute("issue.total", total)
-        print(f"drain-cycle: picked {identifier}: {issue['title']}", file=sys.stderr)
+        console.worker_event(identifier, f"picked: {issue['title']}")
 
         flow_name = flow.resolve(issue)
         if flow_name is not None:
@@ -455,7 +481,7 @@ def _drain_one_issue(
             )
             issue_span.set_attribute("issue.final_linear_state", state_name)
             telemetry.mark_error(issue_span, "err-repo-resolution", halt_reason)
-            print(halt_reason, file=sys.stderr)
+            console.halt(halt_reason)
             return 1, None
 
         issue_span.set_attribute("issue.repo", target_repo.name)
@@ -499,7 +525,7 @@ def _drain_one_issue(
                 issue_span.set_attribute("issue.final_linear_state", state_name)
                 issue_span.set_attribute("issue.resumed", True)
                 telemetry.mark_error(issue_span, "err-resume-cap", halt_reason)
-                print(halt_reason, file=sys.stderr)
+                console.halt(halt_reason)
                 return 1, None
 
         stack = target_repo.name not in repos.push_to_main_repos and not no_stack
@@ -546,7 +572,7 @@ def _drain_one_issue(
             )
             issue_span.set_attribute("issue.final_linear_state", state_name)
             telemetry.mark_error(issue_span, "err-setup-failed", halt_reason)
-            print(halt_reason, file=sys.stderr)
+            console.halt(halt_reason)
             return 1, None
 
         agent_prompt = prompt.build(issue, worktree_path, resumed=handle.resumed, stack=stack)
@@ -556,10 +582,7 @@ def _drain_one_issue(
 
         debug_file = log.debug_path(identifier) if debug else None
         if debug_file is not None:
-            print(
-                f"drain-cycle: {identifier} debug capture → {debug_file}",
-                file=sys.stderr,
-            )
+            console.worker_event(identifier, f"debug capture → {debug_file}")
 
         # Watch mode: run claude inside a tmux pane (so the operator sees the
         # live session) and read its stream-json off a FIFO instead of a
@@ -632,15 +655,11 @@ def _drain_one_issue(
                     "last_event_at": _now_iso(),
                 }
                 progress.write(m)
-                print(
-                    progress.format_progress_line(
-                        ident,
-                        turns,
-                        cumulative_tokens,
-                        peak_context_tokens,
-                        elapsed_seconds,
-                    ),
-                    file=sys.stderr,
+                console.worker_event(
+                    ident,
+                    f"turn {turns} · {progress.fmt_tokens(cumulative_tokens)} tok"
+                    f" (peak {progress.fmt_tokens(peak_context_tokens)})"
+                    f" · {progress.fmt_elapsed(elapsed_seconds)}",
                 )
             return _cb
 
@@ -662,6 +681,7 @@ def _drain_one_issue(
                 external_stream=external_stream,
                 kill_fn=kill_fn,
                 on_progress=_make_on_progress(marker, identifier),
+                passthrough=console.AgentSink(),
             )
         finally:
             progress.clear()
@@ -712,7 +732,7 @@ def _drain_one_issue(
             if flow_name is not None:
                 issue_span.set_attribute("issue.responder_run_count", len(responder_runs))
             telemetry.mark_error(issue_span, "err-per-issue-breach", halt_reason)
-            print(halt_reason, file=sys.stderr)
+            console.halt(halt_reason)
             return 1, pane_id
 
         refreshed = linear.get_issue(issue["id"])
@@ -780,7 +800,7 @@ def _drain_one_issue(
                         **_worker_log_fields(result),
                     )
                     telemetry.mark_error(issue_span, "err-graphite", halt_reason)
-                    print(halt_reason, file=sys.stderr)
+                    console.halt(halt_reason)
                     return 1, pane_id
 
             # Post the PR link back to the Linear issue. Informational only:
@@ -792,9 +812,8 @@ def _drain_one_issue(
                 try:
                     linear.add_comment(issue["id"], "\n".join(comment_lines))
                 except Exception as exc:
-                    print(
-                        f"drain-cycle: {identifier}: Linear PR comment failed: {exc}",
-                        file=sys.stderr,
+                    console.orch(
+                        f"{identifier}: Linear PR comment failed: {exc}"
                     )
 
             remove_error: str | None = None
@@ -804,10 +823,7 @@ def _drain_one_issue(
             except RuntimeError as exc:
                 remove_error = str(exc)
                 issue_span.set_attribute("worktree.remove_error", remove_error)
-                print(
-                    f"drain-cycle: {identifier}: worktree teardown failed: {exc}",
-                    file=sys.stderr,
-                )
+                console.orch(f"{identifier}: worktree teardown failed: {exc}")
             # Append unconditionally for every attempted issue.
             log.append_entry(
                 issue_identifier=identifier,
@@ -838,22 +854,15 @@ def _drain_one_issue(
                 draft_path = grade_draft.write_draft_from_entry(
                     identifier, log.entries[-1]
                 )
-                print(
-                    f"drain-cycle: {identifier}: grade draft → {draft_path}",
-                    file=sys.stderr,
-                )
+                console.worker_event(identifier, f"grade draft → {draft_path}")
             except Exception as exc:
-                print(
-                    f"drain-cycle: {identifier}: grade-draft write failed (non-fatal): {exc}",
-                    file=sys.stderr,
+                console.orch(
+                    f"{identifier}: grade-draft write failed (non-fatal): {exc}"
                 )
             if submitted_pr is not None:
-                print(
-                    f"drain-cycle: {identifier} done; PR {submitted_pr.url}.",
-                    file=sys.stderr,
-                )
+                console.worker_event(identifier, f"done; PR {submitted_pr.url}")
             elif remove_error is None:
-                print(f"drain-cycle: {identifier} done; worktree removed.", file=sys.stderr)
+                console.worker_event(identifier, "done; worktree removed")
             return None, pane_id
 
         # Not-Done halt: revert to the pre-halt state so a re-run picks
@@ -894,5 +903,5 @@ def _drain_one_issue(
         if flow_name is not None:
             issue_span.set_attribute("issue.responder_run_count", len(responder_runs))
         telemetry.mark_error(issue_span, "err-issue-not-done", halt_reason)
-        print(halt_reason, file=sys.stderr)
+        console.halt(halt_reason)
         return 1, pane_id
