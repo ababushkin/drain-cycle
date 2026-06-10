@@ -239,9 +239,10 @@ def test_graphite_failure_halts_cycle_and_preserves_worktree(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """A simulated gt submit failure must halt the cycle, record the failure
-    in the run-log (with the issue's Done final state), and leave the worktree
-    on disk for recovery. The second issue must never be attempted."""
+    """A simulated gt submit failure must halt the cycle, revert the issue out
+    of Done (so a re-run re-attempts the PR), record the failure in the run-log,
+    and leave the worktree on disk for recovery. The second issue must never be
+    attempted."""
     repo = tmp_path / "repo"
     repo.mkdir()
     _init_repo(repo)
@@ -257,6 +258,31 @@ def test_graphite_failure_halts_cycle_and_preserves_worktree(
         orchestrator, "_CLAUDE_CMD", [str(_write_done_claude_script(tmp_path, done_marker))]
     )
     monkeypatch.setattr(handoff, "read", lambda path: None)
+
+    # Stateful stub: the revert set_state (back to the pre-spawn state) flips the
+    # issue out of Done so the post-revert get_issue read-back reflects it. The
+    # earlier Todo→In Progress transition is left to the marker-driven base stub.
+    state_calls: list[tuple[str, str]] = []
+    reverted_ids: set[str] = set()
+
+    def recording_set_state(issue_id: str, state_name: str) -> None:
+        state_calls.append((issue_id, state_name))
+        if state_name == first["state"]["name"]:
+            reverted_ids.add(issue_id)
+
+    base_get_issue = linear.get_issue
+
+    def reverting_get_issue(issue_id: str) -> dict:
+        if issue_id in reverted_ids:
+            return first
+        return base_get_issue(issue_id)
+
+    monkeypatch.setattr(linear, "set_state", recording_set_state)
+    monkeypatch.setattr(linear, "get_issue", reverting_get_issue)
+    comments: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        linear, "add_comment", lambda issue_id, body: comments.append((issue_id, body))
+    )
 
     graphite_error = "gt submit failed: auth token missing"
 
@@ -287,13 +313,76 @@ def test_graphite_failure_halts_cycle_and_preserves_worktree(
     assert len(payload["entries"]) == 1
     entry = payload["entries"][0]
     assert entry["issue_identifier"] == first["identifier"]
-    # Issue reached Done in Linear; the halt is at the orchestrator/stack layer.
-    assert entry["final_linear_state"] == "Done"
+    # Issue reverted out of Done back to its pre-spawn state — Done must guarantee
+    # a PR exists, so a PR-less failure cannot remain Done.
+    assert entry["final_linear_state"] == first["state"]["name"]
     assert entry["halt_reason"] is not None
     assert graphite_error in entry["halt_reason"]
+
+    # Revert was issued and a blocker comment posted.
+    assert (first["id"], first["state"]["name"]) in state_calls
+    assert len(comments) == 1
+    assert comments[0][0] == first["id"]
+    assert graphite_error in comments[0][1]
 
     # Halt line on stderr carries the error detail.
     stderr_lines = capsys.readouterr().err.splitlines()
     halt_lines = [line for line in stderr_lines if line.startswith("Halt: ")]
     assert len(halt_lines) == 1
     assert graphite_error in halt_lines[0]
+
+
+def test_graphite_failure_revert_failure_keeps_done_in_log(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """When the post-graphite revert itself fails, the run-log falls back to the
+    still-Done state and the halt_reason carries the revert-failure suffix."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    first = _issue("ABA-FIRST", sort_order=1.0)
+    done_marker = tmp_path / "done.txt"
+
+    _wire_linear_stubs([first], done_marker, monkeypatch)
+    monkeypatch.setattr(
+        orchestrator, "_CLAUDE_CMD", [str(_write_done_claude_script(tmp_path, done_marker))]
+    )
+    monkeypatch.setattr(handoff, "read", lambda path: None)
+
+    revert_error = "linear set_state 500"
+
+    def failing_set_state(issue_id: str, state_name: str) -> None:
+        # Let the Todo→In Progress transition succeed; fail only the revert back
+        # to the pre-spawn state so the orchestrator reaches the graphite path.
+        if state_name == first["state"]["name"]:
+            raise RuntimeError(revert_error)
+
+    monkeypatch.setattr(linear, "set_state", failing_set_state)
+    monkeypatch.setattr(linear, "add_comment", lambda issue_id, body: None)
+
+    graphite_error = "gt submit failed: base branch merged"
+
+    def failing_submit(
+        worktree: Path, *, parent: str, title: str = "", body: str = ""
+    ) -> graphite.PrInfo:
+        raise RuntimeError(graphite_error)
+
+    monkeypatch.setattr(graphite, "submit", failing_submit)
+
+    exit_code = orchestrator.run(_stub_repos(repo))
+    assert exit_code == 1
+
+    runs_dir = tmp_path / ".drain-cycle" / "runs"
+    entry = json.loads(next(runs_dir.glob("stub-cycle-*.json")).read_text())["entries"][0]
+    # Revert failed, so the issue is still Done — report that truthfully.
+    assert entry["final_linear_state"] == "Done"
+    assert graphite_error in entry["halt_reason"]
+    assert "revert" in entry["halt_reason"]
+    assert revert_error in entry["halt_reason"]
+
+    _ = capsys.readouterr()

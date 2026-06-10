@@ -780,16 +780,41 @@ def _drain_one_issue(
                     graphite_error = str(exc)
 
                 if graphite_error is not None:
+                    # The agent already marked the issue Done, but no PR exists.
+                    # Revert out of Done so a re-run picks the issue back up and
+                    # re-attempts the stack submission against the worktree (left
+                    # on disk below). Mirrors the not-Done halt path.
+                    original_state_name = issue["state"]["name"]
+                    effective_state, revert_error = _revert_to_pre_halt_state(
+                        issue["id"],
+                        target_state_name=original_state_name,
+                        pre_revert_state_name=post_spawn_state,
+                    )
+                    try:
+                        linear.add_comment(
+                            issue["id"],
+                            f"Reverted from Done: stacked PR submission failed — "
+                            f"{graphite_error}. Worktree preserved for re-run.",
+                        )
+                    except Exception as exc:
+                        print(
+                            f"drain-cycle: {identifier}: Linear blocker comment failed: {exc}",
+                            file=sys.stderr,
+                        )
                     halt_reason = (
-                        f"{_halt_message(identifier, post_spawn_state, worktree_path)}"
+                        f"{_halt_message(identifier, effective_state, worktree_path)}"
                         f" — graphite: {graphite_error}"
                     )
+                    if revert_error is not None:
+                        halt_reason += (
+                            f" — revert to {original_state_name!r} failed: {revert_error}"
+                        )
                     log.append_entry(
                         issue_identifier=identifier,
                         started_at=started_at,
                         finished_at=finished_at,
                         exit_code=result.exit_code,
-                        final_linear_state=post_spawn_state,
+                        final_linear_state=effective_state,
                         worktree_path=str(worktree_path),
                         halt_reason=halt_reason,
                         flow=flow_name,
