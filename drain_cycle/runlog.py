@@ -81,12 +81,12 @@ These fields are additive — ``grade.py`` reads only ``cycle_id`` and
 without them grade unchanged.
 
 ``pr_url``, ``pr_number``, ``review_high``, and ``parent_branch`` are
-also additive: set to ``null`` on entries for which no GitHub PR was
-found (pre-PR workflow, halted issues, or ``gh`` unavailable). When
-present, the orchestrator also posts a comment on the Linear issue with
-the PR link (``linear.add_comment``). ``review_high`` mirrors the
-``review:high`` GitHub label the worker applies when it flags an issue
-for operator attention.
+also additive: set to ``null`` on entries with no submitted PR
+(push-to-main repos, halted issues, pre-PR run-logs). When present, the
+orchestrator also posts a comment on the Linear issue with the PR link
+(``linear.add_comment``). ``review_high`` mirrors the ``review:high``
+GitHub label the orchestrator applies when the Linear label or the
+handoff findings flag the issue for operator attention.
 
 ``cycle_cost_usd`` and ``cycle_tokens_cumulative`` are per-invocation
 totals over ``entries`` (entries with ``null`` cost or usage contribute

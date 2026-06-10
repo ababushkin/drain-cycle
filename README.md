@@ -138,9 +138,10 @@ drain-cycle: picked ABA-241: Persist halt_reason in run-log entries
 # issue to In Progress, then spawns a `claude -p` session inside the worktree.
 
   (… claude -p session does the work: reads the issue, edits files,
-       runs tests, commits, pushes, marks the issue Done in Linear …)
+       runs tests, commits to the issue branch, writes the handoff file,
+       marks the issue Done in Linear …)
 
-drain-cycle: ABA-241 done; worktree removed.
+drain-cycle: ABA-241 done; PR https://github.com/owner/drain-cycle/pull/12.
 drain-cycle: picked PDE-12: Add the new triage skill
 
 # PDE-12 is labelled `repo:pde-skills`, so this run lands in a worktree

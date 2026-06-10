@@ -317,3 +317,16 @@ def test_watch_flag_no_warning_when_tmux_set(
     # No TMUX warning on stderr (drain-cycle: picked ... lines are fine).
     stderr_lines = [l for l in captured.err.splitlines() if "tmux" in l.lower() and "warning" in l.lower()]
     assert stderr_lines == []
+
+
+def test_no_stack_flag_passes_no_stack_true_to_orchestrator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _stub_no_op_orchestrator(monkeypatch)
+    monkeypatch.setattr("sys.argv", ["drain-cycle", "--no-stack"])
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 0
+    assert calls == [{"watch": False, "no_stack": True}]

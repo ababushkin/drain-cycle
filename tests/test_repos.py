@@ -390,3 +390,24 @@ def test_load_raises_config_error_when_push_to_main_repos_entry_empty_string(
     )
     with pytest.raises(repos.RepoConfigError, match="must be a non-empty string"):
         repos.load(config)
+
+
+def test_load_raises_config_error_when_push_to_main_repos_entry_unknown(
+    tmp_path: Path,
+) -> None:
+    """A typo'd opt-out entry must fail loudly at startup — silently
+    accepting it would leave the misspelled repo stacking PRs, the exact
+    misconfiguration the option exists to prevent."""
+    target = tmp_path / "target"
+    target.mkdir()
+    config = _write_config(
+        tmp_path,
+        f"""
+        repos:
+          alpha: {target}
+        push_to_main_repos:
+          - alhpa
+        """,
+    )
+    with pytest.raises(repos.RepoConfigError, match="no such repo"):
+        repos.load(config)

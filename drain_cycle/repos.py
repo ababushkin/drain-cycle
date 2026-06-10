@@ -197,6 +197,12 @@ def load(path: Path | None = None) -> Repos:
     push_to_main_repos = _parse_push_to_main_repos(
         data.get("push_to_main_repos")
     )
+    for name in push_to_main_repos:
+        if name not in mapping:
+            raise RepoConfigError(
+                f"{_CONFIG_DISPLAY} 'push_to_main_repos' entry {name!r}: "
+                "no such repo in the 'repos:' block"
+            )
     return Repos(
         mapping=mapping,
         worktree_config_paths=worktree_config_paths,
