@@ -1,0 +1,17 @@
+/idea-refine I noticed that when ever a piece of work starts, that the final graphite PR is always too big to review. i was hoping that by using the shape:* skills i could get the work shaped ahead of time so that from an execution perspective they would land cleanly as neat/small graphite PRs but it seems like this might be too hard. also having graphite commands implemented directly in drain-cycle makes it quite fragile, any small mistakes and the whole program blows up. i'm now thinking that at the very end of a task being worked on (i.e. build -> code-review -> verification) that the final step will be another agent skill to prepare the graphite PRs (small, stacked with good PR descriptions)
+
+---
+
+revise ABA-366 to include slice-during-build and decomposition
+
+---
+
+explain "slice-during-build"
+
+---
+
+got it do we also need a linear ticket to delete any graphite related things from drain-cycle?
+
+---
+
+got it do we also need a linear ticket to delete any graphite related things from drain-cycle? check existing linear projects/tickets to see if there isn't one already that's doing this
