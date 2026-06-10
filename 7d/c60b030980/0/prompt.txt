@@ -1,0 +1,7 @@
+one of my previous runs failed on issue ABA-361
+i merged one of the graphite pr stacks midway through the drain-cycle run so it could not create a stacked PR
+however
+the ticket was marked as done
+even though the PR was never opened
+
+debug this problem and recommend me a plan to make it better
