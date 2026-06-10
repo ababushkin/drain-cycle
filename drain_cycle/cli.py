@@ -102,6 +102,9 @@ def main() -> None:
     if remaining == ["status"] and not watch:
         from . import status
         sys.exit(status.run())
+    if remaining == ["_stop-guard"] and not watch:
+        from . import stop_guard
+        sys.exit(stop_guard.run(sys.stdin, sys.stdout))
     if argv in (["-h"], ["--help"]):
         print(_USAGE)
         sys.exit(0)

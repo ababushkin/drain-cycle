@@ -23,7 +23,7 @@ from typing import Callable, TextIO
 
 from opentelemetry.trace import Span
 
-from . import console, flow, grade_draft, graphite, handoff, linear, model, progress, prompt, runlog, telemetry, worker, worktree
+from . import console, flow, grade_draft, graphite, handoff, linear, model, progress, prompt, runlog, stop_guard, telemetry, worker, worktree
 from .limits import Limits, check_cycle
 from .linear import DependencyCycleError
 from .repos import RepoResolutionError, Repos
@@ -575,6 +575,11 @@ def _drain_one_issue(
             console.halt(halt_reason)
             return 1, None
 
+        # Plant the stop-guard marker so the worker's Stop hook fires only
+        # for drain sessions and knows which completion sequence to enforce.
+        # Replaces any prior marker so a resumed worktree starts fresh.
+        stop_guard.write_marker(worktree_path, mode="stack" if stack else "push")
+
         agent_prompt = prompt.build(issue, worktree_path, resumed=handle.resumed, stack=stack)
         issue_span.set_attribute("issue.resumed", handle.resumed)
         worker_model = model.resolve(issue)
@@ -899,6 +904,9 @@ def _drain_one_issue(
             pre_revert_state_name=post_spawn_state,
         )
         halt_reason = _halt_message(identifier, effective_state, worktree_path)
+        tripped = stop_guard.read_tripped(worktree_path)
+        if tripped is not None:
+            halt_reason += f" — {stop_guard.TRIPPED_HALT_REASON}: {tripped}"
         if revert_error is not None:
             halt_reason += (
                 f" — revert to {original_state_name!r} failed: {revert_error}"
