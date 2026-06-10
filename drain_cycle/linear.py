@@ -15,7 +15,7 @@ import httpx
 
 from . import telemetry
 
-_ENDPOINT = "https://api.linear.app/graphql"
+_DEFAULT_GRAPHQL_URL = "https://api.linear.app/graphql"
 _TEAM_NAME = "Personal"
 _PENDING_STATE_TYPES = ["backlog", "unstarted"]
 _RESOLVED_STATE_TYPES = {"completed", "canceled"}
@@ -51,8 +51,9 @@ def _post(
         if not key:
             telemetry.mark_error(span, "err-linear-no-api-key", "LINEAR_API_KEY is not set")
             raise RuntimeError("LINEAR_API_KEY is not set")
+        url = os.environ.get("LINEAR_API_URL", _DEFAULT_GRAPHQL_URL)
         resp = httpx.post(
-            _ENDPOINT,
+            url,
             headers={"Authorization": key, "Content-Type": "application/json"},
             json={"query": query, "variables": variables or {}},
             timeout=30.0,
