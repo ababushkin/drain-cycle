@@ -1,0 +1,107 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "48052c491186",
+  "session_id": "8bd520d6-f6d8-4720-ab81-ced4d8fc9d8e",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-10T14:25:17.447595Z",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "docs/ideas/stacked-pr-finishing.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "42fa52e72adf",
+  "token_usage": {
+    "input_tokens": 21047,
+    "cache_creation_tokens": 142258,
+    "cache_read_tokens": 2058160,
+    "output_tokens": 26112,
+    "api_call_count": 30
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01GpZt9rU4zUGG1yQf75r1Q5",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "agent-skills:debugging-and-error-recovery"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "42fa52e72adf",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 24,
+        "end": 25,
+        "entry_ids": [
+          "bf9f22bb-960f-4f00-b3a7-8552b62d57b7"
+        ],
+        "tool_use_id": "toolu_01GpZt9rU4zUGG1yQf75r1Q5"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01GpZt9rU4zUGG1yQf75r1Q5"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: agent-skills:debugging-and-error-recovery",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-10T14:25:17.438274Z",
+    "agent_lines": 64,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 64,
+    "total_lines_changed": 64,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1056,
+      "user_lines_removed": 8,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/initiative-multi-agent-collaboration.html": 742,
+        "docs/spikes/rich-console/demo.py": 156,
+        "drain_cycle/orchestrator.py": 27,
+        "pyproject.toml": 1,
+        "tests/test_orchestrator_graphite.py": 91,
+        "uv.lock": 39
+      },
+      "user_removed_per_file": {
+        "drain_cycle/orchestrator.py": 2,
+        "tests/test_orchestrator_graphite.py": 5,
+        "uv.lock": 1
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1002,
+      "agent_lines_removed": 1
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1002,
+      "agent_lines_removed": 1
+    }
+  ]
+}

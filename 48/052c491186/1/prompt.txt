@@ -1,0 +1,9 @@
+why was ABA-376 not completed? last message in logs was "HALTED" /agent-skills:debugging-and-error-recovery
+
+---
+
+yes
+
+---
+
+yes
