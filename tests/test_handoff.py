@@ -2,21 +2,24 @@
 
 ``read`` must never raise: a missing file, a truncated JSON write, or a
 structurally wrong payload all return ``None``. A well-formed file returns
-a typed ``HandoffData`` object with the expected field values.
+a typed ``HandoffData`` object listing the submitted PRs. An empty
+``pr_urls`` list reads as ``None`` — the skill writes URLs only after a PR
+is actually created, so "present but empty" means submission never happened.
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from drain_cycle.handoff import HANDOFF_FILE, HandoffData, read, write
+from drain_cycle.handoff import HANDOFF_FILE, HandoffData, PullRequest, read, write
 
 
 def _valid_data() -> HandoffData:
     return HandoffData(
-        pr_title="feat: add stack-ready worktrees",
-        pr_body="## What\nAdds stacking.\n\n## Why\nNeeded for Graphite.\n\n## What to review\nworktree.py",
-        findings={"critical": 0, "required": 1},
+        pr_urls=(
+            PullRequest(title="feat: crash-proof filter", url="https://github.com/o/r/pull/1"),
+            PullRequest(title="feat: transcript core", url="https://github.com/o/r/pull/2"),
+        )
     )
 
 
@@ -26,9 +29,7 @@ def test_write_then_read_round_trips(tmp_path: Path) -> None:
     result = read(tmp_path)
 
     assert result is not None
-    assert result.pr_title == data.pr_title
-    assert result.pr_body == data.pr_body
-    assert result.findings == data.findings
+    assert result.pr_urls == data.pr_urls
 
 
 def test_read_missing_file_returns_none(tmp_path: Path) -> None:
@@ -45,37 +46,43 @@ def test_read_wrong_top_level_type_returns_none(tmp_path: Path) -> None:
     assert read(tmp_path) is None
 
 
-def test_read_missing_pr_title_returns_none(tmp_path: Path) -> None:
+def test_read_missing_pr_urls_returns_none(tmp_path: Path) -> None:
+    (tmp_path / HANDOFF_FILE).write_text(json.dumps({"other": "key"}))
+    assert read(tmp_path) is None
+
+
+def test_read_empty_pr_urls_returns_none(tmp_path: Path) -> None:
+    (tmp_path / HANDOFF_FILE).write_text(json.dumps({"pr_urls": []}))
+    assert read(tmp_path) is None
+
+
+def test_read_pr_urls_not_list_returns_none(tmp_path: Path) -> None:
+    (tmp_path / HANDOFF_FILE).write_text(json.dumps({"pr_urls": {"title": "x", "url": "y"}}))
+    assert read(tmp_path) is None
+
+
+def test_read_entry_not_dict_returns_none(tmp_path: Path) -> None:
+    (tmp_path / HANDOFF_FILE).write_text(json.dumps({"pr_urls": ["just a string"]}))
+    assert read(tmp_path) is None
+
+
+def test_read_entry_missing_url_returns_none(tmp_path: Path) -> None:
     (tmp_path / HANDOFF_FILE).write_text(
-        json.dumps({"pr_body": "body", "findings": {"critical": 0, "required": 0}})
+        json.dumps({"pr_urls": [{"title": "no url here"}]})
     )
     assert read(tmp_path) is None
 
 
-def test_read_missing_pr_body_returns_none(tmp_path: Path) -> None:
+def test_read_entry_empty_url_returns_none(tmp_path: Path) -> None:
     (tmp_path / HANDOFF_FILE).write_text(
-        json.dumps({"pr_title": "title", "findings": {"critical": 0, "required": 0}})
+        json.dumps({"pr_urls": [{"title": "t", "url": ""}]})
     )
     assert read(tmp_path) is None
 
 
-def test_read_missing_findings_returns_none(tmp_path: Path) -> None:
+def test_read_entry_title_not_string_returns_none(tmp_path: Path) -> None:
     (tmp_path / HANDOFF_FILE).write_text(
-        json.dumps({"pr_title": "title", "pr_body": "body"})
-    )
-    assert read(tmp_path) is None
-
-
-def test_read_findings_not_dict_returns_none(tmp_path: Path) -> None:
-    (tmp_path / HANDOFF_FILE).write_text(
-        json.dumps({"pr_title": "title", "pr_body": "body", "findings": [1, 2]})
-    )
-    assert read(tmp_path) is None
-
-
-def test_read_pr_title_not_string_returns_none(tmp_path: Path) -> None:
-    (tmp_path / HANDOFF_FILE).write_text(
-        json.dumps({"pr_title": 42, "pr_body": "body", "findings": {}})
+        json.dumps({"pr_urls": [{"title": 42, "url": "https://x/pull/1"}]})
     )
     assert read(tmp_path) is None
 

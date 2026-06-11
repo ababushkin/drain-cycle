@@ -152,22 +152,22 @@ def test_stack_false_is_byte_identical_to_default(tmp_path: Path) -> None:
     assert default == explicit_false
 
 
-def test_stack_true_omits_push_and_includes_handoff_instruction(
+def test_stack_true_omits_push_and_drives_pr_finishing_skill(
     tmp_path: Path,
 ) -> None:
-    """``stack=True`` replaces the push-to-main steps with commit-only and
-    handoff-file instructions, and uses the stack tail."""
+    """``stack=True`` replaces push-to-main with slice-commits plus a
+    ``pr-finishing`` skill invocation that owns submission, and uses the
+    stack tail."""
     issue = _fixture_issue()
     worktree = tmp_path / ".worktrees" / issue["identifier"]
     rendered = build(issue, worktree, stack=True)
 
     assert "push to main" not in rendered
+    # The skill owns submission and the handoff file — the worker is told to
+    # invoke it, not to hand-author a PR body or write the handoff itself.
+    assert "/shape:pr-finishing" in rendered
     assert ".drain-handoff.json" in rendered
-    assert "pr_title" in rendered
-    assert "pr_body" in rendered
-    assert "## What" in rendered
-    assert "## Why" in rendered
-    assert "## What to review" in rendered
+    assert "pr_urls" in rendered
 
     # Stack tail is used, not the normal tail.
     assert _STACK_TAIL in rendered

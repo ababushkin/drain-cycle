@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from drain_cycle import stop_guard
-from drain_cycle.handoff import HandoffData, write as write_handoff
+from drain_cycle.handoff import HandoffData, PullRequest, write as write_handoff
 
 
 def _git_init(path: Path) -> None:
@@ -36,9 +36,7 @@ def _commit(path: Path, name: str, contents: str = "x") -> None:
 
 def _valid_handoff() -> HandoffData:
     return HandoffData(
-        pr_title="feat: x",
-        pr_body="## What\n\n## Why\n\n## What to review\n",
-        findings={"critical": 0, "required": 0},
+        pr_urls=(PullRequest(title="feat: x", url="https://github.com/o/r/pull/1"),)
     )
 
 

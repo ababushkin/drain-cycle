@@ -161,13 +161,14 @@ class Decision:
 
 _BLOCK_PROMPT_STACK = (
     "drain-cycle stop-guard: the issue is not finished — the worktree has "
-    "uncommitted changes or no .drain-handoff.json yet. Complete the "
-    "remaining steps now: commit any pending changes to the issue branch "
-    "(do not push), write .drain-handoff.json (pr_title, pr_body with "
-    "## What / ## Why / ## What to review, findings: {critical, required}), "
-    "post a review-summary comment on the Linear issue, then transition the "
-    "issue to Done. If you are genuinely blocked, leave the issue In Progress "
-    "and post a comment naming the blocker — do not stop silently."
+    "uncommitted changes or no submitted PRs in .drain-handoff.json yet. "
+    "Complete the remaining steps now: commit any pending changes to the "
+    "issue branch as reviewable slices (do not push by hand), run "
+    "`/shape:pr-finishing` to submit the stacked PR(s) — it writes the "
+    "pr_urls into .drain-handoff.json and posts the review-summary comment "
+    "— then transition the issue to Done. If you are genuinely blocked, "
+    "leave the issue In Progress and post a comment naming the blocker — "
+    "do not stop silently."
 )
 
 _BLOCK_PROMPT_PUSH = (

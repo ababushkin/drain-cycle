@@ -46,10 +46,10 @@ _TAIL = (
 )
 
 _STACK_TAIL = (
-    "before marking Done: review the working-tree changes for correctness "
-    "and quality, fix Critical/Required findings, commit to the issue branch "
-    "without pushing, write .drain-handoff.json, then post a review-summary "
-    "comment on the issue and transition to Done."
+    "before marking Done: review the changes, fix Critical/Required findings, "
+    "commit them as reviewable slices on the issue branch, then run "
+    "`/shape:pr-finishing` to submit the stacked PR(s) and post the "
+    "review-summary comment, and only then transition to Done."
 )
 
 
@@ -109,16 +109,16 @@ def _stack_preamble(
         "  1. Review the working-tree changes for correctness and quality.\n"
         "  2. Fix any Critical or Required findings. Lower-severity findings "
         "are at your discretion.\n"
-        "  3. Commit to the issue branch (do not push).\n"
-        "  4. Write `.drain-handoff.json` in the worktree root with keys:\n"
-        "     - `pr_title`: a concise PR title (≤ 70 characters)\n"
-        "     - `pr_body`: markdown with ## What, ## Why, and ## What to review "
-        "sections\n"
-        '     - `findings`: `{"critical": N, "required": N}` counts from the '
-        "review\n"
-        "  5. Post a short review-summary comment on the Linear issue via "
-        "`mcp__claude_ai_Linear__save_comment` (count of findings by severity, "
-        "fixed vs deferred).\n"
+        "  3. Commit the changes to the issue branch as reviewable slices — "
+        "one logical change per commit. Do not push by hand.\n"
+        "  4. Run `/shape:pr-finishing`. It submits the slices as stacked "
+        "PR(s) via Graphite, writes the submitted PR URLs into "
+        "`.drain-handoff.json` (`pr_urls`), and posts the review-summary "
+        "comment on the Linear issue. Do not run `gt`/`gh` by hand or write "
+        "`.drain-handoff.json` yourself — the skill owns both.\n"
+        "  5. Confirm `.drain-handoff.json` now contains a non-empty `pr_urls` "
+        "list. If the skill could not submit, leave the issue In Progress and "
+        "comment the blocker — do not mark Done.\n"
         "  6. Transition issue to Done via `mcp__claude_ai_Linear__save_issue` "
         '(state: "Done").\n'
     )
