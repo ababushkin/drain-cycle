@@ -178,6 +178,53 @@ def test_stack_true_omits_push_and_drives_pr_finishing_skill(
     assert non_empty[-1] == _STACK_TAIL
 
 
+def test_base_defaults_to_main_byte_identical(tmp_path: Path) -> None:
+    """Omitting ``base`` (or passing ``"main"``) renders byte-identical
+    output to the no-kwarg default in both stack and push mode — existing
+    call sites are unaffected by the new parameter."""
+    issue = _fixture_issue()
+    worktree = tmp_path / ".worktrees" / issue["identifier"]
+
+    assert build(issue, worktree) == build(issue, worktree, base="main")
+    assert build(issue, worktree, stack=True) == build(
+        issue, worktree, stack=True, base="main"
+    )
+    assert build(issue, worktree, resumed=True) == build(
+        issue, worktree, resumed=True, base="main"
+    )
+
+
+def test_chained_base_replaces_main_in_stack_prompt(tmp_path: Path) -> None:
+    """A non-``main`` base anchors the stack prompt: the base-branch line,
+    the pr-finishing slice instruction, and the resume range all name it."""
+    issue = _fixture_issue()
+    worktree = tmp_path / ".worktrees" / issue["identifier"]
+    rendered = build(issue, worktree, stack=True, resumed=True, base="ABA-386")
+
+    assert "- Base branch: ABA-386" in rendered
+    assert "Base branch: main" not in rendered
+    # pr-finishing is told the slices stack on the chained base.
+    assert "stacked on `ABA-386`" in rendered
+    assert "ABA-386..HEAD" in rendered
+    # Resume range is anchored at the chained base, not main.
+    assert "git log --oneline ABA-386..HEAD" in rendered
+
+    # Four-segment ordering and stack tail are preserved.
+    non_empty = [line for line in rendered.splitlines() if line.strip()]
+    assert non_empty[-1] == _STACK_TAIL
+
+
+def test_chained_base_in_push_mode_sets_base_line_only(tmp_path: Path) -> None:
+    """A non-``main`` base in push mode updates the base-branch line but
+    adds no stack/pr-finishing slice clause (push mode has no skill step)."""
+    issue = _fixture_issue()
+    worktree = tmp_path / ".worktrees" / issue["identifier"]
+    rendered = build(issue, worktree, base="ABA-386")
+
+    assert "- Base branch: ABA-386" in rendered
+    assert "stacked on `ABA-386`" not in rendered
+
+
 def test_verify_flow_detection(tmp_path: Path) -> None:
     """``is_verify_flow`` returns True only when the issue carries the ``verify`` label."""
     issue = _fixture_issue()

@@ -53,25 +53,29 @@ _STACK_TAIL = (
 )
 
 
-def _resume_directive(identifier: str) -> str:
+def _resume_directive(identifier: str, base: str) -> str:
     """Resume preamble for a worktree carrying prior committed work.
 
     Inserted as the first line inside the preamble (after the ``---``
     separator, before "Execution instructions:") so the agent reads it
     ahead of the procedure but the tail still holds the last-line
     position the four-segment ordering reserves for it.
+
+    The ``git log`` range is anchored at ``base`` so a chained worktree
+    (branched off the prior issue's branch, not ``main``) reads back only
+    its own commits rather than the whole stack beneath it.
     """
     return (
         f"Resuming issue {identifier}: this worktree carries prior committed "
         "work from an earlier session that was halted. Run "
-        "`git log --oneline main..HEAD` and `git status` first to read what "
+        f"`git log --oneline {base}..HEAD` and `git status` first to read what "
         "is already done, then continue from that point — do not restart "
         "from scratch.\n\n"
     )
 
 
 def _normal_preamble(
-    identifier: str, worktree: Path, resume_segment: str, shape_task_segment: str
+    identifier: str, worktree: Path, base: str, resume_segment: str, shape_task_segment: str
 ) -> str:
     return (
         "---\n\n"
@@ -79,7 +83,7 @@ def _normal_preamble(
         f"{shape_task_segment}"
         "Execution instructions:\n"
         f"- Working directory: {worktree}\n"
-        "- Base branch: main\n"
+        f"- Base branch: {base}\n"
         f"- Completion sequence for issue {identifier} (run in this order, "
         "before marking Done):\n"
         "  1. Review the working-tree changes for correctness and quality.\n"
@@ -95,15 +99,28 @@ def _normal_preamble(
 
 
 def _stack_preamble(
-    identifier: str, worktree: Path, resume_segment: str, shape_task_segment: str
+    identifier: str, worktree: Path, base: str, resume_segment: str, shape_task_segment: str
 ) -> str:
+    # When the worktree is chained off a prior issue's branch rather than
+    # ``main``, the slices stack on that branch — tell pr-finishing so it
+    # slices ``<base>..HEAD`` instead of its ``main..HEAD`` default and
+    # opens the PR against the right base. Omitted for the ``main`` base so
+    # the unchained prompt stays unchanged.
+    base_clause = (
+        ""
+        if base == "main"
+        else (
+            f" These commits are stacked on `{base}`, not `main`, so pass "
+            f"`{base}` to the skill as its base branch (it slices `{base}..HEAD`)."
+        )
+    )
     return (
         "---\n\n"
         f"{resume_segment}"
         f"{shape_task_segment}"
         "Execution instructions:\n"
         f"- Working directory: {worktree}\n"
-        "- Base branch: main\n"
+        f"- Base branch: {base}\n"
         f"- Completion sequence for issue {identifier} (run in this order, "
         "before marking Done):\n"
         "  1. Review the working-tree changes for correctness and quality.\n"
@@ -115,7 +132,7 @@ def _stack_preamble(
         "PR(s) via Graphite, writes the submitted PR URLs into "
         "`.drain-handoff.json` (`pr_urls`), and posts the review-summary "
         "comment on the Linear issue. Do not run `gt`/`gh` by hand or write "
-        "`.drain-handoff.json` yourself — the skill owns both.\n"
+        f"`.drain-handoff.json` yourself — the skill owns both.{base_clause}\n"
         "  5. Confirm `.drain-handoff.json` now contains a non-empty `pr_urls` "
         "list. If the skill could not submit, leave the issue In Progress and "
         "comment the blocker — do not mark Done.\n"
@@ -130,19 +147,24 @@ def build(
     *,
     resumed: bool = False,
     stack: bool = False,
+    base: str = "main",
 ) -> str:
     title = issue.get("title", "")
     description = issue.get("description") or ""
     identifier = issue.get("identifier", "")
 
-    resume_segment = _resume_directive(identifier) if resumed else ""
+    resume_segment = _resume_directive(identifier, base) if resumed else ""
     shape_task_segment = _shape_task_directive(identifier) if is_verify_flow(issue) else ""
 
     if stack:
-        preamble = _stack_preamble(identifier, worktree, resume_segment, shape_task_segment)
+        preamble = _stack_preamble(
+            identifier, worktree, base, resume_segment, shape_task_segment
+        )
         tail = _STACK_TAIL
     else:
-        preamble = _normal_preamble(identifier, worktree, resume_segment, shape_task_segment)
+        preamble = _normal_preamble(
+            identifier, worktree, base, resume_segment, shape_task_segment
+        )
         tail = _TAIL
 
     return (
