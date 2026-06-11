@@ -1,6 +1,12 @@
 # Per-issue worktrees created by drain-cycle.
 .worktrees/
 
+# Per-session worker artefacts planted in a worktree root by the orchestrator
+# and stop-guard. Never belong in a committed tree.
+.drain-guard.json
+.drain-guard-tripped
+.drain-handoff.json
+
 # Operator secrets (LINEAR_API_KEY etc).
 .env
 
