@@ -14,7 +14,7 @@ Content block handling:
 - ``tool_use`` → ``→ Name(key=val, ...)`` with truncated input
 - ``tool_result`` (in ``user`` events) → ``← N chars``
 - unknown block types → silently skipped (forward-compat)
-``result`` events → ``=== done: N turns, $X.XX ===`` footer.
+``result`` events → ``· done · N turns · $X.XX · <tok> · peak <ctx> ctx`` footer.
 
 A line that is not valid stream-json (or not a JSON object) is echoed
 verbatim, so the worst case is the raw line the operator would have seen
@@ -24,8 +24,9 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timezone
 from typing import Any, TextIO
+
+from drain_cycle.progress import fmt_tokens
 
 _INPUT_MAX = 80
 """Per-argument cap on the ``repr`` of a tool_use input value, so a large
@@ -37,6 +38,69 @@ _ANSI_DIM = "\x1b[2m"
 _ANSI_ITALIC = "\x1b[3m"
 _ANSI_CYAN = "\x1b[36m"
 _ANSI_RED = "\x1b[31m"
+
+_TOKEN_FIELDS = (
+    "input_tokens",
+    "output_tokens",
+    "cache_creation_input_tokens",
+    "cache_read_input_tokens",
+)
+
+
+def _coerce_int(value: Any) -> int:
+    return value if isinstance(value, int) else 0
+
+
+class _UsageTally:
+    """Mirrors ``worker._UsageAccumulator`` arithmetic on the display side.
+
+    Per-``message.id`` last-copy-wins over the four token fields. Cumulative
+    is the sum across turns and fields; peak context is the maximum across
+    turns of ``input + cache_read + cache_creation``. Single-threaded — the
+    filter reads stdin on the main thread and emits one event at a time, so
+    no locking is needed.
+    """
+
+    def __init__(self) -> None:
+        self._turns: dict[str, dict[str, int]] = {}
+        self._anon = 0
+
+    def feed_assistant(self, message: dict[str, Any]) -> None:
+        usage = message.get("usage")
+        if not isinstance(usage, dict):
+            return
+        message_id = message.get("id")
+        if isinstance(message_id, str):
+            key = message_id
+        else:
+            key = f"_anon-{self._anon}"
+            self._anon += 1
+        self._turns[key] = {f: _coerce_int(usage.get(f)) for f in _TOKEN_FIELDS}
+
+    def cumulative(self) -> int:
+        return sum(t[f] for t in self._turns.values() for f in _TOKEN_FIELDS)
+
+    def peak_context(self) -> int:
+        return max(
+            (
+                t["input_tokens"]
+                + t["cache_read_input_tokens"]
+                + t["cache_creation_input_tokens"]
+                for t in self._turns.values()
+            ),
+            default=0,
+        )
+
+    def current_context(self) -> int:
+        """Context size of the most-recently-fed turn."""
+        if not self._turns:
+            return 0
+        t = next(reversed(self._turns.values()))
+        return (
+            t["input_tokens"]
+            + t["cache_read_input_tokens"]
+            + t["cache_creation_input_tokens"]
+        )
 
 
 class StreamFormatter:
@@ -54,6 +118,7 @@ class StreamFormatter:
         self._out = out
         self._turn = 0
         self._last_message_id: str | None = None
+        self._tally = _UsageTally()
         if color is None:
             isatty = getattr(out, "isatty", None)
             try:
@@ -80,12 +145,17 @@ class StreamFormatter:
         message = event.get("message")
         if not isinstance(message, dict):
             return
+        self._tally.feed_assistant(message)
         mid = message.get("id")
         if mid != self._last_message_id:
             self._last_message_id = mid
             self._turn += 1
-            ts = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            self._write("\n" + self._paint(f"=== Turn {self._turn} [{ts}] ===", _ANSI_DIM))
+            status = (
+                f"· Turn {self._turn}"
+                f" · {fmt_tokens(self._tally.cumulative())} tok"
+                f" · {fmt_tokens(self._tally.current_context())} ctx"
+            )
+            self._write("\n" + self._paint(status, _ANSI_DIM))
         content = message.get("content")
         if not isinstance(content, list):
             return
@@ -133,10 +203,18 @@ class StreamFormatter:
     def _feed_result(self, event: dict[str, Any]) -> None:
         turns = event.get("num_turns")
         cost = event.get("total_cost_usd")
+        cumulative = fmt_tokens(self._tally.cumulative())
+        peak = fmt_tokens(self._tally.peak_context())
         if cost is not None:
-            self._write(f"\n=== done: {turns} turns, ${cost:.2f} ===")
+            footer = (
+                f"· done · {turns} turns · ${cost:.2f}"
+                f" · {cumulative} tok · peak {peak} ctx"
+            )
         else:
-            self._write(f"\n=== done: {turns} turns ===")
+            footer = (
+                f"· done · {turns} turns · {cumulative} tok · peak {peak} ctx"
+            )
+        self._write("\n" + self._paint(footer, _ANSI_DIM))
 
     def _write(self, text: str) -> None:
         try:
