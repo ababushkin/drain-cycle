@@ -139,6 +139,55 @@ def test_orchestrator_halts_when_spawn_leaves_issue_not_done(
     assert str(first_worktree) in halt_line
 
 
+def test_orchestrator_halt_reason_includes_stop_guard_tripped_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """When the stop-guard gives up, the orchestrator surfaces it.
+
+    A worker that loops past the guard cap leaves
+    ``.drain-guard-tripped`` in the worktree on its way out. The
+    not-Done halt path must read that marker and tag the halt as
+    ``worker_stopped_incomplete`` so the operator can tell this case
+    apart from a generic not-Done exit.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    first = _issue("ABA-FIRST", sort_order=1.0)
+    raw_issues = [first]
+    issues_by_id = {i["id"]: i for i in raw_issues}
+
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "stub-cycle")
+    monkeypatch.setattr(linear, "pending_issues", lambda c: linear._plan(raw_issues))
+    monkeypatch.setattr(linear, "get_issue", lambda iid: issues_by_id[iid])
+    monkeypatch.setattr(linear, "set_state", lambda iid, s: None)
+
+    worktree_path = repo / ".worktrees" / first["identifier"]
+    tripped_file = worktree_path / ".drain-guard-tripped"
+    # Fake claude that writes the tripped marker before exiting (simulates
+    # the guard giving up after N re-injections).
+    script = tmp_path / "fake-claude.sh"
+    script.write_text(
+        f"#!/bin/sh\n"
+        f'printf "%s" "uncommitted changes in worktree after 3 re-injection(s)" '
+        f'> "{tripped_file}"\n'
+        f"exit 0\n"
+    )
+    script.chmod(0o755)
+    monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(script)])
+
+    exit_code = orchestrator.run(_stub_repos(repo))
+    assert exit_code != 0
+
+    stderr_lines = capsys.readouterr().err.splitlines()
+    (halt_line,) = [line for line in stderr_lines if line.startswith("Halt: ")]
+    assert "worker_stopped_incomplete" in halt_line
+    assert "re-injection" in halt_line
+
+
 def _write_fake_claude_script(tmp_path: Path) -> Path:
     """No-op stand-in for ``claude -p`` that exits cleanly without doing work.
 
