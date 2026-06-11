@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, TextIO
@@ -155,6 +156,94 @@ def _worker_log_fields(result: worker.WorkerResult) -> dict[str, object]:
         "session_id": result.session_id,
         "is_error": result.is_error,
     }
+
+
+@dataclass(frozen=True)
+class _WorkerOutcome:
+    """The post-spawn verdict/responder trio plus the worker result, gathered
+    once after the worker exits and passed as a unit to the halt epilogue and
+    the span-attribute writer so the recorded shape can't drift across branches.
+    """
+
+    result: worker.WorkerResult
+    outcome_verdict: dict | None = None
+    prep_verdict: dict | None = None
+    responder_runs: list[dict] = field(default_factory=list)
+
+
+def _set_verdict_span_attrs(
+    issue_span: Span,
+    outcome: _WorkerOutcome,
+    *,
+    flow_name: str | None,
+) -> None:
+    """Record the verdict/responder span attributes shared by the worker-backed
+    halt branches and the Done append, so the recorded shape can't drift."""
+    if outcome.outcome_verdict is not None:
+        issue_span.set_attribute(
+            "issue.outcome_verdict", outcome.outcome_verdict["result"]
+        )
+    if outcome.prep_verdict is not None:
+        issue_span.set_attribute("issue.prep_verdict", outcome.prep_verdict["result"])
+    if flow_name is not None:
+        issue_span.set_attribute(
+            "issue.responder_run_count", len(outcome.responder_runs)
+        )
+
+
+@dataclass(frozen=True)
+class _HaltContext:
+    """Per-issue constants for recording a terminal halt.
+
+    Every halt branch builds its own ``halt_reason`` and any branch-specific
+    span attributes, then funnels through :meth:`record` for the universal
+    epilogue: the run-log entry, the ``final_linear_state`` span attribute, the
+    error mark, and the operator-facing halt line. Pass ``outcome`` on the
+    post-spawn paths to splice the recorded usage and verdict fields into the
+    entry; the pre-spawn paths leave it ``None``.
+    """
+
+    log: runlog.RunLog
+    issue_span: Span
+    identifier: str
+    started_at: str
+    flow_name: str | None
+    shape_task_invoked: bool
+
+    def record(
+        self,
+        *,
+        slug: str,
+        halt_reason: str,
+        final_linear_state: str,
+        worktree_path: str,
+        finished_at: str,
+        exit_code: int,
+        outcome: _WorkerOutcome | None = None,
+    ) -> None:
+        entry_fields: dict[str, object] = {}
+        if outcome is not None:
+            entry_fields = {
+                "outcome_verdict": outcome.outcome_verdict,
+                "prep_verdict": outcome.prep_verdict,
+                "responder_runs": outcome.responder_runs,
+                **_worker_log_fields(outcome.result),
+            }
+        self.log.append_entry(
+            issue_identifier=self.identifier,
+            started_at=self.started_at,
+            finished_at=finished_at,
+            exit_code=exit_code,
+            final_linear_state=final_linear_state,
+            worktree_path=worktree_path,
+            halt_reason=halt_reason,
+            flow=self.flow_name,
+            shape_task_invoked=self.shape_task_invoked,
+            **entry_fields,
+        )
+        self.issue_span.set_attribute("issue.final_linear_state", final_linear_state)
+        telemetry.mark_error(self.issue_span, slug, halt_reason)
+        console.halt(halt_reason)
 
 
 def _debug_enabled() -> bool:
@@ -332,6 +421,14 @@ def _drain_one_issue(
         started_at = _now_iso()
         is_verify = prompt.is_verify_flow(issue)
         issue_span.set_attribute("issue.verify_flow", is_verify)
+        halt_ctx = _HaltContext(
+            log=log,
+            issue_span=issue_span,
+            identifier=identifier,
+            started_at=started_at,
+            flow_name=flow_name,
+            shape_task_invoked=is_verify,
+        )
         try:
             target_repo = repos.resolve(issue)
         except RepoResolutionError as exc:
@@ -343,20 +440,14 @@ def _drain_one_issue(
                 f"{_halt_message(identifier, state_name, Path(_UNRESOLVED_WORKTREE_DISPLAY))}"
                 f" — {exc}"
             )
-            log.append_entry(
-                issue_identifier=identifier,
-                started_at=started_at,
-                finished_at=_now_iso(),
-                exit_code=-1,
+            halt_ctx.record(
+                slug="err-repo-resolution",
+                halt_reason=halt_reason,
                 final_linear_state=state_name,
                 worktree_path=_UNRESOLVED_WORKTREE_DISPLAY,
-                halt_reason=halt_reason,
-                flow=flow_name,
-                shape_task_invoked=is_verify,
+                finished_at=_now_iso(),
+                exit_code=-1,
             )
-            issue_span.set_attribute("issue.final_linear_state", state_name)
-            telemetry.mark_error(issue_span, "err-repo-resolution", halt_reason)
-            console.halt(halt_reason)
             return 1, None
 
         issue_span.set_attribute("issue.repo", target_repo.name)
@@ -386,21 +477,15 @@ def _drain_one_issue(
                     f"(all {limits.max_resume_attempts} resumes used); "
                     "raise max_resume_attempts, clear prior runs, or finish by hand"
                 )
-                log.append_entry(
-                    issue_identifier=identifier,
-                    started_at=started_at,
-                    finished_at=_now_iso(),
-                    exit_code=-1,
+                issue_span.set_attribute("issue.resumed", True)
+                halt_ctx.record(
+                    slug="err-resume-cap",
+                    halt_reason=halt_reason,
                     final_linear_state=state_name,
                     worktree_path=str(planned_path),
-                    halt_reason=halt_reason,
-                    flow=flow_name,
-                    shape_task_invoked=is_verify,
+                    finished_at=_now_iso(),
+                    exit_code=-1,
                 )
-                issue_span.set_attribute("issue.final_linear_state", state_name)
-                issue_span.set_attribute("issue.resumed", True)
-                telemetry.mark_error(issue_span, "err-resume-cap", halt_reason)
-                console.halt(halt_reason)
                 return 1, None
 
         stack = target_repo.name not in repos.push_to_main_repos and not no_stack
@@ -443,20 +528,14 @@ def _drain_one_issue(
                 f"{_halt_message(identifier, state_name, planned_path)}"
                 f" — setup failed: {exc}"
             )
-            log.append_entry(
-                issue_identifier=identifier,
-                started_at=started_at,
-                finished_at=_now_iso(),
-                exit_code=-1,
+            halt_ctx.record(
+                slug="err-setup-failed",
+                halt_reason=halt_reason,
                 final_linear_state=state_name,
                 worktree_path=str(planned_path),
-                halt_reason=halt_reason,
-                flow=flow_name,
-                shape_task_invoked=is_verify,
+                finished_at=_now_iso(),
+                exit_code=-1,
             )
-            issue_span.set_attribute("issue.final_linear_state", state_name)
-            telemetry.mark_error(issue_span, "err-setup-failed", halt_reason)
-            console.halt(halt_reason)
             return 1, None
 
         # Plant the stop-guard marker so the worker's Stop hook fires only
@@ -569,6 +648,12 @@ def _drain_one_issue(
             if session is not None:
                 session.cleanup()
         finished_at = _now_iso()
+        outcome = _WorkerOutcome(
+            result=result,
+            outcome_verdict=outcome_verdict,
+            prep_verdict=prep_verdict,
+            responder_runs=responder_runs,
+        )
 
         if result.breach is not None:
             # The worker crossed a per-issue cap (tokens or time) and was
@@ -589,31 +674,17 @@ def _drain_one_issue(
                 halt_reason += (
                     f"; revert to {original_state_name!r} failed: {revert_error}"
                 )
-            log.append_entry(
-                issue_identifier=identifier,
-                started_at=started_at,
-                finished_at=finished_at,
-                exit_code=result.exit_code,
+            issue_span.set_attribute("issue.exit_code", result.exit_code)
+            _set_verdict_span_attrs(issue_span, outcome, flow_name=flow_name)
+            halt_ctx.record(
+                slug="err-per-issue-breach",
+                halt_reason=halt_reason,
                 final_linear_state=effective_state,
                 worktree_path=str(worktree_path),
-                halt_reason=halt_reason,
-                flow=flow_name,
-                outcome_verdict=outcome_verdict,
-                prep_verdict=prep_verdict,
-                responder_runs=responder_runs,
-                shape_task_invoked=is_verify,
-                **_worker_log_fields(result),
+                finished_at=finished_at,
+                exit_code=result.exit_code,
+                outcome=outcome,
             )
-            issue_span.set_attribute("issue.exit_code", result.exit_code)
-            issue_span.set_attribute("issue.final_linear_state", effective_state)
-            if outcome_verdict is not None:
-                issue_span.set_attribute("issue.outcome_verdict", outcome_verdict["result"])
-            if prep_verdict is not None:
-                issue_span.set_attribute("issue.prep_verdict", prep_verdict["result"])
-            if flow_name is not None:
-                issue_span.set_attribute("issue.responder_run_count", len(responder_runs))
-            telemetry.mark_error(issue_span, "err-per-issue-breach", halt_reason)
-            console.halt(halt_reason)
             return 1, pane_id
 
         refreshed = linear.get_issue(issue["id"])
@@ -648,24 +719,15 @@ def _drain_one_issue(
                     halt_reason += (
                         f" — revert to {original_state_name!r} failed: {revert_error}"
                     )
-                log.append_entry(
-                    issue_identifier=identifier,
-                    started_at=started_at,
-                    finished_at=finished_at,
-                    exit_code=result.exit_code,
+                halt_ctx.record(
+                    slug="err-stack-no-prs",
+                    halt_reason=halt_reason,
                     final_linear_state=effective_state,
                     worktree_path=str(worktree_path),
-                    halt_reason=halt_reason,
-                    flow=flow_name,
-                    outcome_verdict=outcome_verdict,
-                    prep_verdict=prep_verdict,
-                    responder_runs=responder_runs,
-                    shape_task_invoked=is_verify,
-                    **_worker_log_fields(result),
+                    finished_at=finished_at,
+                    exit_code=result.exit_code,
+                    outcome=outcome,
                 )
-                issue_span.set_attribute("issue.final_linear_state", effective_state)
-                telemetry.mark_error(issue_span, "err-stack-no-prs", halt_reason)
-                console.halt(halt_reason)
                 return 1, pane_id
 
             if submitted is not None:
@@ -696,18 +758,13 @@ def _drain_one_issue(
                 worktree_path=str(worktree_path),
                 halt_reason=remove_error,
                 flow=flow_name,
-                outcome_verdict=outcome_verdict,
-                prep_verdict=prep_verdict,
-                responder_runs=responder_runs,
+                outcome_verdict=outcome.outcome_verdict,
+                prep_verdict=outcome.prep_verdict,
+                responder_runs=outcome.responder_runs,
                 shape_task_invoked=is_verify,
-                **_worker_log_fields(result),
+                **_worker_log_fields(outcome.result),
             )
-            if outcome_verdict is not None:
-                issue_span.set_attribute("issue.outcome_verdict", outcome_verdict["result"])
-            if prep_verdict is not None:
-                issue_span.set_attribute("issue.prep_verdict", prep_verdict["result"])
-            if flow_name is not None:
-                issue_span.set_attribute("issue.responder_run_count", len(responder_runs))
+            _set_verdict_span_attrs(issue_span, outcome, flow_name=flow_name)
             try:
                 draft_path = grade_draft.write_draft_from_entry(
                     identifier, log.entries[-1]
@@ -739,28 +796,14 @@ def _drain_one_issue(
             )
         # halt_reason carries the same string also printed to stderr below
         # so the on-disk and terminal surfaces cannot drift.
-        log.append_entry(
-            issue_identifier=identifier,
-            started_at=started_at,
-            finished_at=finished_at,
-            exit_code=result.exit_code,
+        _set_verdict_span_attrs(issue_span, outcome, flow_name=flow_name)
+        halt_ctx.record(
+            slug="err-issue-not-done",
+            halt_reason=halt_reason,
             final_linear_state=effective_state,
             worktree_path=str(worktree_path),
-            halt_reason=halt_reason,
-            flow=flow_name,
-            outcome_verdict=outcome_verdict,
-            prep_verdict=prep_verdict,
-            responder_runs=responder_runs,
-            shape_task_invoked=is_verify,
-            **_worker_log_fields(result),
+            finished_at=finished_at,
+            exit_code=result.exit_code,
+            outcome=outcome,
         )
-        issue_span.set_attribute("issue.final_linear_state", effective_state)
-        if outcome_verdict is not None:
-            issue_span.set_attribute("issue.outcome_verdict", outcome_verdict["result"])
-        if prep_verdict is not None:
-            issue_span.set_attribute("issue.prep_verdict", prep_verdict["result"])
-        if flow_name is not None:
-            issue_span.set_attribute("issue.responder_run_count", len(responder_runs))
-        telemetry.mark_error(issue_span, "err-issue-not-done", halt_reason)
-        console.halt(halt_reason)
         return 1, pane_id
