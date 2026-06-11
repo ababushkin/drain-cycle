@@ -14,6 +14,7 @@
     "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/N04-usage-status-and-footer.md",
     "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/_deliverable.md",
     "docs/delivery-plans/watch-pane-rich-rendering/README.md",
+    "docs/ideas/drain-past-the-merge-gate.md",
     "drain_cycle/orchestrator.py",
     "tests/test_orchestrator_watch.py"
   ],
@@ -29,13 +30,19 @@
       "transcript": "/dd/092554be43/1/full.jsonl",
       "content_hash": "/dd/092554be43/1/content_hash.txt",
       "prompt": "/dd/092554be43/1/prompt.txt"
+    },
+    {
+      "metadata": "/dd/092554be43/2/metadata.json",
+      "transcript": "/dd/092554be43/2/full.jsonl",
+      "content_hash": "/dd/092554be43/2/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 138365,
-    "cache_creation_tokens": 974372,
-    "cache_read_tokens": 31025513,
-    "output_tokens": 209230,
-    "api_call_count": 268
+    "input_tokens": 142411,
+    "cache_creation_tokens": 996043,
+    "cache_read_tokens": 34688316,
+    "output_tokens": 217152,
+    "api_call_count": 295
   }
 }

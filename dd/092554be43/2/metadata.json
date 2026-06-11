@@ -1,0 +1,84 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "dd092554be43",
+  "session_id": "e55be82e-a00f-4dea-861b-0d6182ca585c",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-11T13:15:05.253206Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "docs/delivery-plans/watch-pane-rich-rendering/D1-filter-never-breaks-the-pane/N01-crash-proof-filter.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D1-filter-never-breaks-the-pane/_deliverable.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N02-transcript-rendering-core.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N03-ansi-color-layer.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N05-docs-pane-rendering.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/_deliverable.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/N04-usage-status-and-footer.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/_deliverable.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/README.md",
+    "docs/ideas/drain-past-the-merge-gate.md",
+    "drain_cycle/orchestrator.py",
+    "tests/test_orchestrator_watch.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "ca85b892940d",
+  "checkpoint_transcript_start": 222,
+  "transcript_lines_at_start": 222,
+  "token_usage": {
+    "input_tokens": 4046,
+    "cache_creation_tokens": 21671,
+    "cache_read_tokens": 3662803,
+    "output_tokens": 7922,
+    "api_call_count": 27
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01GAqSS5BjKJs9LXcoeNmXh5",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "agent-skills:incremental-implementation"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "ca85b892940d",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 164,
+        "end": 165,
+        "entry_ids": [
+          "f6dd9ca2-078b-41ca-8c35-767f779cd47d"
+        ],
+        "tool_use_id": "toolu_01GAqSS5BjKJs9LXcoeNmXh5"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01GAqSS5BjKJs9LXcoeNmXh5"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: agent-skills:incremental-implementation",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-11T13:15:05.236476Z",
+    "agent_lines": 13,
+    "agent_removed": 158,
+    "human_added": 636,
+    "human_modified": 5,
+    "human_removed": 0,
+    "total_committed": 654,
+    "total_lines_changed": 812,
+    "agent_percentage": 21.05911330049261,
+    "metric_version": 2
+  }
+}
