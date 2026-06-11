@@ -121,6 +121,24 @@ ABA-205 · turn 42 · 8.1M tok (peak 180k) · $12.30 · 14m
 
 `drain-cycle status` reads `~/.drain-cycle/active.json` (written before each spawn, removed after the worker returns). With no run active it says so; with a crashed run (pid gone) it reports a stale marker rather than a live run.
 
+Run `drain-cycle --watch` (alias `-w`) from inside tmux to open a split pane per issue carrying the live `claude` session. The pane runs `claude … | tee <fifo> | python -m drain_cycle.watch_format`; the formatter renders the stream-json the operator sees, while the FIFO copy feeds drain-cycle's parser unchanged. A representative pane looks like:
+
+```
+· Turn 1 · 5k tok · 5k ctx
+Reading the README to find the live-run section.
+→ Read(file_path='/repo/README.md')
+← 16 chars
+
+· Turn 2 · 13k tok · 7k ctx
+Patching the stale sentence in design-decisions.md.
+→ Edit(file_path='/repo/docs/design-decisions.md', old_string='the pane shows precisely what claude emits')
+← 2 chars
+
+· done · 2 turns · $0.07 · 13k tok · peak 7k ctx
+```
+
+Each turn header carries cumulative tokens and current context; the cost only appears in the final `· done ·` footer, since `claude` emits `total_cost_usd` once on the result event.
+
 ### What a run looks like
 
 ```bash
