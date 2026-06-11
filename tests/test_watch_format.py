@@ -48,9 +48,9 @@ def _result(**fields: object) -> str:
     return json.dumps({"type": "result", **fields})
 
 
-def _render(lines: list[str]) -> str:
+def _render(lines: list[str], *, color: bool | None = None) -> str:
     stdout = io.StringIO()
-    rc = watch_format.run(io.StringIO("\n".join(lines) + "\n"), stdout)
+    rc = watch_format.run(io.StringIO("\n".join(lines) + "\n"), stdout, color=color)
     assert rc == 0
     return stdout.getvalue()
 
@@ -235,6 +235,29 @@ def test_pathological_shapes_do_not_crash() -> None:
     rc = watch_format.run(io.StringIO("\n".join(lines) + "\n"), stdout)
     assert rc == 0
     assert "=== done: 1 turns ===" in stdout.getvalue()
+
+
+def test_color_default_off_on_stringio() -> None:
+    """Default ``color=None`` auto-detects via ``isatty()`` — a StringIO sink
+    is not a tty, so no ANSI escape bytes appear in the output."""
+    out = _render(
+        [
+            _assistant_with_content("msg_a", [{"type": "text", "text": "Hi."}]),
+            _result(num_turns=1),
+        ]
+    )
+    assert "\x1b" not in out
+
+
+def test_color_true_dims_turn_header() -> None:
+    """With ``color=True`` the turn header is wrapped in the dim escape and
+    terminated by reset."""
+    out = _render(
+        [_assistant_with_content("msg_a", [{"type": "text", "text": "Hi."}])],
+        color=True,
+    )
+    assert "\x1b[2m=== Turn 1" in out
+    assert "===\x1b[0m" in out
 
 
 def test_blank_lines_skipped() -> None:

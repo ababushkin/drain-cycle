@@ -32,6 +32,12 @@ _INPUT_MAX = 80
 prompt or file body renders as a short ``key='...'`` rather than flooding
 the pane."""
 
+_ANSI_RESET = "\x1b[0m"
+_ANSI_DIM = "\x1b[2m"
+_ANSI_ITALIC = "\x1b[3m"
+_ANSI_CYAN = "\x1b[36m"
+_ANSI_RED = "\x1b[31m"
+
 
 class StreamFormatter:
     """Turn stream-json events into human-readable lines on ``out``.
@@ -39,12 +45,27 @@ class StreamFormatter:
     Turn headers are deduped by ``message.id`` — the real stream emits a turn
     once per content block (thinking, text, tool_use), each copy carrying the
     same id — so we emit one header per logical turn.
+
+    ``color`` controls ANSI styling: ``None`` (default) auto-detects via
+    ``out.isatty()``; ``True``/``False`` force on/off.
     """
 
-    def __init__(self, out: TextIO) -> None:
+    def __init__(self, out: TextIO, color: bool | None = None) -> None:
         self._out = out
         self._turn = 0
         self._last_message_id: str | None = None
+        if color is None:
+            isatty = getattr(out, "isatty", None)
+            try:
+                color = bool(isatty()) if callable(isatty) else False
+            except Exception:
+                color = False
+        self._color = color
+
+    def _paint(self, text: str, *codes: str) -> str:
+        if not self._color or not codes:
+            return text
+        return "".join(codes) + text + _ANSI_RESET
 
     def feed(self, event: dict[str, Any]) -> None:
         event_type = event.get("type")
@@ -64,7 +85,7 @@ class StreamFormatter:
             self._last_message_id = mid
             self._turn += 1
             ts = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            self._write(f"\n=== Turn {self._turn} [{ts}] ===")
+            self._write("\n" + self._paint(f"=== Turn {self._turn} [{ts}] ===", _ANSI_DIM))
         content = message.get("content")
         if not isinstance(content, list):
             return
@@ -124,13 +145,14 @@ class StreamFormatter:
             pass
 
 
-def run(stdin: TextIO, stdout: TextIO) -> int:
+def run(stdin: TextIO, stdout: TextIO, color: bool | None = None) -> int:
     """Read stream-json lines from ``stdin``, write the rendering to ``stdout``.
 
     Returns 0; the loop swallows malformed lines (echoing them raw) so the
-    pane filter never exits non-zero on bad input.
+    pane filter never exits non-zero on bad input. ``color`` is forwarded to
+    :class:`StreamFormatter` (``None`` auto-detects via ``stdout.isatty()``).
     """
-    formatter = StreamFormatter(stdout)
+    formatter = StreamFormatter(stdout, color=color)
     for line in stdin:
         stripped = line.strip()
         if not stripped:
