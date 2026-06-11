@@ -1,0 +1,31 @@
+i just had drain-cycle run and it finished work for ABA-386
+but no PR was opened
+
+what happened
+
+---
+
+fix 1 and lets explore the prompt gap with either /idea-refine or something equivalent to make sure we spec out the work correctly
+
+---
+
+i want to fast track development of this, so lets spec here and build now
+what questions can you figure out on your own without my input? 
+
+lets go with the recommended approach on the contract
+
+---
+
+yes to the first 2, don't start increment 2 yet i want to compact this session before that
+
+---
+
+explain the second increment of work, what's the plan, why should i do it, consequence of not doing it
+
+---
+
+start the build - use an appropriate skill to author it
+
+---
+
+run /code-review in a sub-agent and then run /simplify in a sub-agent once all the issues have been fixed
