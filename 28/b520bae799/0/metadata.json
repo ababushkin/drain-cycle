@@ -1,0 +1,55 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "28b520bae799",
+  "session_id": "399a9db7-09ca-4a0f-bf6e-dc9b441ed754",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-11T13:50:02.386739Z",
+  "branch": "ABA-389",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "tests/test_watch_format.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "8f6104f43c02",
+  "token_usage": {
+    "input_tokens": 16348,
+    "cache_creation_tokens": 32378,
+    "cache_read_tokens": 778024,
+    "output_tokens": 6038,
+    "api_call_count": 18
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-11T13:50:02.381468Z",
+    "agent_lines": 1,
+    "agent_removed": 1,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1,
+    "total_lines_changed": 2,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 635,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/delivery-plans/watch-pane-rich-rendering/D1-filter-never-breaks-the-pane/N01-crash-proof-filter.md": 72,
+        "docs/delivery-plans/watch-pane-rich-rendering/D1-filter-never-breaks-the-pane/_deliverable.md": 37,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N02-transcript-rendering-core.md": 94,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N03-ansi-color-layer.md": 69,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N05-docs-pane-rendering.md": 71,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/_deliverable.md": 42,
+        "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/N04-usage-status-and-footer.md": 75,
+        "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/_deliverable.md": 35,
+        "docs/delivery-plans/watch-pane-rich-rendering/README.md": 89,
+        "docs/ideas/drain-past-the-merge-gate.md": 51
+      }
+    }
+  ]
+}
