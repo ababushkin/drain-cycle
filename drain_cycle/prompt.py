@@ -40,14 +40,14 @@ def _shape_task_directive(identifier: str) -> str:
 
 
 _TAIL = (
-    "before marking Done: run /code-review-and-quality on the working-tree "
-    "changes, fix Critical/Required findings, commit + push, then post a "
+    "before marking Done: review the working-tree changes for correctness "
+    "and quality, fix Critical/Required findings, commit + push, then post a "
     "review-summary comment on the issue and transition to Done."
 )
 
 _STACK_TAIL = (
-    "before marking Done: run /code-review-and-quality on the working-tree "
-    "changes, fix Critical/Required findings, commit to the issue branch "
+    "before marking Done: review the working-tree changes for correctness "
+    "and quality, fix Critical/Required findings, commit to the issue branch "
     "without pushing, write .drain-handoff.json, then post a review-summary "
     "comment on the issue and transition to Done."
 )
@@ -82,7 +82,7 @@ def _normal_preamble(
         "- Base branch: main\n"
         f"- Completion sequence for issue {identifier} (run in this order, "
         "before marking Done):\n"
-        "  1. Run `/code-review-and-quality` against the working-tree changes.\n"
+        "  1. Review the working-tree changes for correctness and quality.\n"
         "  2. Fix any Critical or Required findings. Lower-severity findings "
         "are at your discretion.\n"
         "  3. Commit and push to main.\n"
@@ -106,7 +106,7 @@ def _stack_preamble(
         "- Base branch: main\n"
         f"- Completion sequence for issue {identifier} (run in this order, "
         "before marking Done):\n"
-        "  1. Run `/code-review-and-quality` against the working-tree changes.\n"
+        "  1. Review the working-tree changes for correctness and quality.\n"
         "  2. Fix any Critical or Required findings. Lower-severity findings "
         "are at your discretion.\n"
         "  3. Commit to the issue branch (do not push).\n"
