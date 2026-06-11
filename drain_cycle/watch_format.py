@@ -97,11 +97,16 @@ class StreamFormatter:
                 continue
             if block.get("type") == "tool_result":
                 result_content = block.get("content") or []
-                size = sum(
-                    len(str(c.get("text", "")))
-                    for c in result_content
-                    if isinstance(c, dict)
-                )
+                if isinstance(result_content, str):
+                    size = len(result_content)
+                elif isinstance(result_content, list):
+                    size = sum(
+                        len(str(c.get("text", "")))
+                        for c in result_content
+                        if isinstance(c, dict)
+                    )
+                else:
+                    size = 0
                 self._write(f"← {size} chars")
 
     def _feed_result(self, event: dict[str, Any]) -> None:
@@ -136,7 +141,10 @@ def run(stdin: TextIO, stdout: TextIO) -> int:
             formatter._write(stripped)
             continue
         if isinstance(event, dict):
-            formatter.feed(event)
+            try:
+                formatter.feed(event)
+            except Exception:
+                formatter._write(stripped)
         else:
             formatter._write(stripped)
     return 0

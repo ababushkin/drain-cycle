@@ -134,6 +134,109 @@ def test_non_json_line_echoed_raw() -> None:
     assert "=== done: 1 turns ===" in out
 
 
+def test_raising_render_echoes_raw_and_continues(monkeypatch) -> None:
+    """If per-event rendering raises, the raw line is echoed and the loop
+    keeps running — a single rendering bug cannot kill the pane filter."""
+    original_feed = watch_format.StreamFormatter.feed
+    calls = {"n": 0}
+
+    def flaky_feed(self, event):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("boom")
+        return original_feed(self, event)
+
+    monkeypatch.setattr(watch_format.StreamFormatter, "feed", flaky_feed)
+
+    raw = _result(num_turns=1)
+    out = _render([raw, _result(num_turns=2)])
+    assert raw in out
+    assert "=== done: 2 turns ===" in out
+
+
+def test_tool_result_content_string_form() -> None:
+    """``tool_result.content`` arrives as a plain string in some sessions; the
+    size line renders as the string's length."""
+    line = json.dumps(
+        {
+            "type": "user",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "toolu_1",
+                        "content": "hello world",
+                    }
+                ]
+            },
+        }
+    )
+    out = _render([line])
+    assert "← 11 chars" in out
+
+
+def test_tool_result_content_empty() -> None:
+    """Missing/empty ``tool_result.content`` renders as zero chars."""
+    line = json.dumps(
+        {
+            "type": "user",
+            "message": {
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "toolu_1", "content": []}
+                ]
+            },
+        }
+    )
+    out = _render([line])
+    assert "← 0 chars" in out
+
+
+def test_pathological_shapes_do_not_crash() -> None:
+    """Malformed events (wrong types in fields the formatter touches) must
+    render with rc 0 and no traceback — the filter falls back to echoing the
+    raw line for any event whose render path raises."""
+    lines = [
+        # non-dict message
+        json.dumps({"type": "assistant", "message": "not-a-dict"}),
+        json.dumps({"type": "user", "message": 42}),
+        # content list contains bare strings (not dicts)
+        json.dumps(
+            {
+                "type": "assistant",
+                "message": {"id": "m1", "content": ["bare", 123]},
+            }
+        ),
+        # non-dict input on tool_use
+        json.dumps(
+            {
+                "type": "assistant",
+                "message": {
+                    "id": "m2",
+                    "content": [
+                        {"type": "tool_use", "id": "t1", "name": "X", "input": "weird"}
+                    ],
+                },
+            }
+        ),
+        # string-valued usage fields (in case any future render path touches them)
+        json.dumps(
+            {
+                "type": "assistant",
+                "message": {
+                    "id": "m3",
+                    "content": [{"type": "text", "text": "ok"}],
+                    "usage": {"input_tokens": "many", "output_tokens": "few"},
+                },
+            }
+        ),
+        _result(num_turns=1),
+    ]
+    stdout = io.StringIO()
+    rc = watch_format.run(io.StringIO("\n".join(lines) + "\n"), stdout)
+    assert rc == 0
+    assert "=== done: 1 turns ===" in stdout.getvalue()
+
+
 def test_blank_lines_skipped() -> None:
     """Blank lines between events produce no output and don't perturb turn
     counting."""
