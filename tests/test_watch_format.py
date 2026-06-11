@@ -98,14 +98,14 @@ def test_text_tool_use_and_tool_result_rendered() -> None:
 
 
 def test_unknown_content_types_silently_skipped() -> None:
-    """Unknown content block types (e.g. thinking) are skipped — no crash,
-    no spurious output."""
+    """Unknown content block types are skipped — no crash, no spurious
+    output. ``thinking``/``text`` are known and render through."""
     out = _render(
         [
             _assistant_with_content(
                 "msg_a",
                 [
-                    {"type": "thinking", "thinking": "Let me think..."},
+                    {"type": "future_unknown", "blob": "???"},
                     {"type": "text", "text": "Result."},
                 ],
             ),
@@ -113,8 +113,7 @@ def test_unknown_content_types_silently_skipped() -> None:
         ]
     )
     assert "Result." in out
-    # thinking block content must not appear
-    assert "Let me think" not in out
+    assert "???" not in out
 
 
 def test_result_without_cost_renders_turns_only() -> None:
@@ -258,6 +257,57 @@ def test_color_true_dims_turn_header() -> None:
     )
     assert "\x1b[2m=== Turn 1" in out
     assert "===\x1b[0m" in out
+
+
+def test_color_styles_each_surface() -> None:
+    """With ``color=True`` each rendered surface carries its escape:
+    cyan tool names, dim tool_result, red on ``is_error``, dim-italic
+    thinking, dim done footer."""
+    error_result = json.dumps(
+        {
+            "type": "user",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "toolu_2",
+                        "is_error": True,
+                        "content": "boom",
+                    }
+                ]
+            },
+        }
+    )
+    out = _render(
+        [
+            _assistant_with_content(
+                "msg_a",
+                [
+                    {"type": "thinking", "thinking": "musing"},
+                    {
+                        "type": "tool_use",
+                        "id": "toolu_1",
+                        "name": "Read",
+                        "input": {"file_path": "/x"},
+                    },
+                ],
+            ),
+            _user_tool_result("toolu_1", "ok"),
+            error_result,
+            _result(total_cost_usd=0.01, num_turns=1),
+        ],
+        color=True,
+    )
+    # Thinking: dim + italic.
+    assert "\x1b[2m\x1b[3mmusing\x1b[0m" in out
+    # Tool name: cyan.
+    assert "→ \x1b[36mRead\x1b[0m(" in out
+    # Tool result: dim on the success line.
+    assert "\x1b[2m← 2 chars\x1b[0m" in out
+    # Tool result: red on the error line.
+    assert "\x1b[31m← 4 chars\x1b[0m" in out
+    # Done footer: dim.
+    assert "\x1b[2m=== done: 1 turns" in out
 
 
 def test_blank_lines_skipped() -> None:

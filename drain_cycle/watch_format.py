@@ -11,8 +11,9 @@ operator sees activity live rather than in buffered chunks.
 
 Content block handling:
 - ``text`` → assistant prose written as-is
-- ``tool_use`` → ``→ Name(key=val, ...)`` with truncated input
-- ``tool_result`` (in ``user`` events) → ``← N chars``
+- ``thinking`` → dim-italic when colour is on, plain otherwise
+- ``tool_use`` → ``→ Name(key=val, ...)`` with truncated input (name in cyan)
+- ``tool_result`` (in ``user`` events) → ``← N chars`` dim, red on ``is_error``
 - unknown block types → silently skipped (forward-compat)
 ``result`` events → ``=== done: N turns, $X.XX ===`` footer.
 
@@ -104,7 +105,11 @@ class StreamFormatter:
                     f"{k}={repr(v)}"[:_INPUT_MAX]
                     for k, v in (inp.items() if isinstance(inp, dict) else [])
                 )
-                self._write(f"→ {name}({args})")
+                self._write(f"→ {self._paint(str(name), _ANSI_CYAN)}({args})")
+            elif btype == "thinking":
+                thought = block.get("thinking", "")
+                if thought:
+                    self._write(self._paint(str(thought), _ANSI_DIM, _ANSI_ITALIC))
 
     def _feed_user(self, event: dict[str, Any]) -> None:
         message = event.get("message")
@@ -128,15 +133,17 @@ class StreamFormatter:
                     )
                 else:
                     size = 0
-                self._write(f"← {size} chars")
+                style = _ANSI_RED if block.get("is_error") else _ANSI_DIM
+                self._write(self._paint(f"← {size} chars", style))
 
     def _feed_result(self, event: dict[str, Any]) -> None:
         turns = event.get("num_turns")
         cost = event.get("total_cost_usd")
         if cost is not None:
-            self._write(f"\n=== done: {turns} turns, ${cost:.2f} ===")
+            footer = f"=== done: {turns} turns, ${cost:.2f} ==="
         else:
-            self._write(f"\n=== done: {turns} turns ===")
+            footer = f"=== done: {turns} turns ==="
+        self._write("\n" + self._paint(footer, _ANSI_DIM))
 
     def _write(self, text: str) -> None:
         try:
