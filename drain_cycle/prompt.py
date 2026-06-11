@@ -106,14 +106,13 @@ def _stack_preamble(
     # slices ``<base>..HEAD`` instead of its ``main..HEAD`` default and
     # opens the PR against the right base. Omitted for the ``main`` base so
     # the unchained prompt stays unchanged.
-    base_clause = (
-        ""
-        if base == "main"
-        else (
+    if base == "main":
+        base_clause = ""
+    else:
+        base_clause = (
             f" These commits are stacked on `{base}`, not `main`, so pass "
             f"`{base}` to the skill as its base branch (it slices `{base}..HEAD`)."
         )
-    )
     return (
         "---\n\n"
         f"{resume_segment}"

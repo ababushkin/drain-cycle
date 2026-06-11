@@ -538,7 +538,10 @@ def _drain_one_issue(
         # Chain onto the prior same-repo issue's branch only in stack mode;
         # push-mode issues always branch off ``main`` (they land on main, so
         # there is no stack to extend).
-        base = baton.get(target_repo.name, worktree.BASE_BRANCH) if stack else worktree.BASE_BRANCH
+        if stack:
+            base = baton.get(target_repo.name, worktree.BASE_BRANCH)
+        else:
+            base = worktree.BASE_BRANCH
         try:
             handle = worktree.ensure(target_repo, identifier, base)
             worktree_path = handle.path
@@ -810,11 +813,8 @@ def _drain_one_issue(
                 # submitted PRs as the orchestrator's confirmation line.
                 baton[target_repo.name] = identifier
                 issue_span.set_attribute("issue.submitted_pr_count", len(submitted.pr_urls))
-                console.worker_event(
-                    identifier,
-                    "submitted "
-                    + ", ".join(pr.url for pr in submitted.pr_urls),
-                )
+                pr_list = ", ".join(pr.url for pr in submitted.pr_urls)
+                console.worker_event(identifier, f"submitted {pr_list}")
 
             issue_span.set_attribute("issue.final_linear_state", post_spawn_state)
 
