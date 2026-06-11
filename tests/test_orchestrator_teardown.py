@@ -97,7 +97,7 @@ def test_orchestrator_continues_and_records_teardown_failure(
     fake_claude = _write_fake_claude_script(tmp_path, done_marker)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
 
-    exit_code = orchestrator.run(_stub_repos(repo))
+    exit_code = orchestrator.run(_stub_repos(repo), no_stack=True)
 
     # The issue is Done — teardown failure must not halt the drain.
     assert exit_code == 0

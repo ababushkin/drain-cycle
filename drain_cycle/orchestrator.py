@@ -368,6 +368,12 @@ def _run(
     in_tmux = bool(os.environ.get("TMUX"))
     current_pane_id: str | None = None
 
+    # Per-repo base-branch baton for cross-issue stacking: maps a repo name
+    # to the branch of the last issue that submitted PRs there, so the next
+    # same-repo issue branches its worktree off that branch (a true Graphite
+    # stack) instead of off ``main``. Mutated in place by each drained issue.
+    repo_baton: dict[str, str] = {}
+
     total = len(plan.order)
     for index, issue in enumerate(plan.order):
         # Kill the pane from the previous issue before opening one for this issue.
@@ -387,6 +393,7 @@ def _run(
             watch=watch,
             in_tmux=in_tmux,
             no_stack=no_stack,
+            repo_baton=repo_baton,
         )
         if halt_code is not None:
             _emit_summary(log, total=total, halted_on=issue["identifier"])
@@ -429,6 +436,7 @@ def _drain_one_issue(
     watch: bool = False,
     in_tmux: bool = False,
     no_stack: bool = False,
+    repo_baton: dict[str, str] | None = None,
 ) -> tuple[int | None, str | None]:
     """Drain a single issue end to end inside a ``drain.issue`` span.
 
@@ -526,8 +534,14 @@ def _drain_one_issue(
                 return 1, None
 
         stack = target_repo.name not in repos.push_to_main_repos and not no_stack
+        baton = repo_baton if repo_baton is not None else {}
+        # Chain onto the prior same-repo issue's branch only in stack mode;
+        # push-mode issues always branch off ``main`` (they land on main, so
+        # there is no stack to extend).
+        base = baton.get(target_repo.name, worktree.BASE_BRANCH) if stack else worktree.BASE_BRANCH
+        issue_span.set_attribute("issue.base_branch", base)
         try:
-            handle = worktree.ensure(target_repo, identifier, worktree.BASE_BRANCH)
+            handle = worktree.ensure(target_repo, identifier, base)
             worktree_path = handle.path
             # A worktree checks out only tracked files, so gitignored
             # project config (.claude/, .mcp.json) is absent. Symlink it in
@@ -572,7 +586,9 @@ def _drain_one_issue(
         # Replaces any prior marker so a resumed worktree starts fresh.
         stop_guard.write_marker(worktree_path, mode="stack" if stack else "push")
 
-        agent_prompt = prompt.build(issue, worktree_path, resumed=handle.resumed, stack=stack)
+        agent_prompt = prompt.build(
+            issue, worktree_path, resumed=handle.resumed, stack=stack, base=base
+        )
         issue_span.set_attribute("issue.resumed", handle.resumed)
         worker_model = model.resolve(issue)
         issue_span.set_attribute("issue.model", worker_model)
@@ -739,6 +755,62 @@ def _drain_one_issue(
         issue_span.set_attribute("issue.is_done", is_done)
 
         if is_done:
+            # Stack-mode confirmation gate, read before teardown removes the
+            # worktree. A Done issue in stack mode must have left a non-empty
+            # ``pr_urls`` — that is the orchestrator's proof submission ran.
+            # If it's missing, the worker marked Done without opening a PR
+            # (the regression this feature closes): revert + halt, preserve
+            # the worktree for inspection, and do NOT extend the baton — the
+            # next same-repo issue must not stack onto a branch that was
+            # never pushed.
+            submitted = handoff.read(worktree_path) if stack else None
+            if stack and submitted is None:
+                original_state_name = issue["state"]["name"]
+                effective_state, revert_error = _revert_to_pre_halt_state(
+                    issue["id"],
+                    target_state_name=original_state_name,
+                    pre_revert_state_name=post_spawn_state,
+                )
+                halt_reason = (
+                    f"{_halt_message(identifier, effective_state, worktree_path)}"
+                    " — marked Done but .drain-handoff.json has no submitted "
+                    "pr_urls; stack chain halted"
+                )
+                if revert_error is not None:
+                    halt_reason += (
+                        f" — revert to {original_state_name!r} failed: {revert_error}"
+                    )
+                log.append_entry(
+                    issue_identifier=identifier,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    exit_code=result.exit_code,
+                    final_linear_state=effective_state,
+                    worktree_path=str(worktree_path),
+                    halt_reason=halt_reason,
+                    flow=flow_name,
+                    outcome_verdict=outcome_verdict,
+                    prep_verdict=prep_verdict,
+                    responder_runs=responder_runs,
+                    shape_task_invoked=is_verify,
+                    **_worker_log_fields(result),
+                )
+                issue_span.set_attribute("issue.final_linear_state", effective_state)
+                telemetry.mark_error(issue_span, "err-stack-no-prs", halt_reason)
+                console.halt(halt_reason)
+                return 1, pane_id
+
+            if submitted is not None:
+                # Hand the baton to the next same-repo issue and record the
+                # submitted PRs as the orchestrator's confirmation line.
+                baton[target_repo.name] = identifier
+                issue_span.set_attribute("issue.submitted_pr_count", len(submitted.pr_urls))
+                console.worker_event(
+                    identifier,
+                    "submitted "
+                    + ", ".join(pr.url for pr in submitted.pr_urls),
+                )
+
             issue_span.set_attribute("issue.final_linear_state", post_spawn_state)
 
             remove_error: str | None = None

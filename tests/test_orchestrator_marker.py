@@ -130,7 +130,7 @@ def test_marker_written_before_spawn_and_cleared_after_done(
     noop_script = _write_noop_script(tmp_path)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(noop_script)])
 
-    orchestrator.run(_stub_repos(repo))
+    orchestrator.run(_stub_repos(repo), no_stack=True)
 
     # Marker was present at spawn time.
     assert marker_at_spawn is not None
@@ -158,7 +158,7 @@ def test_marker_cleared_after_not_done_halt(
     noop_script = _write_noop_script(tmp_path)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(noop_script)])
 
-    rc = orchestrator.run(_stub_repos(repo))
+    rc = orchestrator.run(_stub_repos(repo), no_stack=True)
     assert rc != 0
     assert progress.read() is None
 
@@ -189,7 +189,7 @@ def test_marker_not_written_on_pre_spawn_resolution_failure(
     )
     monkeypatch.setattr(linear, "set_state", lambda *_: None)
 
-    rc = orchestrator.run(_stub_repos(repo))
+    rc = orchestrator.run(_stub_repos(repo), no_stack=True)
     assert rc != 0
     assert progress.read() is None
 
@@ -225,7 +225,7 @@ def test_marker_index_and_total_correct_for_multiple_issues(
     noop_script = _write_noop_script(tmp_path)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(noop_script)])
 
-    rc = orchestrator.run(_stub_repos(repo))
+    rc = orchestrator.run(_stub_repos(repo), no_stack=True)
     assert rc == 0
 
     assert len(captured) == 2
@@ -275,7 +275,7 @@ def test_marker_progress_updated_via_on_progress_callback(
     noop_script = _write_noop_script(tmp_path)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(noop_script)])
 
-    orchestrator.run(_stub_repos(repo))
+    orchestrator.run(_stub_repos(repo), no_stack=True)
 
     assert len(progress_snapshots) == 1
     snap = progress_snapshots[0]

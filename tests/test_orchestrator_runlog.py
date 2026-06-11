@@ -93,7 +93,7 @@ def test_orchestrator_writes_runlog_with_one_entry_per_successful_issue(
     fake_claude = _write_fake_claude_script(tmp_path, done_marker)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}))
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), no_stack=True)
     assert exit_code == 0
 
     # Per-run filename: one file per drain-cycle invocation,
@@ -194,7 +194,7 @@ def test_runlog_done_entry_carries_worker_usage_from_stream(
     fake_claude = _write_streaming_claude_script(tmp_path, done_marker)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}))
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), no_stack=True)
     assert exit_code == 0
 
     runs_dir = tmp_path / ".drain-cycle" / "runs"

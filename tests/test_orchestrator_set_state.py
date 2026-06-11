@@ -101,7 +101,7 @@ def test_orchestrator_transitions_to_in_progress_before_each_spawn(
     fake_claude = _write_fake_claude_script(tmp_path, trace)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}))
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), no_stack=True)
 
     assert exit_code == 0
     # Every picked issue had set_state called with "In Progress", in pick order.

@@ -112,7 +112,7 @@ def test_orchestrator_drains_every_issue_in_sorted_order(
     fake_claude = _write_fake_claude_script(tmp_path, done_marker)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}))
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), no_stack=True)
 
     assert exit_code == 0
     # The script appends the worktree-basename (== issue identifier) on each
@@ -174,7 +174,7 @@ def test_orchestrator_passes_resolved_model_to_worker(
     fake_claude = _write_argv_capturing_claude_script(tmp_path, done_marker, argv_dir)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}))
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), no_stack=True)
     assert exit_code == 0
 
     assert _model_arg(argv_dir / "ABA-DEF.txt") == "claude-sonnet-4-6"
@@ -228,7 +228,7 @@ def test_orchestrator_links_project_config_into_worker_cwd(
     fake_claude = _write_config_probe_claude_script(tmp_path, done_marker, probe_dir)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}))
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), no_stack=True)
 
     assert exit_code == 0
     # The probe ran inside the worktree and could read .claude/settings.json
@@ -274,7 +274,7 @@ def _captured_argv_for_one_issue(
     fake_claude = _write_argv_capturing_claude_script(tmp_path, done_marker, argv_dir)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
 
-    assert orchestrator.run(repos.Repos(mapping={"test-repo": repo})) == 0
+    assert orchestrator.run(repos.Repos(mapping={"test-repo": repo}), no_stack=True) == 0
     return (argv_dir / f"{identifier}.txt").read_text().splitlines()
 
 
@@ -363,7 +363,7 @@ def test_orchestrator_respects_blocks_over_sort_order(
     fake_claude = _write_fake_claude_script(tmp_path, done_marker)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}))
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), no_stack=True)
 
     assert exit_code == 0
     # Blocker must appear before blocked in the execution log.
@@ -427,7 +427,7 @@ def test_orchestrator_defers_blocked_issue_and_logs_to_stderr(
     fake_claude = _write_fake_claude_script(tmp_path, done_marker)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}))
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), no_stack=True)
 
     assert exit_code == 0
     # Only the free issue ran.

@@ -187,7 +187,7 @@ def test_watch_runs_claude_in_pane_via_fifo(
         subprocess, "run", _make_fake_tmux(tmux_calls, [0], done_marker=done_marker)
     )
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), watch=True)
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), watch=True, no_stack=True)
     assert exit_code == 0
 
     split_calls = [c for c in tmux_calls if len(c) > 1 and c[1] == "split-window"]
@@ -239,7 +239,7 @@ def test_no_tmux_call_when_tmux_env_not_set(
 
     monkeypatch.setattr(subprocess, "run", capturing_run)
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), watch=True)
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), watch=True, no_stack=True)
     assert exit_code == 0
     assert tmux_calls == [], f"unexpected tmux calls: {tmux_calls}"
 
@@ -271,7 +271,7 @@ def test_tmux_failure_does_not_crash_drain(
 
     monkeypatch.setattr(subprocess, "run", failing_tmux)
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), watch=True)
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), watch=True, no_stack=True)
     # Drain must succeed (via the subprocess fallback) even though tmux failed.
     assert exit_code == 0
     assert "ABA-TF" in _completed(done_marker)
@@ -302,7 +302,7 @@ def test_tmux_pane_opened_and_prior_pane_killed_on_next_issue(
         subprocess, "run", _make_fake_tmux(tmux_calls, [0], done_marker=done_marker)
     )
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), watch=True)
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), watch=True, no_stack=True)
     assert exit_code == 0
 
     split_calls = [c for c in tmux_calls if len(c) > 1 and c[1] == "split-window"]
@@ -347,7 +347,7 @@ def test_fifo_timeout_falls_back_to_subprocess(
         subprocess, "run", _make_fake_tmux(tmux_calls, [0], done_marker=None)
     )
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), watch=True)
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), watch=True, no_stack=True)
     # Fallback spawn ran fake-claude, which marked the issue done.
     assert exit_code == 0
     assert "ABA-TO" in _completed(done_marker)
@@ -383,7 +383,7 @@ def test_watch_false_by_default_no_panes_or_logs(
         subprocess, "run", _make_fake_tmux(tmux_calls, [0], done_marker=done_marker)
     )
 
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}))
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), no_stack=True)
     assert exit_code == 0
     assert tmux_calls == []
 

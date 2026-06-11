@@ -25,6 +25,15 @@ import pytest
 
 from drain_cycle import linear, orchestrator, repos
 
+# Shell fragment a fake stack-mode worker appends to emit the handoff a real
+# `/shape:pr-finishing` run would write — the orchestrator reads its non-empty
+# ``pr_urls`` as proof the issue's PRs were submitted before tearing down.
+_HANDOFF_LINE = (
+    "printf '%s' "
+    "'{\"pr_urls\":[{\"title\":\"feat\",\"url\":\"https://x/pull/1\"}]}'"
+    " > .drain-handoff.json\n"
+)
+
 
 def _issue(
     identifier: str,
@@ -60,6 +69,7 @@ def _write_fake_claude(tmp_path: Path, marker: Path) -> Path:
     script.write_text(
         "#!/bin/sh\n"
         f'printf "%s\\t%s\\n" "$(basename "$PWD")" "$PWD" >> "{marker}"\n'
+        f"{_HANDOFF_LINE}"
     )
     script.chmod(0o755)
     return script
@@ -143,6 +153,7 @@ def _write_committing_claude(tmp_path: Path, marker: Path) -> Path:
         "git add work.txt\n"
         'git commit -m "work for $id"\n'
         f'printf "%s\\n" "$id" >> "{marker}"\n'
+        f"{_HANDOFF_LINE}"
     )
     script.chmod(0o755)
     return script
@@ -160,12 +171,13 @@ def _git_log_hashes(path: Path, ref: str = "HEAD") -> list[str]:
     return result.stdout.strip().splitlines()
 
 
-def test_stack_mode_all_worktrees_branch_from_main(
+def test_stack_mode_chains_same_repo_worktrees_off_prior_branch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """In stack mode (the default), all worktrees branch from main — the skill
-    owns gt stacking, so the orchestrator no longer chains worktrees off prior
-    issue branches. Each completed issue's worktree is torn down normally."""
+    """In stack mode, consecutive same-repo issues chain: the second issue's
+    worktree branches off the first issue's branch (a true Graphite stack),
+    while an issue in a different repo still branches off its own main. Each
+    completed issue's worktree is torn down normally."""
     repo_a = tmp_path / "repo-a"
     repo_b = tmp_path / "repo-b"
     repo_a.mkdir()
@@ -215,12 +227,65 @@ def test_stack_mode_all_worktrees_branch_from_main(
     assert not (repo_a / ".worktrees" / "ABA-2").exists()
     assert not (repo_b / ".worktrees" / "ABA-3").exists()
 
-    # All branches fork from main — the skill handles gt stacking, not the orchestrator.
+    # ABA-2 (same repo, runs after ABA-1) is stacked on ABA-1: ABA-1's commit
+    # is an ancestor of ABA-2, so it appears in ABA-2's history.
     hashes_1 = _git_log_hashes(repo_a, "ABA-1")
     hashes_2 = _git_log_hashes(repo_a, "ABA-2")
-    main_hashes = _git_log_hashes(repo_a, "main")
-    assert main_hashes[0] in hashes_1
-    assert main_hashes[0] in hashes_2
+    assert hashes_1[0] in hashes_2
+    # ABA-3 is in a different repo, so it branches from that repo's main, not
+    # from any alpha branch.
+    main_b = _git_log_hashes(repo_b, "main")
+    hashes_3 = _git_log_hashes(repo_b, "ABA-3")
+    assert main_b[0] in hashes_3
+
+
+def test_stack_mode_done_without_handoff_halts_and_preserves_worktree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stack-mode issue the worker marked Done but left no submitted
+    ``pr_urls`` must halt the run rather than tear down: the orchestrator
+    cannot let the next same-repo issue stack onto a branch that was never
+    pushed. The worktree is preserved for inspection and the run exits
+    non-zero."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    issue = _issue("ABA-1", repo_name="alpha", sort_order=1.0)
+    issues_by_id = {issue["id"]: issue}
+    marker = tmp_path / "done.txt"
+
+    def fake_pending_issues(cycle_id: str):
+        completed = set(_lines(marker))
+        return linear._plan(
+            [i for i in [issue] if i["identifier"] not in completed]
+        )
+
+    def fake_get_issue(issue_id: str) -> dict:
+        if issues_by_id[issue_id]["identifier"] in set(_lines(marker)):
+            return {**issues_by_id[issue_id], "state": {"type": "completed", "name": "Done"}}
+        return issues_by_id[issue_id]
+
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "cycle-id")
+    monkeypatch.setattr(linear, "pending_issues", fake_pending_issues)
+    monkeypatch.setattr(linear, "get_issue", fake_get_issue)
+    monkeypatch.setattr(linear, "set_state", lambda issue_id, name: None)
+
+    # Worker marks the issue Done but writes no .drain-handoff.json.
+    script = tmp_path / "no-handoff-claude.sh"
+    script.write_text(
+        "#!/bin/sh\n"
+        f'printf "%s\\n" "$(basename "$PWD")" >> "{marker}"\n'
+    )
+    script.chmod(0o755)
+    monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(script)])
+
+    exit_code = orchestrator.run(repos.Repos(mapping={"alpha": repo}))
+
+    assert exit_code != 0
+    # Worktree is preserved (not torn down) so the work can be inspected.
+    assert (repo / ".worktrees" / "ABA-1").exists()
 
 
 # ---------------------------------------------------------------------------

@@ -130,7 +130,7 @@ def test_orchestrator_stops_cycle_when_cycle_token_cap_breached(
         cycle_seconds=None,
     )
 
-    exit_code = orchestrator.run(repos.Repos(mapping={_TEST_REPO_NAME: repo}), lim)
+    exit_code = orchestrator.run(repos.Repos(mapping={_TEST_REPO_NAME: repo}), lim, no_stack=True)
     assert exit_code == 1
 
     payload = json.loads(

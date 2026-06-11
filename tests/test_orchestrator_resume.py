@@ -204,11 +204,13 @@ def test_resume_reuses_preserved_worktree_and_signals_resumed_prompt(
     build_calls: list[dict] = []
     real_build = prompt.build
 
-    def recording_build(issue_arg, worktree_arg, *, resumed=False, stack=False):
+    def recording_build(issue_arg, worktree_arg, *, resumed=False, stack=False, base="main"):
         build_calls.append(
             {"identifier": issue_arg["identifier"], "resumed": resumed}
         )
-        return real_build(issue_arg, worktree_arg, resumed=resumed, stack=stack)
+        return real_build(
+            issue_arg, worktree_arg, resumed=resumed, stack=stack, base=base
+        )
 
     monkeypatch.setattr(prompt, "build", recording_build)
 
@@ -217,7 +219,7 @@ def test_resume_reuses_preserved_worktree_and_signals_resumed_prompt(
 
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(_noop_claude(tmp_path))])
 
-    exit_code = orchestrator.run(_stub_repos(repo))
+    exit_code = orchestrator.run(_stub_repos(repo), no_stack=True)
     # The no-op claude leaves Linear at Todo, so the orchestrator halts on
     # the not-Done branch — but the load-bearing assertions below are about
     # what happened BEFORE that halt: ensure reused, prompt was resumed.
