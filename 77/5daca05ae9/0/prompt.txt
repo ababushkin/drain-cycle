@@ -2,3 +2,7 @@ i just had drain-cycle run and it finished work for ABA-386
 but no PR was opened
 
 what happened
+
+---
+
+fix 1 and lets explore the prompt gap with either /idea-refine or something equivalent to make sure we spec out the work correctly

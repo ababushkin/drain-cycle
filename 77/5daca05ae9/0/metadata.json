@@ -19,6 +19,40 @@
     "output_tokens": 9296,
     "api_call_count": 22
   },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01UY1qEAGAuQ9ububFNhPgYM",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "agent-skills:idea-refine"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "74f91e48b419",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 176,
+        "end": 177,
+        "entry_ids": [
+          "9565b7ad-3b83-43a5-bf37-e21107cd28a1"
+        ],
+        "tool_use_id": "toolu_01UY1qEAGAuQ9ububFNhPgYM"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01UY1qEAGAuQ9ububFNhPgYM"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: agent-skills:idea-refine",
+        "default_collapsed": true
+      }
+    }
+  ],
   "session_metrics": {
     "turn_count": 2
   },
