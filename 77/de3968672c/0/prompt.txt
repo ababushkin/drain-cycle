@@ -1,0 +1,15 @@
+i just had drain-cycle run and it finished work for ABA-386
+but no PR was opened
+
+what happened
+
+---
+
+fix 1 and lets explore the prompt gap with either /idea-refine or something equivalent to make sure we spec out the work correctly
+
+---
+
+i want to fast track development of this, so lets spec here and build now
+what questions can you figure out on your own without my input? 
+
+lets go with the recommended approach on the contract
