@@ -29,7 +29,7 @@ from typing import Any
 
 import pytest
 
-from drain_cycle import linear, orchestrator, repos
+from drain_cycle import linear, orchestrator, repos, watch
 
 
 def _issue(
@@ -333,7 +333,7 @@ def test_fifo_timeout_falls_back_to_subprocess(
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("TMUX", "/tmp/tmux-stub,1234,0")
     # Keep the startup window short so the timeout path is quick.
-    monkeypatch.setattr(orchestrator, "_WATCH_FIFO_TIMEOUT_SECONDS", 0.2)
+    monkeypatch.setattr(watch, "FIFO_TIMEOUT_SECONDS", 0.2)
 
     done_marker = tmp_path / "done.txt"
     raw_issues = [_issue("ABA-TO", 1.0)]
