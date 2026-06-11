@@ -1,0 +1,24 @@
+yes spec out the record_halt / HaltContext, be sure to include in your spec that the work should not be commited until a sub-agent has done a /code-review over the changes and subsequently a /simplify as well
+
+---
+
+go
+
+---
+
+review it in ~/src/agent-skills-shaper -- but keep in mind its designed at the "WHAT" level so not knowing exactly how the codebase has been implemented is not necessarily a bad thing
+
+---
+
+create a linear a ticket so i can action it later, include the information in that ticket just like we discused here and shape it using the /delivery-shape skill
+
+---
+
+honestly the delivery-shape skill wrote too much content, have a look at the ticket now and you'll see what i trimmed
+also a 'walking-skeleton' seemed completely overkill
+
+i think we should add more tuning to this skill - it should work for situations on single tasks as well as project/design breakdowns
+
+---
+
+yes thats fine, however; the goal should be written in a way that implies how we'll know something is done. think of it as if we're going to execute this task using the /goal skill
