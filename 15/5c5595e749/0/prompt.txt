@@ -1,0 +1,5 @@
+yes spec out the record_halt / HaltContext, be sure to include in your spec that the work should not be commited until a sub-agent has done a /code-review over the changes and subsequently a /simplify as well
+
+---
+
+go
