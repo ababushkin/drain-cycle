@@ -15,16 +15,16 @@ from __future__ import annotations
 import io
 import json
 
-from drain_cycle import watch_format
+from drain_cycle import watch_format, worker
 
 
-def _assistant_with_content(message_id: str, content: list) -> str:
-    return json.dumps(
-        {
-            "type": "assistant",
-            "message": {"id": message_id, "content": content},
-        }
-    )
+def _assistant_with_content(
+    message_id: str, content: list, usage: dict | None = None
+) -> str:
+    message: dict = {"id": message_id, "content": content}
+    if usage is not None:
+        message["usage"] = usage
+    return json.dumps({"type": "assistant", "message": message})
 
 
 def _user_tool_result(tool_use_id: str, content_text: str) -> str:
@@ -81,7 +81,7 @@ def test_text_tool_use_and_tool_result_rendered() -> None:
     )
 
     # Turn 1 header appears once (deduped by message_id).
-    assert out.count("=== Turn 1") == 1
+    assert out.count("· Turn 1 ·") == 1
     # Assistant prose.
     assert "I will read the file." in out
     # Tool call line.
@@ -90,10 +90,10 @@ def test_text_tool_use_and_tool_result_rendered() -> None:
     # Tool result size (500 chars of "x").
     assert "← 500 chars" in out
     # Turn 2 header.
-    assert "=== Turn 2" in out
+    assert "· Turn 2 ·" in out
     assert "Done." in out
     # Footer with cost.
-    assert "=== done: 2 turns" in out
+    assert "· done · 2 turns" in out
     assert "$0.05" in out
 
 
@@ -120,7 +120,7 @@ def test_result_without_cost_renders_turns_only() -> None:
     """A killed/partial run can emit a result with no ``total_cost_usd``; the
     footer then drops the cost segment rather than crashing on ``None``."""
     out = _render([_result(num_turns=3, session_id="s3", is_error=True)])
-    assert "=== done: 3 turns ===" in out
+    assert "· done · 3 turns · 0 tok · peak 0 ctx" in out
     assert "$" not in out
 
 
@@ -130,7 +130,7 @@ def test_non_json_line_echoed_raw() -> None:
     crash or a swallowed line."""
     out = _render(["not json at all", _result(num_turns=1)])
     assert "not json at all" in out
-    assert "=== done: 1 turns ===" in out
+    assert "· done · 1 turns" in out
 
 
 def test_raising_render_echoes_raw_and_continues(monkeypatch) -> None:
@@ -150,7 +150,7 @@ def test_raising_render_echoes_raw_and_continues(monkeypatch) -> None:
     raw = _result(num_turns=1)
     out = _render([raw, _result(num_turns=2)])
     assert raw in out
-    assert "=== done: 2 turns ===" in out
+    assert "· done · 2 turns" in out
 
 
 def test_tool_result_content_string_form() -> None:
@@ -233,7 +233,7 @@ def test_pathological_shapes_do_not_crash() -> None:
     stdout = io.StringIO()
     rc = watch_format.run(io.StringIO("\n".join(lines) + "\n"), stdout)
     assert rc == 0
-    assert "=== done: 1 turns ===" in stdout.getvalue()
+    assert "· done · 1 turns" in stdout.getvalue()
 
 
 def test_color_default_off_on_stringio() -> None:
@@ -255,8 +255,8 @@ def test_color_true_dims_turn_header() -> None:
         [_assistant_with_content("msg_a", [{"type": "text", "text": "Hi."}])],
         color=True,
     )
-    assert "\x1b[2m=== Turn 1" in out
-    assert "===\x1b[0m" in out
+    assert "\x1b[2m· Turn 1" in out
+    assert "ctx\x1b[0m" in out
 
 
 def test_color_styles_each_surface() -> None:
@@ -307,7 +307,7 @@ def test_color_styles_each_surface() -> None:
     # Tool result: red on the error line.
     assert "\x1b[31m← 4 chars\x1b[0m" in out
     # Done footer: dim.
-    assert "\x1b[2m=== done: 1 turns" in out
+    assert "\x1b[2m· done · 1 turns" in out
 
 
 def test_blank_lines_skipped() -> None:
@@ -320,7 +320,69 @@ def test_blank_lines_skipped() -> None:
             _assistant_with_content("msg_a", [{"type": "text", "text": "Again."}]),
         ]
     )
-    assert out.count("=== Turn 1") == 1
-    assert "=== Turn 2" not in out
+    assert out.count("· Turn 1 ·") == 1
+    assert "· Turn 2 ·" not in out
     assert "Hi." in out
     assert "Again." in out
+
+
+def _usage(inp: int, out: int, cc: int, cr: int) -> dict:
+    return {
+        "input_tokens": inp,
+        "output_tokens": out,
+        "cache_creation_input_tokens": cc,
+        "cache_read_input_tokens": cr,
+    }
+
+
+def _shared_fixture_events() -> list[str]:
+    """Stream with duplicate per-id events plus a mid-stream usage correction:
+    msg_a appears twice (first copy underreports tokens, second copy is the
+    final snapshot — last-copy-wins), msg_b appears once. Used to pin the
+    pane tally against the orchestrator accumulator."""
+    return [
+        _assistant_with_content(
+            "msg_a",
+            [{"type": "text", "text": "first"}],
+            usage=_usage(100, 50, 10, 20),
+        ),
+        _assistant_with_content(
+            "msg_a",
+            [{"type": "tool_use", "id": "t1", "name": "Read", "input": {}}],
+            usage=_usage(120, 60, 10, 30),
+        ),
+        _assistant_with_content(
+            "msg_b",
+            [{"type": "text", "text": "second"}],
+            usage=_usage(200, 80, 5, 150),
+        ),
+        _result(total_cost_usd=0.42, num_turns=2, session_id="s", is_error=False),
+    ]
+
+
+def test_tally_matches_worker_accumulator_on_shared_fixture() -> None:
+    """The pane tally must agree with ``worker._UsageAccumulator`` on the same
+    event stream — they implement the same per-id last-copy-wins arithmetic,
+    so cumulative and peak-context are pinned equal."""
+    events = _shared_fixture_events()
+
+    formatter = watch_format.StreamFormatter(io.StringIO(), color=False)
+    for line in events:
+        formatter.feed(json.loads(line))
+
+    acc = worker._UsageAccumulator()
+    for line in events:
+        acc.feed(json.loads(line))
+    acc_usage = acc.usage()
+
+    assert formatter._tally.cumulative() == acc_usage["cumulative"]
+    assert formatter._tally.peak_context() == acc_usage["peak_context"]
+
+
+def test_footer_renders_cumulative_and_peak() -> None:
+    """The footer carries cumulative tokens and peak-context, both
+    formatted via ``fmt_tokens``."""
+    out = _render(_shared_fixture_events())
+    # cumulative = 200+80+5+150 + 120+60+10+30 = 655
+    # peak ctx (msg_b) = 200 + 150 + 5 = 355
+    assert "· done · 2 turns · $0.42 · 655 tok · peak 355 ctx" in out
