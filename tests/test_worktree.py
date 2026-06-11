@@ -292,7 +292,7 @@ def test_ensure_leftover_branch_without_worktree_falls_through_to_add(
     handle = worktree.ensure(repo, "ABA-LEFT")
     # Simulate the partial-cleanup state: worktree gone, branch kept.
     subprocess.run(
-        ["git", "worktree", "remove", str(handle.path)],
+        ["git", "worktree", "remove", "--force", str(handle.path)],
         cwd=repo,
         check=True,
         capture_output=True,
@@ -378,6 +378,25 @@ def test_add_with_custom_base_forks_off_that_branch(tmp_path: Path) -> None:
         text=True,
     ).stdout.strip()
     assert wt_sha == feature_sha
+    # ``add`` records the base so a later resume can recover it.
+    assert worktree.read_base(wt) == "feature-base"
+
+
+def test_read_base_defaults_to_main_when_marker_absent(tmp_path: Path) -> None:
+    """A worktree with no base marker (created before the marker existed, or
+    not by ``add``) reads back ``main`` — the same default an unchained issue
+    computes."""
+    (tmp_path / worktree.BASE_FILE).unlink(missing_ok=True)
+    assert worktree.read_base(tmp_path) == "main"
+
+
+def test_add_default_base_records_main(tmp_path: Path) -> None:
+    """The base marker is written even for an unchained (main-based) worktree."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    wt = worktree.add(repo, "ABA-MAIN")
+    assert worktree.read_base(wt) == "main"
 
 
 def test_ensure_with_custom_base_forks_off_that_branch(tmp_path: Path) -> None:

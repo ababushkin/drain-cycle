@@ -6,6 +6,7 @@
 .drain-guard.json
 .drain-guard-tripped
 .drain-handoff.json
+.drain-base
 
 # Operator secrets (LINEAR_API_KEY etc).
 .env

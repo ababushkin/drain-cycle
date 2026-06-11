@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from drain_cycle import limits, linear, orchestrator, prompt, repos
+from drain_cycle import limits, linear, orchestrator, prompt, repos, worktree
 
 
 _TEST_REPO_NAME = "test-repo"
@@ -238,6 +238,59 @@ def test_resume_reuses_preserved_worktree_and_signals_resumed_prompt(
     # lifecycle half-owned by the orchestrator does not change because the
     # worktree was reused.
     assert (issue["id"], "In Progress") in set_state_calls
+
+
+def test_resume_of_chained_worktree_recovers_base_from_worktree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A resumed chained issue threads its true base into the prompt.
+
+    The chain baton is in-memory and empty across runs, so a re-run of an
+    issue whose worktree was forked off a prior issue's branch would
+    recompute its base as ``main``. The base recorded in the worktree at
+    creation must win, so the resumed worker slices ``<base>..HEAD`` rather
+    than folding the lower stack into its diff.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    # A prior same-repo issue's branch the worktree was stacked on.
+    subprocess.run(
+        ["git", "branch", "ABA-1", "main"], cwd=repo, check=True, capture_output=True
+    )
+
+    issue = _issue("ABA-2", sort_order=1.0)
+    preserved = repo / ".worktrees" / issue["identifier"]
+    subprocess.run(
+        ["git", "worktree", "add", "-b", issue["identifier"], str(preserved), "ABA-1"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    # The base marker ``worktree.add`` would have written at creation.
+    (preserved / worktree.BASE_FILE).write_text("ABA-1\n")
+
+    build_calls: list[dict] = []
+    real_build = prompt.build
+
+    def recording_build(issue_arg, worktree_arg, *, resumed=False, stack=False, base="main"):
+        build_calls.append({"identifier": issue_arg["identifier"], "base": base})
+        return real_build(
+            issue_arg, worktree_arg, resumed=resumed, stack=stack, base=base
+        )
+
+    monkeypatch.setattr(prompt, "build", recording_build)
+    _patch_linear(monkeypatch, [issue], set_state_calls=[])
+    monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(_noop_claude(tmp_path))])
+
+    # Stack mode (no no_stack): the baton starts empty, so only the recovered
+    # worktree base can supply ``ABA-1``.
+    orchestrator.run(_stub_repos(repo))
+
+    assert build_calls == [{"identifier": "ABA-2", "base": "ABA-1"}]
 
 
 def test_resume_cap_halts_before_any_state_change(

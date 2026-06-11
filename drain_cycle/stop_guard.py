@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Literal, TextIO
 
 from .handoff import HANDOFF_FILE, read as _read_handoff
+from .worktree import BASE_FILE
 
 MARKER_FILE = ".drain-guard.json"
 TRIPPED_FILE = ".drain-guard-tripped"
@@ -109,7 +110,7 @@ def read_tripped(worktree: Path) -> str | None:
 # expected to be untracked. ``_git_dirty`` filters them out so the guard
 # doesn't see itself (or the handoff file written *after* the commit) as
 # uncaptured work.
-_OWN_ARTEFACTS = frozenset({MARKER_FILE, TRIPPED_FILE, HANDOFF_FILE})
+_OWN_ARTEFACTS = frozenset({MARKER_FILE, TRIPPED_FILE, HANDOFF_FILE, BASE_FILE})
 
 
 def _git_dirty(worktree: Path) -> bool:

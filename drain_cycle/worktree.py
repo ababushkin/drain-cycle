@@ -24,6 +24,10 @@ from . import telemetry
 
 BASE_BRANCH = "main"
 WORKTREE_DIR = ".worktrees"
+# Records the branch a worktree was forked from, so a later run that reuses a
+# preserved worktree (a resumed halt) recovers the true base rather than
+# recomputing it from the in-memory chain baton, which is empty across runs.
+BASE_FILE = ".drain-base"
 
 
 @dataclass(frozen=True)
@@ -56,6 +60,7 @@ def add(repo: Path, identifier: str, base: str = BASE_BRANCH) -> Path:
             ["worktree", "add", "-b", identifier, str(worktree_path), base],
             cwd=repo,
         )
+    (worktree_path / BASE_FILE).write_text(f"{base}\n")
     return worktree_path
 
 
@@ -80,6 +85,21 @@ def ensure(repo: Path, identifier: str, base: str = BASE_BRANCH) -> WorktreeHand
             return WorktreeHandle(path=worktree_path, resumed=True)
         span.set_attribute("worktree.resumed", False)
     return WorktreeHandle(path=add(repo, identifier, base), resumed=False)
+
+
+def read_base(worktree_path: Path) -> str:
+    """Return the branch a worktree was forked from, or ``main`` if unknown.
+
+    Reads the :data:`BASE_FILE` marker written by :func:`add`. A missing or
+    empty marker (a worktree created before this marker existed, or one not
+    created by :func:`add`) falls back to ``BASE_BRANCH`` — the same default
+    an unchained issue would compute.
+    """
+    try:
+        base = (worktree_path / BASE_FILE).read_text().strip()
+    except OSError:
+        return BASE_BRANCH
+    return base or BASE_BRANCH
 
 
 def link_project_config(

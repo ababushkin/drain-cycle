@@ -539,10 +539,15 @@ def _drain_one_issue(
         # push-mode issues always branch off ``main`` (they land on main, so
         # there is no stack to extend).
         base = baton.get(target_repo.name, worktree.BASE_BRANCH) if stack else worktree.BASE_BRANCH
-        issue_span.set_attribute("issue.base_branch", base)
         try:
             handle = worktree.ensure(target_repo, identifier, base)
             worktree_path = handle.path
+            # A reused worktree keeps the branch it was originally forked from;
+            # the in-memory baton is empty across runs, so recover the true
+            # base from the worktree itself rather than the recomputed value.
+            if handle.resumed:
+                base = worktree.read_base(worktree_path)
+            issue_span.set_attribute("issue.base_branch", base)
             # A worktree checks out only tracked files, so gitignored
             # project config (.claude/, .mcp.json) is absent. Symlink it in
             # so the worker loads the same settings/hooks/agents/skills/MCP
@@ -758,11 +763,11 @@ def _drain_one_issue(
             # Stack-mode confirmation gate, read before teardown removes the
             # worktree. A Done issue in stack mode must have left a non-empty
             # ``pr_urls`` — that is the orchestrator's proof submission ran.
-            # If it's missing, the worker marked Done without opening a PR
-            # (the regression this feature closes): revert + halt, preserve
-            # the worktree for inspection, and do NOT extend the baton — the
-            # next same-repo issue must not stack onto a branch that was
-            # never pushed.
+            # If it's missing, the worker marked Done without opening a PR:
+            # revert + halt, preserve the worktree for inspection, and do NOT
+            # extend the baton — the next same-repo issue must not stack onto a
+            # branch that was never pushed. Push-mode issues have no stack to
+            # extend and no handoff, so they bypass the gate entirely.
             submitted = handoff.read(worktree_path) if stack else None
             if stack and submitted is None:
                 original_state_name = issue["state"]["name"]
