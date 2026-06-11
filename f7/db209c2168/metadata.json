@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "f7db209c2168",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/orchestrator.py",
+    "tests/test_orchestrator_watch.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/f7/db209c2168/0/metadata.json",
+      "transcript": "/f7/db209c2168/0/full.jsonl",
+      "content_hash": "/f7/db209c2168/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 137,
+    "cache_creation_tokens": 2482,
+    "cache_read_tokens": 593743,
+    "output_tokens": 1461,
+    "api_call_count": 4
+  }
+}

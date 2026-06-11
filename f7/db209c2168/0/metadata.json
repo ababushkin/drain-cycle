@@ -1,0 +1,74 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "f7db209c2168",
+  "session_id": "e55be82e-a00f-4dea-861b-0d6182ca585c",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-11T13:15:43.562746Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/orchestrator.py",
+    "tests/test_orchestrator_watch.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "ca85b892940d",
+  "checkpoint_transcript_start": 383,
+  "transcript_lines_at_start": 383,
+  "token_usage": {
+    "input_tokens": 137,
+    "cache_creation_tokens": 2482,
+    "cache_read_tokens": 593743,
+    "output_tokens": 1461,
+    "api_call_count": 4
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01GAqSS5BjKJs9LXcoeNmXh5",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "agent-skills:incremental-implementation"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "ca85b892940d",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 164,
+        "end": 165,
+        "entry_ids": [
+          "f6dd9ca2-078b-41ca-8c35-767f779cd47d"
+        ],
+        "tool_use_id": "toolu_01GAqSS5BjKJs9LXcoeNmXh5"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01GAqSS5BjKJs9LXcoeNmXh5"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: agent-skills:incremental-implementation",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-11T13:15:43.547627Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 0,
+    "total_lines_changed": 0,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}
