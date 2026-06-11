@@ -160,12 +160,12 @@ def _git_log_hashes(path: Path, ref: str = "HEAD") -> list[str]:
     return result.stdout.strip().splitlines()
 
 
-def test_stack_mode_chains_same_repo_issues_and_forks_different_repo_off_main(
+def test_stack_mode_all_worktrees_branch_from_main(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """In stack mode (the default), same-repo issues chain: issue 2's branch
-    contains issue 1's commit in its history. A different-repo issue still
-    forks off main and has no cross-repo commits."""
+    """In stack mode (the default), all worktrees branch from main — the skill
+    owns gt stacking, so the orchestrator no longer chains worktrees off prior
+    issue branches. Each completed issue's worktree is torn down normally."""
     repo_a = tmp_path / "repo-a"
     repo_b = tmp_path / "repo-b"
     repo_a.mkdir()
@@ -174,7 +174,6 @@ def test_stack_mode_chains_same_repo_issues_and_forks_different_repo_off_main(
     _init_repo(repo_b)
     monkeypatch.setenv("HOME", str(tmp_path))
 
-    # Two issues in repo-a, one in repo-b. sort_order drives execution order.
     first = _issue("ABA-1", repo_name="alpha", sort_order=1.0)
     second = _issue("ABA-2", repo_name="alpha", sort_order=2.0)
     other = _issue("ABA-3", repo_name="beta", sort_order=3.0)
@@ -211,20 +210,17 @@ def test_stack_mode_chains_same_repo_issues_and_forks_different_repo_off_main(
     )
     assert exit_code == 0
 
-    # Worktrees are torn down after assembly; the issue branches carry the chain.
+    # Worktrees are torn down after each issue completes.
     assert not (repo_a / ".worktrees" / "ABA-1").exists()
     assert not (repo_a / ".worktrees" / "ABA-2").exists()
     assert not (repo_b / ".worktrees" / "ABA-3").exists()
 
+    # All branches fork from main — the skill handles gt stacking, not the orchestrator.
     hashes_1 = _git_log_hashes(repo_a, "ABA-1")
     hashes_2 = _git_log_hashes(repo_a, "ABA-2")
-    hashes_3 = _git_log_hashes(repo_b, "ABA-3")
-
-    # ABA-1's tip commit appears in ABA-2's history (chain).
-    assert hashes_1[0] in hashes_2
-
-    # ABA-3 (different repo) does not contain ABA-1's commit.
-    assert hashes_1[0] not in hashes_3
+    main_hashes = _git_log_hashes(repo_a, "main")
+    assert main_hashes[0] in hashes_1
+    assert main_hashes[0] in hashes_2
 
 
 # ---------------------------------------------------------------------------

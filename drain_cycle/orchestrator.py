@@ -23,7 +23,7 @@ from typing import Callable, TextIO
 
 from opentelemetry.trace import Span
 
-from . import console, flow, grade_draft, graphite, handoff, linear, model, progress, prompt, runlog, stop_guard, telemetry, worker, worktree
+from . import console, flow, grade_draft, handoff, linear, model, progress, prompt, runlog, stop_guard, telemetry, worker, worktree
 from .limits import Limits, check_cycle
 from .linear import DependencyCycleError
 from .repos import RepoResolutionError, Repos
@@ -367,7 +367,6 @@ def _run(
 
     in_tmux = bool(os.environ.get("TMUX"))
     current_pane_id: str | None = None
-    last_branch_per_repo: dict[str, str] = {}
 
     total = len(plan.order)
     for index, issue in enumerate(plan.order):
@@ -388,7 +387,6 @@ def _run(
             watch=watch,
             in_tmux=in_tmux,
             no_stack=no_stack,
-            last_branch_per_repo=last_branch_per_repo,
         )
         if halt_code is not None:
             _emit_summary(log, total=total, halted_on=issue["identifier"])
@@ -431,7 +429,6 @@ def _drain_one_issue(
     watch: bool = False,
     in_tmux: bool = False,
     no_stack: bool = False,
-    last_branch_per_repo: dict[str, str] | None = None,
 ) -> tuple[int | None, str | None]:
     """Drain a single issue end to end inside a ``drain.issue`` span.
 
@@ -529,13 +526,8 @@ def _drain_one_issue(
                 return 1, None
 
         stack = target_repo.name not in repos.push_to_main_repos and not no_stack
-        base = (
-            last_branch_per_repo.get(target_repo.name, worktree.BASE_BRANCH)
-            if stack and last_branch_per_repo is not None
-            else worktree.BASE_BRANCH
-        )
         try:
-            handle = worktree.ensure(target_repo, identifier, base)
+            handle = worktree.ensure(target_repo, identifier, worktree.BASE_BRANCH)
             worktree_path = handle.path
             # A worktree checks out only tracked files, so gitignored
             # project config (.claude/, .mcp.json) is absent. Symlink it in
@@ -748,103 +740,6 @@ def _drain_one_issue(
 
         if is_done:
             issue_span.set_attribute("issue.final_linear_state", post_spawn_state)
-            submitted_pr: graphite.PrInfo | None = None
-            review_high: bool | None = None
-            parent_branch: str | None = None
-            if stack and last_branch_per_repo is not None:
-                # Read the agent's handoff and determine PR review priority.
-                hd = handoff.read(worktree_path)
-                findings = hd.findings if hd is not None else {}
-                review_high = (
-                    "review:high" in issue["labels"]
-                    or bool(findings.get("critical"))
-                    or bool(findings.get("required"))
-                )
-
-                # Assemble into the per-repo Graphite stack. Any gt/gh failure is
-                # stop-the-line: the next issue would otherwise chain onto an
-                # uncertain push state. Leave the worktree on disk for recovery.
-                parent_branch = (
-                    last_branch_per_repo.get(target_repo.name) or worktree.BASE_BRANCH
-                )
-                graphite_error: str | None = None
-                try:
-                    submitted_pr = graphite.submit(
-                        worktree_path,
-                        parent=parent_branch,
-                        title=hd.pr_title if hd is not None else "",
-                        body=hd.pr_body if hd is not None else "",
-                    )
-                    if review_high:
-                        graphite.ensure_review_high_label(worktree_path)
-                        graphite.add_label(
-                            submitted_pr.number, "review:high", worktree_path
-                        )
-                    last_branch_per_repo[target_repo.name] = identifier
-                except RuntimeError as exc:
-                    graphite_error = str(exc)
-
-                if graphite_error is not None:
-                    # The agent already marked the issue Done, but no PR exists.
-                    # Revert out of Done so a re-run picks the issue back up and
-                    # re-attempts the stack submission against the worktree (left
-                    # on disk below). Mirrors the not-Done halt path.
-                    original_state_name = issue["state"]["name"]
-                    effective_state, revert_error = _revert_to_pre_halt_state(
-                        issue["id"],
-                        target_state_name=original_state_name,
-                        pre_revert_state_name=post_spawn_state,
-                    )
-                    try:
-                        linear.add_comment(
-                            issue["id"],
-                            f"Reverted from Done: stacked PR submission failed — "
-                            f"{graphite_error}. Worktree preserved for re-run.",
-                        )
-                    except Exception as exc:
-                        print(
-                            f"drain-cycle: {identifier}: Linear blocker comment failed: {exc}",
-                            file=sys.stderr,
-                        )
-                    halt_reason = (
-                        f"{_halt_message(identifier, effective_state, worktree_path)}"
-                        f" — graphite: {graphite_error}"
-                    )
-                    if revert_error is not None:
-                        halt_reason += (
-                            f" — revert to {original_state_name!r} failed: {revert_error}"
-                        )
-                    log.append_entry(
-                        issue_identifier=identifier,
-                        started_at=started_at,
-                        finished_at=finished_at,
-                        exit_code=result.exit_code,
-                        final_linear_state=effective_state,
-                        worktree_path=str(worktree_path),
-                        halt_reason=halt_reason,
-                        flow=flow_name,
-                        outcome_verdict=outcome_verdict,
-                        prep_verdict=prep_verdict,
-                        responder_runs=responder_runs,
-                        shape_task_invoked=is_verify,
-                        **_worker_log_fields(result),
-                    )
-                    telemetry.mark_error(issue_span, "err-graphite", halt_reason)
-                    console.halt(halt_reason)
-                    return 1, pane_id
-
-            # Post the PR link back to the Linear issue. Informational only:
-            # a comment failure never halts the drain.
-            if submitted_pr is not None:
-                comment_lines = [f"PR: {submitted_pr.url}"]
-                if review_high:
-                    comment_lines.append("review:high — flagged for operator review")
-                try:
-                    linear.add_comment(issue["id"], "\n".join(comment_lines))
-                except Exception as exc:
-                    console.orch(
-                        f"{identifier}: Linear PR comment failed: {exc}"
-                    )
 
             remove_error: str | None = None
             try:
@@ -868,10 +763,6 @@ def _drain_one_issue(
                 prep_verdict=prep_verdict,
                 responder_runs=responder_runs,
                 shape_task_invoked=is_verify,
-                pr_url=submitted_pr.url if submitted_pr is not None else None,
-                pr_number=submitted_pr.number if submitted_pr is not None else None,
-                review_high=review_high,
-                parent_branch=parent_branch if submitted_pr is not None else None,
                 **_worker_log_fields(result),
             )
             if outcome_verdict is not None:
@@ -889,9 +780,7 @@ def _drain_one_issue(
                 console.orch(
                     f"{identifier}: grade-draft write failed (non-fatal): {exc}"
                 )
-            if submitted_pr is not None:
-                console.worker_event(identifier, f"done; PR {submitted_pr.url}")
-            elif remove_error is None:
+            if remove_error is None:
                 console.worker_event(identifier, "done; worktree removed")
             return None, pane_id
 

@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from drain_cycle import graphite, handoff, linear, orchestrator, repos
+from drain_cycle import linear, orchestrator, repos
 
 
 def _issue(
@@ -138,10 +138,6 @@ def test_orchestrator_writes_runlog_with_one_entry_per_successful_issue(
         "prep_verdict",
         "responder_runs",
         "shape_task_invoked",
-        "pr_url",
-        "pr_number",
-        "review_high",
-        "parent_branch",
     }
     for entry in payload["entries"]:
         assert set(entry.keys()) == required_keys
@@ -219,90 +215,6 @@ def test_runlog_done_entry_carries_worker_usage_from_stream(
     # Per-invocation aggregates roll up the single entry.
     assert payload["cycle_cost_usd"] == 0.42
     assert payload["cycle_tokens_cumulative"] == 439
-
-
-def test_done_entry_records_pr_fields_and_posts_linear_comment(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """When stack assembly submits a PR, the run-log entry carries the PR
-    fields and a Linear comment is posted with the PR link."""
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    _init_repo(repo)
-    monkeypatch.chdir(repo)
-    monkeypatch.setenv("HOME", str(tmp_path))
-
-    only = _issue("ABA-ONE", sort_order=1.0)
-    raw_issues = [only]
-    issues_by_id = {i["id"]: i for i in raw_issues}
-    done_marker = tmp_path / "done-identifiers.txt"
-
-    def fake_pending_issues(cycle_id: str):
-        completed = _completed_identifiers(done_marker)
-        return linear._plan(
-            [i for i in raw_issues if i["identifier"] not in completed]
-        )
-
-    def fake_get_issue(issue_id: str) -> dict:
-        issue = issues_by_id[issue_id]
-        if issue["identifier"] in _completed_identifiers(done_marker):
-            return {**issue, "state": {"type": "completed", "name": "Done"}}
-        return issue
-
-    monkeypatch.setattr(linear, "current_cycle_id", lambda: "stub-cycle-id")
-    monkeypatch.setattr(linear, "pending_issues", fake_pending_issues)
-    monkeypatch.setattr(linear, "get_issue", fake_get_issue)
-    monkeypatch.setattr(linear, "set_state", lambda issue_id, state_name: None)
-
-    # Stub the assembler to return a fake PR; handoff findings drive review:high.
-    fake_pr = graphite.PrInfo(url="https://github.com/owner/repo/pull/7", number=7)
-
-    def fake_submit(
-        worktree: Path, *, parent: str, title: str = "", body: str = ""
-    ) -> graphite.PrInfo:
-        return fake_pr
-
-    monkeypatch.setattr(graphite, "submit", fake_submit)
-    monkeypatch.setattr(graphite, "ensure_review_high_label", lambda worktree: None)
-    monkeypatch.setattr(graphite, "add_label", lambda pr_number, label, worktree: None)
-    monkeypatch.setattr(
-        handoff, "read",
-        lambda path: handoff.HandoffData(
-            pr_title="Test PR",
-            pr_body="## What\nbody",
-            findings={"critical": 1, "required": 0},
-        ),
-    )
-
-    # Capture add_comment calls.
-    posted_comments: list[tuple[str, str]] = []
-    monkeypatch.setattr(
-        linear, "add_comment",
-        lambda issue_id, body: posted_comments.append((issue_id, body)),
-    )
-
-    fake_claude = _write_fake_claude_script(tmp_path, done_marker)
-    monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(fake_claude)])
-
-    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}))
-    assert exit_code == 0
-
-    # PR fields are in the run-log entry.
-    runs_dir = tmp_path / ".drain-cycle" / "runs"
-    payload = json.loads(next(runs_dir.glob("stub-cycle-id-*.json")).read_text())
-    (entry,) = payload["entries"]
-    assert entry["pr_url"] == "https://github.com/owner/repo/pull/7"
-    assert entry["pr_number"] == 7
-    assert entry["review_high"] is True
-    assert entry["parent_branch"] == "main"
-
-    # A Linear comment was posted with the PR link.
-    assert len(posted_comments) == 1
-    issue_id, body = posted_comments[0]
-    assert issue_id == "id-ABA-ONE"
-    assert "https://github.com/owner/repo/pull/7" in body
-    assert "review:high" in body
-
 
 def _completed_identifiers(marker: Path) -> set[str]:
     if not marker.exists():
