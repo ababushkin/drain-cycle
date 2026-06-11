@@ -1,0 +1,16 @@
+explain the codebase to me, from the point of view of how the APIs invoked/interact with one another
+for example, if i ran this codebase from an interactive python session - how would i invoke this program?
+
+i want to stress test if the design is coherent, follows proper separation of concern rules and there there is strong cohesion
+
+---
+
+lets spec them both one by one
+
+---
+
+lets build this first
+
+---
+
+lets build it using the /incremental-implementation skill

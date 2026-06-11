@@ -1,0 +1,93 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "7b2349f85919",
+  "session_id": "e55be82e-a00f-4dea-861b-0d6182ca585c",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-11T13:11:15.11587Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/watch.py",
+    "tests/test_watch.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "ca85b892940d",
+  "token_usage": {
+    "input_tokens": 16572,
+    "cache_creation_tokens": 107786,
+    "cache_read_tokens": 2080452,
+    "output_tokens": 17027,
+    "api_call_count": 22
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01GAqSS5BjKJs9LXcoeNmXh5",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "agent-skills:incremental-implementation"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "ca85b892940d",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 164,
+        "end": 165,
+        "entry_ids": [
+          "f6dd9ca2-078b-41ca-8c35-767f779cd47d"
+        ],
+        "tool_use_id": "toolu_01GAqSS5BjKJs9LXcoeNmXh5"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01GAqSS5BjKJs9LXcoeNmXh5"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: agent-skills:incremental-implementation",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-11T13:11:15.10053Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 303,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 303,
+    "total_lines_changed": 303,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 635,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/delivery-plans/watch-pane-rich-rendering/D1-filter-never-breaks-the-pane/N01-crash-proof-filter.md": 72,
+        "docs/delivery-plans/watch-pane-rich-rendering/D1-filter-never-breaks-the-pane/_deliverable.md": 37,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N02-transcript-rendering-core.md": 94,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N03-ansi-color-layer.md": 69,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N05-docs-pane-rendering.md": 71,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/_deliverable.md": 42,
+        "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/N04-usage-status-and-footer.md": 75,
+        "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/_deliverable.md": 35,
+        "docs/delivery-plans/watch-pane-rich-rendering/README.md": 89,
+        "docs/ideas/drain-past-the-merge-gate.md": 51
+      }
+    }
+  ]
+}
