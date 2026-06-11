@@ -1,0 +1,102 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "f43b6cf9e1db",
+  "session_id": "b03df76c-a39c-480c-91c5-0d7df4fab4d2",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-11T12:46:53.55128Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "AGENTS.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "2fdee3a14660",
+  "token_usage": {
+    "input_tokens": 51924,
+    "cache_creation_tokens": 368656,
+    "cache_read_tokens": 13108273,
+    "output_tokens": 93050,
+    "api_call_count": 137
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01UY1qEAGAuQ9ububFNhPgYM",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "agent-skills:idea-refine"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "2fdee3a14660",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 176,
+        "end": 177,
+        "entry_ids": [
+          "9565b7ad-3b83-43a5-bf37-e21107cd28a1"
+        ],
+        "tool_use_id": "toolu_01UY1qEAGAuQ9ububFNhPgYM"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01UY1qEAGAuQ9ububFNhPgYM"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: agent-skills:idea-refine",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_014H5138jhgZLnfubiuhvq1L",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "agent-skills:incremental-implementation"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "2fdee3a14660",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 636,
+        "end": 637,
+        "entry_ids": [
+          "ca0c0120-0e4d-45af-b5d2-090787f6234a"
+        ],
+        "tool_use_id": "toolu_014H5138jhgZLnfubiuhvq1L"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_014H5138jhgZLnfubiuhvq1L"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: agent-skills:incremental-implementation",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-11T12:46:53.523927Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 1,
+    "human_removed": 0,
+    "total_committed": 0,
+    "total_lines_changed": 1,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}
