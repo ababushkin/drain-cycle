@@ -1,0 +1,9 @@
+i noticed that when ever i run drain-cycle -w it shows me the output in json - this is really hard for me to read as a human - is there a way of making it show the normal human friendly output i normally see when i run claude interactively without sacrificing some of the logging/observability that's been built?
+
+---
+
+move them to a new project that one is already completed - small focused project
+
+---
+
+also i just realized but this whole delivery plan should be moved to the drain-cycle project, ~/src/drain-cycle

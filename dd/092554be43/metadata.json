@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "dd092554be43",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/delivery-plans/watch-pane-rich-rendering/D1-filter-never-breaks-the-pane/N01-crash-proof-filter.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D1-filter-never-breaks-the-pane/_deliverable.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N02-transcript-rendering-core.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N03-ansi-color-layer.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N05-docs-pane-rendering.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/_deliverable.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/N04-usage-status-and-footer.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/_deliverable.md",
+    "docs/delivery-plans/watch-pane-rich-rendering/README.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/dd/092554be43/0/metadata.json",
+      "transcript": "/dd/092554be43/0/full.jsonl",
+      "content_hash": "/dd/092554be43/0/content_hash.txt",
+      "prompt": "/dd/092554be43/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 55622,
+    "cache_creation_tokens": 481840,
+    "cache_read_tokens": 7184101,
+    "output_tokens": 75264,
+    "api_call_count": 57
+  }
+}
