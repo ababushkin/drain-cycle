@@ -1,0 +1,29 @@
+[Image #1] i'm re-thinking the architecture for this project and this is my rough idea that i'm going through at the moment. review it, critique it and lets collaboratively design something better
+
+one idea i had was that this project effectively could have been a set of claude skills, eg: /execute-project or /execute-cycle and then it will create a precrafted prompt and go through a workflow to create a "team of agents" in claude. i don't think it has to be this way necessarily as this feature is not cross-portable between different agent paradigms but i still like this way of encapsulating the implementation. overall i need to have a clearer understanding of what the "orchestator" and all the code that's been written is for and what the control plane should look like
+
+---
+
+i'd still push on having 3 separate agents. an agent that coded and then subsequentely reviewing its own work is likely to lead to poor outcomes. also i will almost always anchor towards more expensive models for review even when a cheaper model was used to code it up.
+
+having a new persona is fine as well as the fold you're suggesting
+
+one minor tweak is that right now this project is framed as "drain a cycle", but it can also "execute a project", which is not in scope yet but will be later on. for archiecture/vision i'd rather keep it more generic (execute a planned cycle or an entire project).
+
+the other thing is also envision that there will two additional "review it" phases:
+
+- one at the deliverable/milestone stage: when a coordinator agent learns that an entire milestone has been completed it will launch a review phase against that milestone. i'll create some additional skills/extend existing ones later on but i currently envision: an integration/coherence review/acceptance review (similar to the task one but now at the milestone level) and a regression review (did landing this degrade anything outside its own boundary?)
+
+- one at a whole project level: similarly but this will just do an architecture review and check against any stated goals that can be measured now (not all can be as some project goals take time to measure)
+
+---
+
+that looks good go ahead
+
+---
+
+review everything you've written carefully with /writing-refinement
+
+---
+
+also make a linear issue for the changes you've identified in layer 2 (reliability-resilience persona and a verification-implementation fold)

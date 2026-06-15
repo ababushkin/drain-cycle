@@ -1,0 +1,131 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "ac47c6e87053",
+  "session_id": "e4e003ae-fe39-4c0f-ba1b-ee6c3cb06de7",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-15T12:00:45.480138Z",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "docs/architecture.md",
+    "docs/design-decisions.md",
+    "docs/vision.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "f77e3172ca5d",
+  "token_usage": {
+    "input_tokens": 41680,
+    "cache_creation_tokens": 301648,
+    "cache_read_tokens": 1996063,
+    "output_tokens": 31966,
+    "api_call_count": 29
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-commit-commands:commit-2026-06-15T12:00:21.966601Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "commit-commands:commit"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "f77e3172ca5d",
+      "timestamp": "2026-06-15T12:00:21.966601Z",
+      "native": {
+        "command": "/commit-commands:commit"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/commit-commands:commit",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_012fDTiSZYceVpoHh9cLNevA",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "writing-refinement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "f77e3172ca5d",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 207,
+        "end": 208,
+        "entry_ids": [
+          "817ca7b0-f407-42c5-960d-32466f074934"
+        ],
+        "tool_use_id": "toolu_012fDTiSZYceVpoHh9cLNevA"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_012fDTiSZYceVpoHh9cLNevA"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: writing-refinement",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-15T12:00:45.451245Z",
+    "agent_lines": 76,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 22,
+    "human_removed": 2,
+    "total_committed": 87,
+    "total_lines_changed": 100,
+    "agent_percentage": 76,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 100,
+      "agent_lines_removed": 3
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 100,
+      "agent_lines_removed": 3
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 11,
+      "user_lines_removed": 12,
+      "agent_lines_added": 100,
+      "agent_lines_removed": 3,
+      "user_added_per_file": {
+        "docs/architecture.md": 11
+      },
+      "user_removed_per_file": {
+        "docs/architecture.md": 12
+      }
+    }
+  ]
+}
