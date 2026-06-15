@@ -1,0 +1,54 @@
+review the docs/architecture.md doc against these writing guidelines: 1. Establish the "Logic of the Whole" (Minto Pyramid)
+A design document is inherently a hierarchy of ideas. Use the Minto Pyramid Principle to ensure the reader can grasp your entire system architecture in the first 30 seconds
+.
+The Vertical Relationship: Every component description should answer a question raised by the level above it (e.g., if the top level describes a "Scalable Microservices Architecture," the next level must answer How it achieves that scale)
+.
+Structural Order: When dividing a system into parts, follow the MECE (Mutually Exclusive and Collectively Exhaustive) principle
+. This ensures that your architectural layers (e.g., Frontend, Backend, Data) do not overlap and that no essential component is left out
+.
+Process Order: If your document describes a data flow or a sequence of operations, order the sections chronologically based on the system’s functioning
+.
+2. Narrative Flow via SCQ Logic
+Avoid starting with a sterile list of data points
+. Instead, use the Situation-Complication-Question (SCQ) framework for your introduction to justify the design's existence
+.
+The Problem Gap: Define the specific gap between the current technical state (R1) and the desired success state (R2)
+. For example, instead of just stating a goal to "improve efficiency," provide a narrative: "Our API currently serves 1k RPS. Expected traffic is 10k RPS. To scale for this, we will re-architect..."
+.
+Internal Logic: Do not use "Complication" or "Question" as explicit headers; let the logic drive the narrative flow naturally
+.
+3. Sentence-Level Technical Precision
+To make complex architectural concepts accessible, apply the principles of Clarity and Grace:
+Characters as Subjects: In technical docs, "characters" are often the system, a user, or a specific service
+. Make these characters the grammatical subjects of your sentences
+. Avoid "dead" sentences where the action is hidden in nouns (nominalizations) like utilization or optimization
+.
+Old-before-New: Connect new technical concepts to what the reader already knows
+. Start sentences with familiar context (the current state) and end them with the new, complex information (the proposed change)
+.
+The Stress Position: Place new technical terms or the most important concepts at the end of the sentence to give them emphasis
+.
+4. Balanced Concision vs. Integrity
+While you should prune "verbal sludge" (e.g., changing "at this point in time" to "now"), you must never sacrifice operational integrity
+.
+Preserve Dependencies: Concision in a design doc must not lead to the removal of essential assumptions, technical dependencies, or risks
+.
+The "Hand-Product" Test: Every technical task or milestone mentioned in your document should imply a tangible end product (like a deployed service or a verified report) that the reader can visualize
+.
+5. Vocabulary and Tone
+Avoid Cluttered Metaphors: Steer clear of overworked metaphors like "bottleneck," "blueprint," or "load-bearing," which can distract from technical reality
+. Use Plain English alternatives like "shortage," "plan," or "essential"
+.
+Technical Humanity: Even a design document should sound like a professional talking to a peer, rather than a machine generating "volume-related production adjustments"
+.
+Sequential Logic: Science and technology writing is most effective when it leads the reader step-by-step through a sequence of deductions
+. Start with the facts the reader must know before they can understand the next layer of the system
+.
+
+---
+
+make a plan to improve it. we're aiming for an architecture document that follows these writing guidelines but is also something that can be complimented with simple visuals, example: [Image #2]
+
+---
+
+create a task list and execute on the changes in the plan carefully one by one. before proceeding to the next task create a sub-agent and perform a review of what you wrote using the /writing-refinement skill
