@@ -1,0 +1,5 @@
+i restored docs/initiative-multi-agent-collaboration.md - can this file be deleted? does it have anything in there that isn't already covered in the architecture doc?
+
+---
+
+i already have this initiative inside linear - does it serve anything useful that the linear project doesn't already capture?
