@@ -4,7 +4,7 @@ Design rationale for `drain-cycle`. Read this before making architectural change
 
 These decisions serve the project's guiding vision, [`docs/vision.md`](vision.md), and realize the architecture that serves it, [`docs/architecture.md`](architecture.md) — the two-layer supervisor/workflow split on an artifact boundary. Each decision below should hold the vision as its frame; a decision that no longer fits it is the signal to revisit the vision deliberately, not to drift from it silently.
 
-Nineteen decisions are recorded so a future reader doesn't have to reverse-engineer them from the code. ADRs would be heavier than this tool needs.
+Twenty-two decisions are recorded so a future reader doesn't have to reverse-engineer them from the code. ADRs would be heavier than this tool needs.
 
 ## 1. The spawned agent updates Linear itself
 
@@ -347,3 +347,52 @@ This reverses the actor in §16 and §18. There, the orchestrator assembled and 
 
 - *Keep the orchestrator assembling the stack (§16/§18 as written).* Rejected: it hard-codes the PR-tooling sequence into Layer 1, blocking the keystone and the vendor-agnostic worker.
 - *Worker pushes by hand instead of via the skill.* Rejected: the skill is the single place the submission procedure lives, so it stays identical in interactive and drain modes; a hand-rolled push in the worker prompt would be a second, drifting copy.
+
+## 20. A worker per phase, not a worker per issue
+
+Today one spawned worker runs the whole `exec:*` chain for an issue — pickup through finish — in a single session. The decision is to split it: each phase (code, review, finish) is its own spawn, with its own model tier, and the agent that produced an artifact never reviews it. See [`architecture.md`](architecture.md) §9.
+
+**Why split.** Two independent reasons, either sufficient on its own:
+
+- *Independent verification.* A coder reviewing its own work rationalises its own choices — the review inherits the blind spots of the build. A separate review agent that did not write the code is adversarial by construction, not by prompt wording. This is the same logic that made `exec:review` fan out to distinct personas (the persona contract); phase separation extends it across the build/review boundary, not just within review.
+- *Per-phase model economics.* The operator anchors review to a stronger, more expensive model regardless of what built the change — a cheap model codes, an expensive one reviews. That asymmetry is only expressible if each phase is its own `claude -p` spawn with its own `--model` pin. A single worker pins one model for the whole chain.
+
+**Cost accepted.** Every phase boundary now pays a spawn plus artifact rehydration: the next phase starts cold and reads its inputs from the handoff envelope (architecture §2) rather than inheriting them in context. A single worker kept that context for free. This makes the handoff envelope load-bearing for *all* cross-phase state, not just `pr_urls` — the envelope must carry what each phase needs the next to know. This is the deliberate price of independence and the asymmetric-model economics.
+
+**Alternatives considered.**
+
+- *One worker runs the whole chain (status quo).* Rejected: it forecloses both independent review and per-phase model pinning — the coder grades itself, on the model that built the change.
+- *One worker, but review re-spawned as a sub-agent within it.* Rejected as a half-measure: it buys independent review but not independent model economics at the phase grain, and it keeps the chain's lifecycle coupled to one outer session that the control plane cannot steer phase-by-phase (§10).
+
+## 21. Review is multi-altitude; higher-altitude review yields new work, not reverts
+
+Review fires at three altitudes matching the delivery hierarchy `shape:delivery` already produces — task, milestone, project — not only per task. The full model is in [`architecture.md`](architecture.md) §11.
+
+**Why multi-altitude.** A task review is diff-bounded: it grades one issue's change against its AC and the quality lenses. It cannot see whether the tasks of a milestone *cohere*, whether landing them degraded something *outside* their own boundary, or whether the project met its stated goals. Those are real defect classes that only exist at a higher altitude, so they need a review oriented to that altitude. Verification rolls up the same tree the work was decomposed down — the dual of the delivery hierarchy.
+
+**The load-bearing consequence: higher-altitude review produces new remediation work, not reverts.** Task review can halt before a PR merges, so its verdict can block a not-yet-merged artifact. A milestone or project review runs *after* its child PRs have merged; a merged slice cannot be cleanly reverted. So a failing milestone/project review emits new Linear issues slotted back into the plan — it does not roll back landed work. This is a genuinely different halt semantic from the task-level halt/revert contract (§3, §9-guardrails) and must be modelled as such: the supervisor's tree walker reacts to a failing altitude verdict by *scheduling*, not *reverting*.
+
+**Two unknowns deferred to spikes, not decided here.**
+
+- *Regression-review blast radius.* "Did landing this milestone degrade anything outside its boundary" is not diff-bounded the way task review is — it needs a definition of the boundary and probably a cross-cutting test/check run. Shape it with `shape:design` before building.
+- *Remediation routing.* When an altitude review fails, what exactly is created (a new issue under the same milestone? a blocking flag on the project?), and does the supervisor pause the parent or keep draining siblings? This is the verdict-handoff open seam (architecture "Known open seam") widened to higher altitudes.
+
+**Alternatives considered.**
+
+- *Task review only; trust that coherent tasks compose into a coherent milestone.* Rejected: integration and regression defects are exactly the ones that survive a green per-task review, because no task-level lens is oriented to find them.
+- *Run all altitude reviews inline at project end.* Rejected: a milestone defect found only at project end is far more expensive to remediate than one caught when the milestone closed, and project-end is too late to inform the next milestone's work.
+
+## 22. The supervisor stays a process executing a planned unit; it is not a Claude skill
+
+Two coupled decisions about the supervisor's form and scope.
+
+**Scope — a planned unit, not specifically a cycle.** The supervisor executes a *planned unit of work*: a Linear cycle today, a whole project later. The execution atom is unchanged (one issue, a worker per phase, §20); a cycle and a project differ only as containers with a hierarchy over them (§21). "Drain a cycle" becomes one entry point rather than the definition. Project execution is out of scope now, but it is a later container on the same machinery, not a redesign — so vision and architecture are written in the generic terms ([`architecture.md`](architecture.md) §12). The tool keeps the name `drain-cycle`.
+
+**Form — a process with a CLI front-door, not a `/execute-cycle` skill.** It is tempting to encapsulate the supervisor itself as a Claude skill (`/execute-cycle`, `/execute-project`) for one-command ergonomics. Rejected: a skill runs *inside* a Claude session, which makes the supervisor Claude-shaped and collapses the artifact boundary (§2) that lets the worker be any vendor. The supervisor's whole value is being content-blind and vendor-agnostic; a skill cannot be that. The one-command ergonomics come instead from a thin CLI front-door (`drain-cycle run <unit>`), while Layer 2 stays skills.
+
+**Why this matters now.** The resident control plane (§10) is a long-lived process with an API — that only makes sense as a process, reinforcing the form decision. A control plane implemented as a Claude skill could not be the daemon that spawns and steers vendor-agnostic workers.
+
+**Alternatives considered.**
+
+- */execute-cycle as the primary entry point.* Rejected per above — collapses the vendor-agnostic boundary.
+- *Hybrid: a `/execute-cycle` skill that shells out to the process for interactive use.* Not adopted now, but not foreclosed — it is a thin convenience wrapper over `drain-cycle run`, addable later if the keyboard ergonomics warrant it, without moving any supervision logic into the skill.
