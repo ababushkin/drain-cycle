@@ -1,0 +1,259 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "6a6aa92e2922",
+  "session_id": "1e976e2b-d1ef-4117-8571-ed46c0326009",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-15T09:24:34.438749Z",
+  "branch": "main",
+  "checkpoints_count": 9,
+  "files_touched": [
+    "AGENTS.md",
+    "README.md",
+    "docs/delivery-plans/orchestrator-enforced-completion/D1-recover-stranded-committed-work/N01-recover-stranded-committed-work.md",
+    "docs/delivery-plans/orchestrator-enforced-completion/D1-recover-stranded-committed-work/_deliverable.md",
+    "docs/delivery-plans/orchestrator-enforced-completion/README.md",
+    "docs/design-decisions.md",
+    "docs/ideas/drain-past-the-merge-gate.md",
+    "docs/ideas/stacked-pr-finishing.md",
+    "docs/initiative-multi-agent-collaboration.md",
+    "docs/integration-test-architecture.md",
+    "docs/tasks/us-a-unattended-cycle-drain.md",
+    "docs/tasks/us-c-artefacts-that-grade-the-krs.md",
+    "docs/vision.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "89f98f557da1",
+  "token_usage": {
+    "input_tokens": 56312,
+    "cache_creation_tokens": 997093,
+    "cache_read_tokens": 23275808,
+    "output_tokens": 145461,
+    "api_call_count": 155
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01TwEcn5FXzUBZiyp2b1PUhX",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-pr-finishing"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "89f98f557da1",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 214,
+        "end": 215,
+        "entry_ids": [
+          "22388501-51a3-46ba-90dc-8a21bd54b8d2"
+        ],
+        "tool_use_id": "toolu_01TwEcn5FXzUBZiyp2b1PUhX"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01TwEcn5FXzUBZiyp2b1PUhX"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-pr-finishing",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_011hcYswqKbidwxysLMPBHfD",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-delivery"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "89f98f557da1",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 342,
+        "end": 343,
+        "entry_ids": [
+          "faab4ee7-5365-491c-986b-5a47702f773f"
+        ],
+        "tool_use_id": "toolu_011hcYswqKbidwxysLMPBHfD"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_011hcYswqKbidwxysLMPBHfD"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-delivery",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01Wmp7Xm3mPtVPy4Yn9wv9tX",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape:shape:design"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "89f98f557da1",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 668,
+        "end": 669,
+        "entry_ids": [
+          "a94f88b3-024e-4d4b-a951-dc462f415d2f"
+        ],
+        "tool_use_id": "toolu_01Wmp7Xm3mPtVPy4Yn9wv9tX"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Wmp7Xm3mPtVPy4Yn9wv9tX"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape:shape:design",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01TAnWT2n9pkNG3SqkXCEzd5",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-writing-refinement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "89f98f557da1",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 851,
+        "end": 852,
+        "entry_ids": [
+          "e5bb4b2c-e641-438d-8bde-aa0a16b73d9b"
+        ],
+        "tool_use_id": "toolu_01TAnWT2n9pkNG3SqkXCEzd5"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01TAnWT2n9pkNG3SqkXCEzd5"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-writing-refinement",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 15
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-15T09:24:34.391524Z",
+    "agent_lines": 330,
+    "agent_removed": 171,
+    "human_added": 70,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 400,
+    "total_lines_changed": 571,
+    "agent_percentage": 87.74080560420316,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 635,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/delivery-plans/watch-pane-rich-rendering/D1-filter-never-breaks-the-pane/N01-crash-proof-filter.md": 72,
+        "docs/delivery-plans/watch-pane-rich-rendering/D1-filter-never-breaks-the-pane/_deliverable.md": 37,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N02-transcript-rendering-core.md": 94,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N03-ansi-color-layer.md": 69,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N05-docs-pane-rendering.md": 71,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/_deliverable.md": 42,
+        "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/N04-usage-status-and-footer.md": 75,
+        "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/_deliverable.md": 35,
+        "docs/delivery-plans/watch-pane-rich-rendering/README.md": 89,
+        "docs/ideas/drain-past-the-merge-gate.md": 51
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 833,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 966,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 14,
+      "user_lines_removed": 20,
+      "agent_lines_added": 966,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/designs/end-to-end-skill-drain.md": 14
+      },
+      "user_removed_per_file": {
+        "docs/designs/end-to-end-skill-drain.md": 20
+      }
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 973,
+      "agent_lines_removed": 1
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 977,
+      "agent_lines_removed": 162
+    },
+    {
+      "checkpoint_number": 7,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 977,
+      "agent_lines_removed": 162
+    },
+    {
+      "checkpoint_number": 8,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 977,
+      "agent_lines_removed": 162
+    },
+    {
+      "checkpoint_number": 9,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 977,
+      "agent_lines_removed": 162
+    }
+  ]
+}

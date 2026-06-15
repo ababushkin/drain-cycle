@@ -1,0 +1,115 @@
+debug why my previous cycle-drain run failed (793fc9ea-08c7-40c1-8c1b-417efb20adbf)
+
+---
+
+ok you can finish aba-383 after that we're going to look at what kind of fix/solution we can apply to this problem to the orchestrator itself so that its the one that ensures completeness
+
+---
+
+finishing spawn should always be sonnet, but any fixes should be delegated to opus
+both
+ucommited = treat as genuine failure - we don't know how much of the work is 50% complete, 70% complete etc
+
+yes this should be turned into a linear issue, use delivery-shape to shape it up appropriately
+
+---
+
+that project is already completed, if its just one issue you can move it to a different project, even the ops one will do for now
+
+---
+
+review this ticket against the project Multi-agent collaboration for correctness and the issues in that project
+
+---
+
+yes do that, but also is any of what's been planned clash with the other ideas in that project? i planned it a while ago and don't quite remember all the details and whether or not i should proceed with it as it currently stands
+
+---
+
+explain the difference - i think we need to define orchestration better to avoid this internal inconsistency
+
+then review the skills in my agent-skill-shaper pack vs. drain-cycle to see what's currently in place against the the projects i have scheduled
+
+---
+
+i want to have a proper design doc that shows me how what i'm doing is connected and what the direction is so that my projects are all update to date and are working in support of the design, not the other way around
+
+this includes explaining properly what layer 1 vs layer 2 means etc
+
+---
+
+there was a design doc in the drain-cycle repo, have a look at it first and lets fix it up. it should really belong there
+
+---
+
+first perform a writing review using /writing-refinement over it
+
+---
+
+thats better, i'd say also that the real thing i'm trying to do is to replace the work that I as a human normally do with an "orchestrator". in other words, the orchestrator is similar to the human layer with the goal that it will free me up to do higher-order activities rather than manual and fairly mechanical supervision. in saying that, one thing that i'm trading off is a feedback loop. when you supervise you can intervene and catch issues/problems with the workflow early on, you can also pivot and change direction rapidly. this is a deliberate trade off and i'm using it to drive work where i feel the trade off is worth it. ultimately i want to improve this incrementally over time so really good observability is a critical element to help me improve this product.
+
+---
+
+lets review all the docs created in drain cycle now against this vision, i want to make sure we discard what's out of date and re-align how the project is structured (and subsequently design docs) to work around this vision.
+
+---
+
+first move this doc to a new folder (i think just the root docs folder - docs/vision.md or docs/about.md -- suggest me a name
+
+---
+
+yes
+
+---
+
+ok now lets review the vision against the writing guidelines below. they're similar to /writing-refinement : 
+
+1. Structure via the "S-C-Q" Framework
+A vision statement is most engaging when it resolves a specific tension
+. Barbara Minto suggests using a narrative flow to establish relevance before presenting your "Answer" (the vision)
+.
+Situation: Begin with a non-controversial statement about the current state of your field or product area that your audience already knows or will accept as true
+.
+Complication: Describe what has changed or what problem has arisen in that situation (e.g., a technological shift, a lagging performance, or an unmet customer need)
+.
+Question: This complication should naturally trigger a question in the reader's mind (e.g., "How can we adapt?" or "What should our strategy be?")
+.
+Answer (The Vision): Your vision statement serves as the resolution to this story
+.
+2. Motivate through "Practical Problems"
+A compelling vision must address a problem your audience actually cares about
+.
+Define the Cost: Joseph Williams and Joseph Bizup emphasize that a problem is only a problem if it has a cost—a palpable consequence like lost time, money, or happiness
+. Your vision is the "solution" to this cost
+.
+Focus on Themes: Put your most important concepts in the "stress position" (at the end) of your introductory sentences to signal the key themes you will develop
+.
+3. Infuse Humanity and Warmth
+William Zinsser argues that "clutter" and "creeping nounism" are the diseases of business writing
+.
+Avoid "Corporate Robots": Do not use abstractions like "profitability" or "implementation"
+. Instead, use active verbs and real nouns that allow the reader to visualize someone doing something
+.
+Locate the "I": A vision statement should reflect the identity and enthusiasm of the person behind it
+. Zinsser suggests writing the first draft in the first person ("I" or "we") to keep the tone warm, even if you remove the pronouns later
+.
+Be Natural: Never say anything in writing that you wouldn't comfortably say in conversation
+.
+4. Apply the Principle of "Thinking Small"
+To make a large vision engaging, don't try to be definitive or all-encompassing, which can lead to "unwieldy writing" that drains enthusiasm
+.
+Find the "Window": Like a memoir, a good vision statement shouldn't be the summary of an entire life or company; it should be a window into the intended future
+.
+One Provocative Thought: Every successful piece of nonfiction should leave the reader with exactly one provocative thought they didn't have before
+.
+5. Practice Ruthless Concision
+A strong vision statement must be "stripped to its cleanest components"
+.
+Prune Redundancy: Eliminate "meaningless words" (like actually, basically, particular) and "redundant pairs" (like full and complete)
+.
+End with Strength: Your final sentence should encapsulate the vision and conclude with a jolt of fitness or surprise
+.
+
+---
+
+draft me the changes so i can review them first
