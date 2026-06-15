@@ -1,0 +1,5 @@
+make a todo list and action each item one by one. for anything that requires you to change what you're writing review it in a sub-agent using /writing-refinement after that task before you proceed to the next one
+
+---
+
+rather than "Act" what other label could you have used? its a bit weird to use "Act" as a way to describe a system design / architecture doc
