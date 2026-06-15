@@ -118,6 +118,11 @@
   main pre { background: var(--rule-soft); padding: 16px 18px; border-radius: 8px; overflow-x: auto; font-size: 13.5px; line-height: 1.6; border: 1px solid var(--rule); color: var(--fg-soft); }
   main code { font-size: 0.92em; padding: 2px 6px; background: var(--rule-soft); border-radius: 4px; color: var(--fg); }
   main pre code { padding: 0; background: transparent; font-size: 1em; }
+  /* lightweight, theme-aware syntax highlight for Python blocks */
+  .code-py .tok-kw  { color: var(--accent); font-weight: 600; }
+  .code-py .tok-fn  { color: var(--info); }
+  .code-py .tok-str { color: var(--ok); }
+  .code-py .tok-com { color: var(--muted); font-style: italic; }
   main em { color: var(--fg); font-style: italic; }
   main table { border-collapse: collapse; margin: 18px 0; width: 100%; font-size: 14px; }
   main th, main td { border-bottom: 1px solid var(--rule); padding: 10px 14px; text-align: left; vertical-align: top; }
@@ -258,8 +263,10 @@
     <p class="kicker">Interface<span class="sub">How the layers meet</span></p>
     <nav><ul>
       <li><a href="#s5"><span class="navnum">§5</span>Writes signals; reads them</a></li>
+      <li><a href="#sguard"><span class="navnum">▸</span>The stop-guard enforces Done</a></li>
       <li><a href="#s4"><span class="navnum">§4</span>A worker per phase</a></li>
       <li><a href="#s6"><span class="navnum">§6</span>Dual-mode</a></li>
+      <li><a href="#sspine"><span class="navnum">▸</span>The supervisor in one loop</a></li>
     </ul></nav>
 
     <p class="kicker">Scale<span class="sub">How far it runs</span></p>
@@ -491,6 +498,30 @@
       <p>Keeping the boundary at the artifact is what makes Layer 1 content-blind, and content-blindness is what lets the same Layer 2 run under any worker.</p>
     </section>
 
+    <section class="s" id="sguard">
+      <header><span class="ix">guard</span><h2>Done has to mean done — the stop-guard enforces it</h2></header>
+      <p>Content-blindness has one precondition: a worker must not be able to <em>stop</em> with the work uncaptured. A <code>claude -p</code> session that loads a "report findings and await input" skill can end its turn with the code green but uncommitted and no PR submitted — the boundary would then read "not Done" for work that was actually finished, or worse, let the run march on past a half-done issue. The <strong>stop-guard</strong> closes that gap. Before each spawn the orchestrator plants <code>.drain-guard.json</code> in the worktree; the worker runs <code>stop_guard</code> as its Stop hook, so at end-of-turn Layer 1 gets one last check on the artifacts before the session is allowed to exit:</p>
+
+      <pre class="code-py"><code><span class="tok-kw">def</span> <span class="tok-fn">evaluate</span>(worktree, *, stop_hook_active):
+    config = <span class="tok-fn">read_marker</span>(worktree)             <span class="tok-com"># planted before the spawn; absent ⇒ not a drain worker</span>
+    <span class="tok-kw">if</span> config <span class="tok-kw">is</span> <span class="tok-kw">None</span>:
+        <span class="tok-kw">return</span> <span class="tok-fn">Decision</span>(block_reason=<span class="tok-kw">None</span>, tripped_reason=<span class="tok-kw">None</span>)   <span class="tok-com"># silent no-op for interactive sessions</span>
+
+    dirty      = <span class="tok-fn">_git_dirty</span>(worktree)          <span class="tok-com"># uncommitted work in the tree?</span>
+    handoff_ok = <span class="tok-fn">_has_handoff</span>(worktree) <span class="tok-kw">if</span> config.mode == <span class="tok-str">"stack"</span> <span class="tok-kw">else</span> <span class="tok-kw">True</span>
+    <span class="tok-kw">if</span> <span class="tok-kw">not</span> dirty <span class="tok-kw">and</span> handoff_ok:                <span class="tok-com"># commit + handoff present ⇒ the sequence ran</span>
+        <span class="tok-kw">return</span> <span class="tok-fn">Decision</span>(block_reason=<span class="tok-kw">None</span>, tripped_reason=<span class="tok-kw">None</span>)
+
+    <span class="tok-kw">if</span> config.count &gt;= config.max_blocks:    <span class="tok-com"># out of retries ⇒ give up and tag it</span>
+        (worktree / TRIPPED_FILE).<span class="tok-fn">write_text</span>(reason)   <span class="tok-com"># orchestrator reads → worker_stopped_incomplete</span>
+        <span class="tok-kw">return</span> <span class="tok-fn">Decision</span>(block_reason=<span class="tok-kw">None</span>, tripped_reason=reason)
+
+    <span class="tok-fn">_write_marker_count</span>(worktree, config, count=config.count + 1)
+    <span class="tok-kw">return</span> <span class="tok-fn">Decision</span>(block_reason=_BLOCK_PROMPT, tripped_reason=<span class="tok-kw">None</span>)   <span class="tok-com"># re-inject: finish the sequence, then stop</span></code></pre>
+
+      <p>The shape generalises: Layer 1 watches what a worker leaves behind, and when it falls short, re-injects a corrective prompt and retries before giving up and recording the shortfall. The same loop — observe, push back, retry, then escalate — is how the supervisor will later answer review comments on an open PR: revise, resubmit, and record the pass, escalating to the operator when a fix keeps missing.</p>
+    </section>
+
     <section class="s" id="s4">
       <header><span class="ix">§4</span><h2>Spawn a worker per phase, not per issue</h2></header>
       <p>A worker does not run the whole <code>exec:*</code> chain. Each phase — code, review, finish — is its own spawn, with its own model tier, and the agent that produced an artifact never judges it. Two independent reasons force this:</p>
@@ -535,17 +566,62 @@ me         → review the finished work; step in only where it halted</code></pr
       <p>Design decision §10 (config symlinked into each worktree) is what makes the headless worker's environment match an interactive session, so a skill behaves the same in both modes.</p>
     </section>
 
+    <section class="s" id="sspine">
+      <header><span class="ix">spine</span><h2>The whole supervisor is one loop</h2></header>
+      <p>§6 showed the operator's view; this is the supervisor's. Layer 1 is a handful of single-purpose modules — <code>linear</code> moves issue state, <code>worktree</code> isolates the branch, <code>prompt</code> points the worker at the entry skill, <code>worker</code> spawns the metered <code>claude -p</code>, and <code>handoff</code> and <code>runlog</code> are the artifacts read back. The run is just the loop that threads them together:</p>
+
+      <pre class="code-py"><code><span class="tok-kw">from</span> drain_cycle <span class="tok-kw">import</span> linear, repos, model, worktree, prompt, worker, handoff, runlog
+
+<span class="tok-kw">def</span> <span class="tok-fn">run</span>(repos, limits):
+    cycle_id = linear.<span class="tok-fn">current_cycle_id</span>()              <span class="tok-com"># the state plane (§7)</span>
+    plan = linear.<span class="tok-fn">pending_issues</span>(cycle_id)            <span class="tok-com"># runnable issues, topo-sorted</span>
+    log = runlog.<span class="tok-fn">RunLog</span>(cycle_id=cycle_id)
+
+    <span class="tok-kw">for</span> issue <span class="tok-kw">in</span> plan.order:
+        repo   = repos.<span class="tok-fn">resolve</span>(issue)                 <span class="tok-com"># isolate on its own branch (§10)</span>
+        handle = worktree.<span class="tok-fn">ensure</span>(repo, issue[<span class="tok-str">"identifier"</span>], base=<span class="tok-str">"main"</span>)
+        linear.<span class="tok-fn">set_state</span>(issue[<span class="tok-str">"id"</span>], <span class="tok-str">"In Progress"</span>)
+
+        prompt_text = prompt.<span class="tok-fn">build</span>(issue, handle.path, stack=<span class="tok-kw">True</span>)   <span class="tok-com"># entry skill, no procedure (§3)</span>
+        result = worker.<span class="tok-fn">run_issue</span>(                    <span class="tok-com"># one metered `claude -p` (§4)</span>
+            claude_cmd=[<span class="tok-str">"claude"</span>, <span class="tok-str">"-p"</span>, <span class="tok-str">"--dangerously-skip-permissions"</span>],
+            model=model.<span class="tok-fn">resolve</span>(issue), prompt=prompt_text, cwd=handle.path,
+            token_limit=limits.per_issue_tokens,
+            time_limit_seconds=limits.per_issue_seconds,
+            cost_limit_usd=limits.per_issue_cost_usd,
+        )
+
+        <span class="tok-com"># advance on the artifacts the worker left — never on what it did (§5)</span>
+        done = linear.<span class="tok-fn">get_issue</span>(issue[<span class="tok-str">"id"</span>])[<span class="tok-str">"state"</span>][<span class="tok-str">"type"</span>] == <span class="tok-str">"completed"</span>
+        prs  = handoff.<span class="tok-fn">read</span>(handle.path)              <span class="tok-com"># .drain-handoff.json → pr_urls</span>
+        log.<span class="tok-fn">append_entry</span>(issue_identifier=issue[<span class="tok-str">"identifier"</span>],
+                         final_linear_state=<span class="tok-str">"Done"</span> <span class="tok-kw">if</span> done <span class="tok-kw">else</span> <span class="tok-str">"In Progress"</span>)</code></pre>
+
+      <p>That loop is <code>orchestrator.run</code>, near enough. Notice what is absent: no line reads what the worker <em>did</em>. The supervisor advances on three artifacts and nothing else — the Linear state from <code>linear.get_issue</code>, the <code>pr_urls</code> from <code>handoff.read</code>, and the entry it appends to the <code>runlog</code>. Swap <code>claude -p</code> for any other worker and the loop is unchanged.</p>
+    </section>
+
     <!-- ACT III -->
     <div class="act-head" id="act3">
       <div class="act-kicker">Scale</div>
       <h2 class="act-title">How far it runs</h2>
-      <p class="act-tldr">The supervisor reaches further as observability earns trust: from one-shot CLI to resident daemon, from one issue to a whole planned unit, with review rolling up the same tree the work was broken down along.</p>
+      <p class="act-tldr">The supervisor runs wider as its records earn trust: from one-shot CLI to resident daemon, from a single issue to a whole planned unit, with review rolling back up the decomposition tree.</p>
     </div>
 
     <section class="s" id="s9">
-      <header><span class="ix">§9</span><h2>Extend the autonomy horizon as observability earns trust</h2></header>
-      <p>How far the supervisor runs without the operator. Today it drains a cycle transactionally — one issue, one worker, one diff — and halts when it runs out of runnable work or hits a result it cannot get past. The horizon extends outward as observability earns more trust: building on unmerged work, auto-merging trusted classes, and eventually a resident process that watches its own PRs through the review-and-merge loop. That extension is shaped in <a href="ideas/drain-past-the-merge-gate.md"><code>ideas/drain-past-the-merge-gate.md</code></a>.</p>
-      <p>The horizon is a deliberate trade, not a default: autonomy is applied selectively where the delayed feedback loop (§7) makes the loss of live intervention acceptable.</p>
+      <header><span class="ix">§9</span><h2>Extend the autonomy horizon as the run-logs earn trust</h2></header>
+      <p>The autonomy horizon is how far the supervisor runs without the operator. Today it drains a cycle transactionally — one issue, one worker, one diff — and halts when it runs out of runnable work or hits a result it cannot get past. It widens as the records earn more trust: building on unmerged work, auto-merging trusted classes, and eventually a resident process that watches its own PRs through the review-and-merge loop. That work is shaped in <a href="ideas/drain-past-the-merge-gate.md"><code>ideas/drain-past-the-merge-gate.md</code></a>.</p>
+      <p>Widening is a deliberate trade, not a default: the supervisor runs unattended only where the delayed feedback loop (§7) makes it safe to stop watching live.</p>
+      <p><code>grade</code> is how that trust is measured. It reads every run-log under <code>~/.drain-cycle/runs/</code> and scores the series — a Done-rate per cycle, a trend across the last three, the <code>(final_linear_state, exit_code)</code> failures that recur, and a verdict band the operator reads against their own kill rule:</p>
+
+      <pre class="code-py"><code><span class="tok-kw">def</span> <span class="tok-fn">verdict</span>(cycles):                              <span class="tok-com"># cycles built from ~/.drain-cycle/runs/*.json</span>
+    recent = [c.completion_percent <span class="tok-kw">for</span> c <span class="tok-kw">in</span> cycles[-3:]]   <span class="tok-com"># Done-rate per cycle</span>
+    trend  = <span class="tok-fn">_trend_label</span>(recent)                 <span class="tok-com"># improving / flat / regressing</span>
+    pct    = recent[-1]
+    <span class="tok-kw">if</span> pct &gt;= 80:  <span class="tok-kw">return</span> <span class="tok-str">"HEALTHY"</span>               <span class="tok-com"># the horizon may widen</span>
+    <span class="tok-kw">if</span> pct &gt;= 50:  <span class="tok-kw">return</span> <span class="tok-str">"WATCH"</span>
+    <span class="tok-kw">return</span> <span class="tok-str">"CONCERNING"</span>                          <span class="tok-com"># pull it back</span></code></pre>
+
+      <p>Records (§7) feed grades, and grades decide whether the supervisor takes on more: it drains, records, grades, then decides how far to go next.</p>
     </section>
 
     <section class="s" id="s10">
