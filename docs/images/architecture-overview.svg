@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1035" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" fill="#222">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1100" height="1035" fill="#ffffff"/>
+
+  <!-- operator -->
+  <rect x="470" y="15" width="160" height="42" rx="8" fill="#f0f0f0" stroke="#333"/>
+  <text x="550" y="41" text-anchor="middle" font-weight="600">operator</text>
+
+  <!-- operator -> control plane -->
+  <line x1="550" y1="57" x2="550" y2="90" stroke="#444" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="566" y="71" font-size="12" fill="#555">points at planned work;</text>
+  <text x="566" y="86" font-size="12" fill="#555">queries &#183; halts &#183; resumes</text>
+
+  <!-- control plane -->
+  <rect x="30" y="94" width="1040" height="130" rx="10" fill="#e8f0fe" stroke="#3b6fb5"/>
+  <text x="50" y="120" font-weight="700" font-size="16">Control plane &#8212; one per machine (resident daemon)</text>
+  <text x="1054" y="114" text-anchor="end" font-size="11" fill="#3b6fb5" font-weight="600">LAYER 1</text>
+  <text x="50" y="146" font-size="13.5">&#8226; owns process lifecycle &#183; the queue of planned units to execute</text>
+  <text x="50" y="170" font-size="13.5">&#8226; steer API the operator queries: what&#8217;s running &#183; halt &#183; resume</text>
+  <text x="50" y="194" font-size="13.5">&#8226; watches open PRs through the review-and-merge loop &#183; responds to PR comments</text>
+  <text x="50" y="214" font-size="11.5" font-style="italic" fill="#666">(horizon behaviour &#8212; only a resident process can watch a PR after it is open)</text>
+
+  <!-- control plane -> coordinator -->
+  <line x1="550" y1="224" x2="550" y2="252" stroke="#444" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="566" y="242" font-size="12" fill="#555">spawns one coordinator per unit in flight</text>
+
+  <!-- execution coordinator -->
+  <rect x="30" y="256" width="1040" height="92" rx="10" fill="#e8f0fe" stroke="#3b6fb5"/>
+  <text x="50" y="282" font-weight="700" font-size="16">Execution-coordinator &#8212; one per unit in flight (a tree walker)</text>
+  <text x="1054" y="276" text-anchor="end" font-size="11" fill="#3b6fb5" font-weight="600">LAYER 1</text>
+  <text x="50" y="308" font-size="13.5">&#8226; advances work by reading artifacts (&#167;5) &#8212; never by reading inside a phase</text>
+  <text x="50" y="332" font-size="13.5">&#8226; halts on a missing or failed artifact</text>
+
+  <!-- coordinator -> unit -->
+  <line x1="550" y1="348" x2="550" y2="378" stroke="#444" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="566" y="368" font-size="12" fill="#555">drives one planned unit</text>
+
+  <!-- fan-down / roll-up edge arrows -->
+  <line x1="18" y1="386" x2="18" y2="980" stroke="#888" stroke-width="2" marker-end="url(#arrow)"/>
+  <text transform="translate(13,683) rotate(-90)" text-anchor="middle" font-size="12.5" fill="#777" font-weight="600">work fans down &#183; decomposition</text>
+  <line x1="1082" y1="980" x2="1082" y2="386" stroke="#888" stroke-width="2" marker-end="url(#arrow)"/>
+  <text transform="translate(1094,683) rotate(-90)" text-anchor="middle" font-size="12.5" fill="#777" font-weight="600">verification rolls up</text>
+
+  <!-- nesting: project > milestone > task -->
+  <rect x="55" y="386" width="650" height="600" rx="10" fill="none" stroke="#555" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="72" y="412" font-weight="700" font-size="14" fill="#444">PROJECT</text>
+
+  <rect x="85" y="440" width="600" height="520" rx="10" fill="none" stroke="#555" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="102" y="466" font-weight="700" font-size="14" fill="#444">MILESTONE</text>
+
+  <rect x="115" y="496" width="550" height="430" rx="10" fill="#fafafa" stroke="#444" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="132" y="522" font-weight="700" font-size="14" fill="#333">TASK &#8212; one issue</text>
+
+  <!-- phase spawns (vertical) -->
+  <rect x="140" y="548" width="500" height="92" rx="8" fill="#e6f4ea" stroke="#2e7d4f"/>
+  <text x="160" y="576" font-weight="700" font-size="15">exec:build</text>
+  <text x="624" y="570" text-anchor="end" font-size="10.5" fill="#2e7d4f" font-weight="600">LAYER 2 SKILL</text>
+  <text x="160" y="600" font-size="13">goal: produce sliced artifacts</text>
+  <text x="160" y="622" font-size="11.5" fill="#666">(+ exec:debug, exec:simplify)</text>
+
+  <line x1="390" y1="640" x2="390" y2="674" stroke="#444" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="404" y="654" font-size="11.5" font-style="italic" fill="#b03030">the agent that produced an</text>
+  <text x="404" y="668" font-size="11.5" font-style="italic" fill="#b03030">artifact never judges it</text>
+
+  <rect x="140" y="676" width="500" height="92" rx="8" fill="#e6f4ea" stroke="#2e7d4f"/>
+  <text x="160" y="704" font-weight="700" font-size="15">exec:review</text>
+  <text x="624" y="698" text-anchor="end" font-size="10.5" fill="#2e7d4f" font-weight="600">LAYER 2 SKILL</text>
+  <text x="160" y="728" font-size="13">goal: apply every quality lens</text>
+  <text x="160" y="750" font-size="11.5" fill="#666">(fans out reviewer personas)</text>
+
+  <line x1="390" y1="768" x2="390" y2="802" stroke="#444" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="140" y="804" width="500" height="98" rx="8" fill="#e6f4ea" stroke="#2e7d4f"/>
+  <text x="160" y="832" font-weight="700" font-size="15">exec:finish</text>
+  <text x="624" y="826" text-anchor="end" font-size="10.5" fill="#2e7d4f" font-weight="600">LAYER 2 SKILL</text>
+  <text x="160" y="856" font-size="13">goal: land human-readable PRs</text>
+  <text x="160" y="878" font-size="11.5" fill="#666">(What/Why/Focus PR &#183; summary comment &#183; status move)</text>
+
+  <!-- review altitudes (right column) -->
+  <rect x="740" y="400" width="325" height="96" rx="8" fill="#fff4d6" stroke="#b8860b"/>
+  <text x="756" y="424" font-weight="700" font-size="14">Project review</text>
+  <text x="756" y="448" font-size="12.5">&#183; architecture review</text>
+  <text x="756" y="468" font-size="12.5">&#183; measurable stated goals</text>
+  <text x="756" y="488" font-size="11.5" fill="#666">(partial &#8212; some goals deferred)</text>
+  <line x1="705" y1="444" x2="740" y2="444" stroke="#b8860b" stroke-width="1.3" stroke-dasharray="3 3"/>
+
+  <rect x="740" y="520" width="325" height="96" rx="8" fill="#fff4d6" stroke="#b8860b"/>
+  <text x="756" y="544" font-weight="700" font-size="14">Milestone review</text>
+  <text x="756" y="568" font-size="12.5">&#183; integration / coherence / acceptance</text>
+  <text x="756" y="588" font-size="12.5">&#183; regression (outside this boundary)</text>
+  <text x="756" y="608" font-size="11.5" fill="#666">after child PRs merge &#8594; new work, not reverts</text>
+  <line x1="685" y1="560" x2="740" y2="560" stroke="#b8860b" stroke-width="1.3" stroke-dasharray="3 3"/>
+
+  <rect x="740" y="648" width="325" height="186" rx="8" fill="#fff4d6" stroke="#b8860b"/>
+  <text x="756" y="672" font-weight="700" font-size="14">Task review &#8212; diff-bounded</text>
+  <text x="756" y="694" font-size="11.5" fill="#666">before the PR merges:</text>
+  <text x="756" y="720" font-size="12.5">&#183; spec-compliance</text>
+  <text x="756" y="742" font-size="12.5">&#183; security</text>
+  <text x="756" y="764" font-size="12.5">&#183; reliability/resilience</text>
+  <text x="756" y="786" font-size="12.5">&#183; code-quality</text>
+  <text x="756" y="808" font-size="12.5">&#183; outcome</text>
+  <line x1="665" y1="722" x2="740" y2="722" stroke="#b8860b" stroke-width="1.3" stroke-dasharray="3 3"/>
+
+  <!-- legend -->
+  <rect x="40" y="1002" width="20" height="14" rx="3" fill="#e8f0fe" stroke="#3b6fb5"/>
+  <text x="66" y="1014" font-size="12.5">Layer 1 &#8212; supervision</text>
+  <rect x="260" y="1002" width="20" height="14" rx="3" fill="#e6f4ea" stroke="#2e7d4f"/>
+  <text x="286" y="1014" font-size="12.5">Layer 2 &#8212; workflow skills</text>
+  <rect x="500" y="1002" width="20" height="14" rx="3" fill="#fff4d6" stroke="#b8860b"/>
+  <text x="526" y="1014" font-size="12.5">review &#8212; run by an agent that did not author the work</text>
+</svg>

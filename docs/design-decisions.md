@@ -290,7 +290,7 @@ gt submit --stack --no-interactive --publish
 
 ## 17. `/shape:task` runs inside the worker session; whole-project shaping stays at design-doc scope
 
-> **Forward-pointer.** Not stale today, but the target moved into the pack. Under the `exec:*` namespace (ADR 0004 / Shaper `execution-workflow` design doc), `/shape:task` folds into `exec:pickup`/`exec:breakdown` at the keystone cutover ([`architecture.md`](architecture.md) §7). The in/out contract below still describes what that step does.
+> **Forward-pointer.** Not stale today, but the target moved into the pack. Under the `exec:*` namespace (ADR 0004 / Shaper `execution-workflow` design doc), `/shape:task` folds into `exec:pickup`/`exec:breakdown` at the keystone cutover ([`architecture.md`](architecture.md) §8). The in/out contract below still describes what that step does.
 
 The M2 worker pipeline introduces a Task Shaper role — `/shape:task` — that runs before the implementer on verify-flow tickets. The initiative doc deferred the invocation interface to this ADR: whether whole-project shaping (via `/shape:planning-and-task-breakdown`) pre-computes per-ticket task lists that workers later read, or `/shape:task` runs inside each worker session on its own ticket.
 
@@ -335,9 +335,9 @@ All four run-log fields are additive and default to `null` (push-to-main repos, 
 
 ## 19. The worker owns PR submission via the finishing skill; the orchestrator reads `pr_urls` back
 
-This reverses the actor in §16 and §18. There, the orchestrator assembled and submitted the per-repo Graphite stack and posted the Linear comment. Now the **worker** does it: in drain mode the worker commits reviewable slices, then runs the finishing skill (`/shape:pr-finishing` today; `exec:finish` after the keystone cutover, [`architecture.md`](architecture.md) §7), which owns submission — it drives `gt`/`gh`, writes the submitted PR URLs into `.drain-handoff.json` (`pr_urls`), and posts the review-summary comment on the Linear issue. The orchestrator no longer assembles or submits anything; it **reads `pr_urls` back** as confirmation that submission succeeded, and a Done stack-mode issue with no `pr_urls` halts the run rather than letting the next issue stack on an unpushed branch.
+This reverses the actor in §16 and §18. There, the orchestrator assembled and submitted the per-repo Graphite stack and posted the Linear comment. Now the **worker** does it: in drain mode the worker commits reviewable slices, then runs the finishing skill (`/shape:pr-finishing` today; `exec:finish` after the keystone cutover, [`architecture.md`](architecture.md) §8), which owns submission — it drives `gt`/`gh`, writes the submitted PR URLs into `.drain-handoff.json` (`pr_urls`), and posts the review-summary comment on the Linear issue. The orchestrator no longer assembles or submits anything; it **reads `pr_urls` back** as confirmation that submission succeeded, and a Done stack-mode issue with no `pr_urls` halts the run rather than letting the next issue stack on an unpushed branch.
 
-**Why the reversal.** It is the artifact boundary applied ([`architecture.md`](architecture.md) §2). Submitting a stack is "what a role does" — Layer 2 — so it belongs in a skill that runs identically by hand or unattended. Reading back whether the PRs exist is "whether an artifact exists" — Layer 1 — so it stays in the supervisor. The §16/§18 design put a Layer-2 action inside Layer 1, which is exactly the coupling the two-layer split removes: an orchestrator that knows the `gt`/`gh` sequence cannot be the thin, vendor-agnostic supervisor the keystone (§7) requires.
+**Why the reversal.** It is the artifact boundary applied ([`architecture.md`](architecture.md) §5). Submitting a stack is "what a role does" — Layer 2 — so it belongs in a skill that runs identically by hand or unattended. Reading back whether the PRs exist is "whether an artifact exists" — Layer 1 — so it stays in the supervisor. The §16/§18 design put a Layer-2 action inside Layer 1, which is exactly the coupling the two-layer split removes: an orchestrator that knows the `gt`/`gh` sequence cannot be the thin, vendor-agnostic supervisor the keystone (§8) requires.
 
 **The verified `gt`/`gh` sequence in §16 is still correct** — it is just run by the finishing skill, not the orchestrator. §16's per-repo preconditions (`gt auth`, `gt init --trunk main`) and its stop-the-line restack policy carry over unchanged.
 
@@ -350,14 +350,14 @@ This reverses the actor in §16 and §18. There, the orchestrator assembled and 
 
 ## 20. A worker per phase, not a worker per issue
 
-Today one spawned worker runs the whole `exec:*` chain for an issue — pickup through finish — in a single session. The decision is to split it: each phase (code, review, finish) is its own spawn, with its own model tier, and the agent that produced an artifact never reviews it. See [`architecture.md`](architecture.md) §9.
+Today one spawned worker runs the whole `exec:*` chain for an issue — pickup through finish — in a single session. The decision is to split it: each phase (code, review, finish) is its own spawn, with its own model tier, and the agent that produced an artifact never reviews it. See [`architecture.md`](architecture.md) §4.
 
 **Why split.** Two independent reasons, either sufficient on its own:
 
 - *Independent verification.* A coder reviewing its own work rationalises its own choices — the review inherits the blind spots of the build. A separate review agent that did not write the code is adversarial by construction, not by prompt wording. This is the same logic that made `exec:review` fan out to distinct personas (the persona contract); phase separation extends it across the build/review boundary, not just within review.
 - *Per-phase model economics.* The operator anchors review to a stronger, more expensive model regardless of what built the change — a cheap model codes, an expensive one reviews. That asymmetry is only expressible if each phase is its own `claude -p` spawn with its own `--model` pin. A single worker pins one model for the whole chain.
 
-**Cost accepted.** Every phase boundary now pays a spawn plus artifact rehydration: the next phase starts cold and reads its inputs from the handoff envelope (architecture §2) rather than inheriting them in context. A single worker kept that context for free. This makes the handoff envelope load-bearing for *all* cross-phase state, not just `pr_urls` — the envelope must carry what each phase needs the next to know. This is the deliberate price of independence and the asymmetric-model economics.
+**Cost accepted.** Every phase boundary now pays a spawn plus artifact rehydration: the next phase starts cold and reads its inputs from the handoff envelope (architecture §5) rather than inheriting them in context. A single worker kept that context for free. This makes the handoff envelope load-bearing for *all* cross-phase state, not just `pr_urls` — the envelope must carry what each phase needs the next to know. This is the deliberate price of independence and the asymmetric-model economics.
 
 **Alternatives considered.**
 
@@ -366,7 +366,7 @@ Today one spawned worker runs the whole `exec:*` chain for an issue — pickup t
 
 ## 21. Review is multi-altitude; higher-altitude review yields new work, not reverts
 
-Review fires at three altitudes matching the delivery hierarchy `shape:delivery` already produces — task, milestone, project — not only per task. The full model is in [`architecture.md`](architecture.md) §11.
+Review fires at three altitudes matching the delivery hierarchy `shape:delivery` already produces — task, milestone, project — not only per task. The full model is in [`architecture.md`](architecture.md) §12.
 
 **Why multi-altitude.** A task review is diff-bounded: it grades one issue's change against its AC and the quality lenses. It cannot see whether the tasks of a milestone *cohere*, whether landing them degraded something *outside* their own boundary, or whether the project met its stated goals. Those are real defect classes that only exist at a higher altitude, so they need a review oriented to that altitude. Verification rolls up the same tree the work was decomposed down — the dual of the delivery hierarchy.
 
