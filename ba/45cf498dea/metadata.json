@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "ba45cf498dea",
+  "strategy": "manual-commit",
+  "branch": "anton/aba-370-n01-thin-supervisor-contract-design-doc-before-build",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "docs/architecture.html"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ba/45cf498dea/0/metadata.json",
+      "transcript": "/ba/45cf498dea/0/full.jsonl",
+      "content_hash": "/ba/45cf498dea/0/content_hash.txt",
+      "prompt": "/ba/45cf498dea/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 20262,
+    "cache_creation_tokens": 198617,
+    "cache_read_tokens": 6289876,
+    "output_tokens": 85538,
+    "api_call_count": 58
+  }
+}

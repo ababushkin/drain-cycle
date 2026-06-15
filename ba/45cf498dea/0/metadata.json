@@ -1,0 +1,87 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "ba45cf498dea",
+  "session_id": "10755336-9ce6-4395-9a79-1aded556761f",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-15T15:06:56.818824Z",
+  "branch": "anton/aba-370-n01-thin-supervisor-contract-design-doc-before-build",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "docs/architecture.html"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "e2c4821f4b4c",
+  "token_usage": {
+    "input_tokens": 20262,
+    "cache_creation_tokens": 198617,
+    "cache_read_tokens": 6289876,
+    "output_tokens": 85538,
+    "api_call_count": 58
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01F9194EHtzR2cY3RPsu7C4a",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape:plan-review"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "e2c4821f4b4c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 277,
+        "end": 278,
+        "entry_ids": [
+          "52fb63fe-fefd-4196-b09e-853d68ded605"
+        ],
+        "tool_use_id": "toolu_01F9194EHtzR2cY3RPsu7C4a"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01F9194EHtzR2cY3RPsu7C4a"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape:plan-review",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-15T15:06:56.792288Z",
+    "agent_lines": 80,
+    "agent_removed": 4,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 80,
+    "total_lines_changed": 84,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 80,
+      "agent_lines_removed": 4
+    }
+  ]
+}
