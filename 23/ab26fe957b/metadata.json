@@ -3,7 +3,7 @@
   "checkpoint_id": "23ab26fe957b",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 1,
+  "checkpoints_count": 5,
   "files_touched": [
     "docs/delivery-plans/orchestrator-enforced-completion/D1-recover-stranded-committed-work/N01-recover-stranded-committed-work.md",
     "docs/delivery-plans/orchestrator-enforced-completion/D1-recover-stranded-committed-work/_deliverable.md",
@@ -25,13 +25,19 @@
       "transcript": "/23/ab26fe957b/0/full.jsonl",
       "content_hash": "/23/ab26fe957b/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/23/ab26fe957b/1/metadata.json",
+      "transcript": "/23/ab26fe957b/1/full.jsonl",
+      "content_hash": "/23/ab26fe957b/1/content_hash.txt",
+      "prompt": "/23/ab26fe957b/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 131,
-    "cache_creation_tokens": 10935,
-    "cache_read_tokens": 155589,
-    "output_tokens": 146,
-    "api_call_count": 1
+    "input_tokens": 1543,
+    "cache_creation_tokens": 231087,
+    "cache_read_tokens": 5202071,
+    "output_tokens": 36383,
+    "api_call_count": 78
   }
 }

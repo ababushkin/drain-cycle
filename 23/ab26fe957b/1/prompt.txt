@@ -1,0 +1,33 @@
+why did my previous drain-cycle run halt before all the tasks were drained?
+
+---
+
+yes look into it, i suspect there was work upstream that blocked it
+
+---
+
+/idea-refine i want better logging by default, debugging should be used for extremely verbose logging. i'm picturing drain-me to start up and run in a similar way that i would see a kubernetes console or any other type of console. it should show me things like:
+
+1. on startup - the work its going to pick up and the specific order. rendered in a friendly way
+2. during the run - beyond the current execution log which is emitted by the agent, it should show me what the orchestator is doing, spinning up the process, creating any sub-agents, etc.
+3. on completion/failure - what happened, whats next, etc
+
+---
+
+direction A seems like it might be the right way to go, but i want to spike it and see what the output looks like and also how to make the output look nicer
+
+---
+
+looks pretty good, i would fix up the contrast a bit so that it's easier to read, but overwall its coming along. the feedback you mentioned is also good to fix up
+
+---
+
+i'm happy with that, we should create a spec or design it so that we can implement it
+
+---
+
+attach the visual style guide to the ticket itself
+
+---
+
+why upload the whole demo script? isn't there just a way to describe the visual style guide? or is it too complex?
