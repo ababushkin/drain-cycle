@@ -1,0 +1,69 @@
+/shape-writing-refinement Re-scoped (2026-06-15) to Layer-1 only. This project originally proposed six agent-driven roles plus the skills behind them. Those skills now exist: the "Issues drain end-to-end on first-party skills" project shipped them in the Shaper pack as the exec:* execution flow (exec:pickup/exec:breakdown, exec:build, exec:debug/exec:simplify, exec:review/exec:pr-prepare, exec:verify, exec:pr-respond). Under the two-layer architecture (drain-cycle/docs/architecture.md — supervision over a workflow pack, split on the artifact boundary), this project keeps only drain-cycle's Layer-1 work: enforce, record, and grade around those artifacts. It does not build skills.
+
+Goal: For the operator running drain-cycle on outcome-focused Linear tickets, the supervisor enforces that complex tickets clear their acceptance criteria before they land — recording an Outcome Verifier verdict in the run log, gating Done on it, and grading the result — so hard tickets don't silently ship with missing AC and the outcome of every drained ticket is inspectable after the fact.
+
+Surviving scope (drain-cycle only):
+
+Run-log schema fields: outcome_verdict, prep_verdict, responder_runs[], flow, plus matching OTel span attributes.
+
+The verify Linear label mechanism (alongside repo: / model: resolution).
+
+The verifier-gated Done contract — supersedes design decision §1 (agent self-asserts Done).
+
+Grading: drain-cycle grade-draft <issue> and drain-cycle grade --flow=verify.
+
+Out of scope now (delivered elsewhere): authoring the exec:* skills (done by "Issues drain end-to-end on first-party skills"); the thin-supervisor prompt re-scope and the exec:* cutover (owned by "drain-cycle supervises; the pack owns the workflow").
+
+Key results:
+
+KR1 (stretch) — Of the next 5 hard tickets drained with the verify flow, ≥ 3 ship and merge with no operator-pushed fix commits (bet)
+
+baseline: the recording/enforcement layer doesn't exist yet, so Done can be self-asserted unverified
+
+target: ≥ 3 of 5 ship and merge with no operator-pushed fix commits
+
+measured over: the first 5 hard tickets drained with the verify flow (~2 cycles)
+
+how we'll know: per-ticket grade markdown at ~/.drain-cycle/grades/<issue>.md (auto-drafted by drain-cycle grade-draft, operator confirms draft → confirmed); drain-cycle grade --flow=verify reports the rolled-up pass-rate
+
+KR2 (commit) — Every ticket reaching Done under the verify flow has a recorded Outcome Verifier verdict in the run log; zero exceptions (brake)
+
+baseline: silent self-assertion currently possible (design decision §1); past count unknown because the recording fields don't exist yet
+
+target: 0 tickets reach Done under the verify flow without an outcome_verdict recorded in the run log
+
+measured over: every cycle that runs the verify flow, capped at 10 cycles
+
+how we'll know: drain-cycle grade fails any entry where flow == "verify" AND final_linear_state == "completed" AND outcome_verdict is absent; exit code ≠ 0 on any violation
+
+KR3 (commit) — Every PR submitted under the verify flow has a structured What / Why / Focus body, or is correctly routed to auto-merge (brake)
+
+baseline: PRs from drained tickets carry whatever body the worker produced — typically a one-line subject and no review guidance
+
+target: 0 PRs submitted under the verify flow without either (a) structured What/Why/Focus body OR (b) auto-merge label with reasoning
+
+measured over: every PR submitted under the verify flow, for the project's duration
+
+how we'll know: the prep step writes its decision to prep_verdict on the run-log entry; drain-cycle grade fails any verify-flow entry where prep_verdict is absent or claims a structured body the PR doesn't have
+
+Affected repos: drain-cycle only. The exec:* skills already live in agent-skills-shaper; no new skill work belongs here.
+
+Kill condition: after running the verify flow on 5+ hard tickets across 2 cycles, the Outcome Verifier produces zero true-positive findings (every halt was a false positive, and verifier-passed Dones don't visibly improve PR-review outcomes vs default-flow drains). On kill: revert contract enforcement, keep the recording fields (cheap and useful), record the negative result in docs/design-decisions.md.
+
+Project type: 2 — personal product, single-user.
+
+Design context: docs/architecture.md (the two-layer split and the verdict-handoff open seam this project resolves) and docs/design-decisions.md §1 (the verifier-gated-Done supersession). This project description is the source of truth for scope, KRs, and the kill condition.
+
+---
+
+now review it again and delete any unnecessary bits / text / copy that don't necessarily add anything helpful to the reader
+
+---
+
+push this content to this linear project: Multi-agent collaboration for correctness
+
+replace the entire project description with what you have now
+
+---
+
+yes
