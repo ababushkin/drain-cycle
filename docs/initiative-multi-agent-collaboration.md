@@ -1,5 +1,21 @@
 # Linear initiative — multi-agent collaboration for correctness
 
+> **Now a facet of the north-star.** The system architecture this initiative assumed is consolidated in [`docs/architecture.md`](architecture.md) (serving the [vision](vision.md)). Under that design this initiative is reframed as the **Layer-1 (supervision) enforcement + recording + grading** project — its six-role *skill-building* is overtaken by the pack's `exec:*` skills, already delivered by the "Issues drain end-to-end on first-party skills" project. Read the architecture first; treat the role/flow detail below as historical context for the recording/enforcement/grading work that survives. The surviving scope is stated in §0 below.
+
+## 0 Surviving scope (Layer-1 only)
+
+This initiative now builds **only drain-cycle's Layer-1 work** — enforcement, recording, and grading. The Layer-2 skills it originally proposed are delivered:
+
+- **Roles 1–5 (Task Shaper, Implementer, Outcome Verifier, PR Preparer, PR Responder)** are the pack's `exec:*` skills — `exec:pickup`/`exec:breakdown`, `exec:build`, `exec:verify`, `exec:review`/`exec:pr-prepare`, `exec:pr-respond` — shipped by the "Issues drain end-to-end on first-party skills" project. Not rebuilt here.
+- **What survives in drain-cycle:**
+  1. Run-log recording fields: `outcome_verdict`, `prep_verdict`, `responder_runs[]` (M1).
+  2. The **verifier-gated Done** contract: a ticket reaches Done only with a recorded `outcome_verdict` (KR2) — this supersedes design decision §1's agent-self-asserts-Done.
+  3. Grading: `drain-cycle grade-draft` / `grade --flow=verify` (M5).
+
+The role/flow narrative below is retained as historical context. Where it says drain-cycle *builds* a `/shape:*` skill, read it as "the pack provides the `exec:*` skill; drain-cycle records and grades its artifact." The artifact boundary is [`docs/architecture.md`](architecture.md) §2.
+
+---
+
 **Six agent-driven roles take a Linear ticket from intake to merged PR — so hard tickets don't silently ship with missing AC.**
 
 **The bet.** drain-cycle today drains a Linear cycle unattended — one ticket, one worker, one diff. The next step: six agent-driven roles operating end-to-end on the same ticket — task-shaping before code, outcome verification before Done, structured PR preparation, and autonomous handling of human review feedback. Same operator, same tickets, less manual shepherding.
@@ -63,14 +79,14 @@ The bet: six agent-driven roles end-to-end, each backed by a skill (or CLI subco
 | # | Role | Phase | Skill / CLI | Status |
 |---|---|---|---|---|
 | 0 | **Operator** (you) | Throughout | Operator-side skill table; defines *why* + *what* | — |
-| 1 | **Task Shaper** | Before code | `/shape:task` *(complements `/shape:planning-and-task-breakdown`)* | [R] |
-| 2 | **Implementer** | Middle | 6 existing skills (incremental-implementation, test-driven-development, source-driven-development, code-review-and-quality, git-workflow-and-versioning, debugging-and-error-recovery) | [E] |
-| 3 | **Outcome Verifier** | After implementation, before Done | `/shape:verify-implementation` *(new)* | [N] |
-| 4 | **PR Preparer** | After Outcome Verifier passes, before PR submission | `/shape:pr-prepare` *(new)* | [N] |
-| 5 | **PR Responder** | On new human review comments (operator-launched polling loop) | `/shape:pr-respond` *(new)*, launched via `drain-cycle pr-feedback` subcommand | [N] |
+| 1 | **Task Shaper** | Before code | `exec:pickup`/`exec:breakdown` (pack) | delivered by A |
+| 2 | **Implementer** | Middle | `exec:build` + `exec:debug`/`exec:simplify` (pack) | delivered by A |
+| 3 | **Outcome Verifier** | After implementation, before Done | `exec:verify` (pack) | delivered by A |
+| 4 | **PR Preparer** | After Outcome Verifier passes, before PR submission | `exec:review`/`exec:pr-prepare` (pack) | delivered by A |
+| 5 | **PR Responder** | On new human review comments (operator-launched polling loop) | `exec:pr-respond` (pack), launched via `drain-cycle pr-feedback` subcommand | delivered by A |
 | 6 | **Grader** (post-drain) | After worker session finishes | `drain-cycle grade-draft <issue>` CLI subcommand | [—] |
 
-Roles 1 and 3 are a **complementary pair**: `/shape:task` defines the outcome-shaped task list at the start; `/shape:verify-implementation` validates the outcome at the end. Roles 4 and 5 are the **PR-side pair**: Preparer shapes outbound PRs, Responder addresses inbound review feedback. Role 6 is operator-confirm scaffolding for grading the initiative against its KRs.
+"Delivered by A" = the "Issues drain end-to-end on first-party skills" project shipped the `exec:*` skill in the pack. This initiative's remaining work is drain-cycle's Layer-1 enforcement/recording/grading around those artifacts (§0). Roles 1 and 3 are a **complementary pair**: `exec:pickup` defines the outcome-shaped task list at the start; `exec:verify` validates the outcome at the end. Roles 4 and 5 are the **PR-side pair**. Role 6 is operator-confirm scaffolding for grading the initiative against its KRs.
 
 **If the initiative is built:**
 
@@ -85,8 +101,8 @@ Roles 1 and 3 are a **complementary pair**: `/shape:task` defines the outcome-sh
 
 ## 2 Affected repos
 
-- **`drain-cycle`** — primary. Worker integration of roles 1–5, run-log schema extensions, `verify` label mechanism, CLI subcommands (`grade-draft`, `grade --flow=verify`), supersession of design decision §1, OTel attribute additions.
-- **`agent-skills-shaper`** — secondary. Receives one per-ticket task-shaping skill (`/shape:task`, complementing the whole-project `/shape:planning-and-task-breakdown`) and three new skills (`/shape:verify-implementation`, `/shape:pr-prepare`, `/shape:pr-respond`).
+- **`drain-cycle`** — primary, and now the *only* repo this initiative builds in. Layer-1 work: run-log schema extensions (`outcome_verdict`, `prep_verdict`, `responder_runs[]`), the `verify` label mechanism, the verifier-gated Done contract (supersedes design decision §1), CLI subcommands (`grade-draft`, `grade --flow=verify`), and OTel attribute additions.
+- **`agent-skills-shaper`** — the `exec:*` skills that fill roles 1–5 are already delivered by the "Issues drain end-to-end on first-party skills" project; no new skill work belongs to this initiative.
 
 ## 3 Goal and Key results
 

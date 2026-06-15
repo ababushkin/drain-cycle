@@ -2,9 +2,13 @@
 
 Design rationale for `drain-cycle`. Read this before making architectural changes — `AGENTS.md` points here.
 
-Seventeen decisions are recorded so a future reader doesn't have to reverse-engineer them from the code. ADRs would be heavier than this tool needs.
+These decisions serve the project's guiding vision, [`docs/vision.md`](vision.md), and realize the architecture that serves it, [`docs/architecture.md`](architecture.md) — the two-layer supervisor/workflow split on an artifact boundary. Each decision below should hold the vision as its frame; a decision that no longer fits it is the signal to revisit the vision deliberately, not to drift from it silently.
+
+Nineteen decisions are recorded so a future reader doesn't have to reverse-engineer them from the code. ADRs would be heavier than this tool needs.
 
 ## 1. The spawned agent updates Linear itself
+
+> **Superseded-by (pending).** The "Multi-agent collaboration for correctness" Layer-1 project replaces self-asserted Done with a **verifier-gated Done** contract: a ticket reaches Done only with a recorded `outcome_verdict` (its KR2). The supervisor records the verdict; the agent no longer asserts success unobserved. Until that lands, the decision below stands.
 
 The orchestrator does **not** poll Linear and write status. The spawned `claude -p` session is told, in its prompt, to move its issue to Done on completion. The orchestrator only reads Linear after the session exits, to decide whether to advance or halt.
 
@@ -262,6 +266,8 @@ In `--watch` mode the operator wants to see the agent working in real time. The 
 
 ## 16. The Graphite PR-stacking sequence the orchestrator will run (ABA-300 spike)
 
+> **Superseded by §19.** The orchestrator no longer assembles or submits the stack. The `gt`/`gh` sequence below is now run by the worker's finishing skill, not the orchestrator; the verified commands stay accurate, but the actor is the skill. See §19.
+
 Decided empirically by ABA-300: the full `gt` + `gh` stacking sequence was driven by hand against this repo with two stacked branches (`spike/aba-300-step-a` off `main`, `spike/aba-300-step-b` off A), producing PRs [#5](https://github.com/ababushkin/drain-cycle/pull/5) and [#6](https://github.com/ababushkin/drain-cycle/pull/6). The four findings below are what the orchestrator (Ticket 2) wires against — verified commands, not guesses.
 
 **(a) `gt` works from a linked worktree; cwd = the per-issue worktree root.** `gt track` and `gt submit` were run from inside `.worktrees/spike-a` and `.worktrees/spike-b` (linked worktrees created with `git worktree add`), and both succeeded. The Graphite metadata DB lives in the shared `.git` dir (`.git/.graphite_metadata.db`), so every linked worktree sees the same stack state — `gt ls` from worktree B even annotates which worktree each branch is checked out in. **The orchestrator runs `gt` from the per-issue worktree root** (§3's "fresh worktree per issue"), the same cwd the worker already uses. No need to run from the primary checkout.
@@ -284,6 +290,8 @@ gt submit --stack --no-interactive --publish
 
 ## 17. `/shape:task` runs inside the worker session; whole-project shaping stays at design-doc scope
 
+> **Forward-pointer.** Not stale today, but the target moved into the pack. Under the `exec:*` namespace (ADR 0004 / Shaper `execution-workflow` design doc), `/shape:task` folds into `exec:pickup`/`exec:breakdown` at the keystone cutover ([`architecture.md`](architecture.md) §7). The in/out contract below still describes what that step does.
+
 The M2 worker pipeline introduces a Task Shaper role — `/shape:task` — that runs before the implementer on verify-flow tickets. The initiative doc deferred the invocation interface to this ADR: whether whole-project shaping (via `/shape:planning-and-task-breakdown`) pre-computes per-ticket task lists that workers later read, or `/shape:task` runs inside each worker session on its own ticket.
 
 **Decision: `/shape:task` runs inside the worker session, invoked once per ticket before the implementer begins.** The skill takes a Linear issue identifier, fetches the live issue from Linear via MCP, and produces an enriched AC checklist + sizing decision + per-stack task list. The output is fed to the implementer in-session and written to the Linear issue body. The Linear write is the durable artefact — a worker resuming a halted issue (§14) reads the existing output from the issue body rather than re-invoking the skill.
@@ -305,6 +313,8 @@ The M2 worker pipeline introduces a Task Shaper role — `/shape:task` — that 
 
 ## 18. PR links are recorded in the run-log and posted to Linear by the orchestrator
 
+> **Superseded by §19.** This decision assumes the orchestrator assembles the stack, so `graphite.submit` returns the URL and the orchestrator posts the Linear comment. Under §19 the worker's finishing skill submits and writes `pr_urls` into `.drain-handoff.json`; the orchestrator *reads them back* rather than producing them. The recording intent survives — memory lives in artefacts — but the actor and the source of the URL changed.
+
 After a stack-mode issue is confirmed Done and its branch is assembled into the per-repo Graphite stack (§16), the orchestrator needs to close the loop: the operator and any future session must be able to find the PR without reading source or re-running `gh`. Memory lives in artefacts.
 
 **Decision.** The orchestrator already holds the PR's URL and number — `graphite.submit` returns them (`gh pr view` runs as the final step of assembly). On a successful submit it:
@@ -322,3 +332,18 @@ All four run-log fields are additive and default to `null` (push-to-main repos, 
 
 - *Post-hoc `gh pr list --head <branch>` lookup.* Rejected as redundant once assembly moved into the orchestrator — see above.
 - *Always post the PR comment unconditionally (even on halt).* Rejected: a halted issue has no submitted PR (a graphite failure halts before this step). The comment fires only on confirmed Done with a successful submit.
+
+## 19. The worker owns PR submission via the finishing skill; the orchestrator reads `pr_urls` back
+
+This reverses the actor in §16 and §18. There, the orchestrator assembled and submitted the per-repo Graphite stack and posted the Linear comment. Now the **worker** does it: in drain mode the worker commits reviewable slices, then runs the finishing skill (`/shape:pr-finishing` today; `exec:finish` after the keystone cutover, [`architecture.md`](architecture.md) §7), which owns submission — it drives `gt`/`gh`, writes the submitted PR URLs into `.drain-handoff.json` (`pr_urls`), and posts the review-summary comment on the Linear issue. The orchestrator no longer assembles or submits anything; it **reads `pr_urls` back** as confirmation that submission succeeded, and a Done stack-mode issue with no `pr_urls` halts the run rather than letting the next issue stack on an unpushed branch.
+
+**Why the reversal.** It is the artifact boundary applied ([`architecture.md`](architecture.md) §2). Submitting a stack is "what a role does" — Layer 2 — so it belongs in a skill that runs identically by hand or unattended. Reading back whether the PRs exist is "whether an artifact exists" — Layer 1 — so it stays in the supervisor. The §16/§18 design put a Layer-2 action inside Layer 1, which is exactly the coupling the two-layer split removes: an orchestrator that knows the `gt`/`gh` sequence cannot be the thin, vendor-agnostic supervisor the keystone (§7) requires.
+
+**The verified `gt`/`gh` sequence in §16 is still correct** — it is just run by the finishing skill, not the orchestrator. §16's per-repo preconditions (`gt auth`, `gt init --trunk main`) and its stop-the-line restack policy carry over unchanged.
+
+**Completion recovery preserves the boundary.** When a worker exits leaving committed slices but the issue is not properly closed (not Done, or Done-without-`pr_urls`), the orchestrator does not run `gt`/`gh` itself — it spawns a fresh finishing sub-agent that runs the skill, then re-checks the contract, and only halts if completion still fails. A worker that left no committed slices halts as untrusted. (Tracked by the "Orchestrator-enforced completion" delivery plan.)
+
+**Alternatives considered.**
+
+- *Keep the orchestrator assembling the stack (§16/§18 as written).* Rejected: it hard-codes the PR-tooling sequence into Layer 1, blocking the keystone and the vendor-agnostic worker.
+- *Worker pushes by hand instead of via the skill.* Rejected: the skill is the single place the submission procedure lives, so it stays identical in interactive and drain modes; a hand-rolled push in the worker prompt would be a second, drifting copy.

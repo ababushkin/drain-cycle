@@ -6,6 +6,8 @@ Unattended execution of a Linear cycle. One invocation, no prompts; each issue r
 
 Today, executing a Linear cycle is manual: launch Claude per issue, watch it run, approve permissions, update Linear, repeat. Execution shepherding consumes time that should go to *scoping the next cycle* and *validating delivered work*. `drain-cycle` removes that shepherding so attention shifts back to scoping and validation. The full goal / KRs / kill condition live in the Linear project description.
 
+**Guiding vision:** [`docs/vision.md`](docs/vision.md) — drain-cycle as the automated supervisory layer over a pack of composable skills, replacing the operator's mechanical supervision so attention moves to higher-order work. Every decision and review aligns to it. The architecture that serves it — the two layers, the artifact boundary, the dual-mode property — is [`docs/architecture.md`](docs/architecture.md).
+
 ## Is this for you?
 
 Read this section before installing — `drain-cycle` is deliberately not for everyone.

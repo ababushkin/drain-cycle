@@ -6,7 +6,11 @@ Instructions for any coding agent (Claude Code, Codex, etc.) working in this rep
 
 `drain-cycle` is a CLI that picks up a well-scoped Linear cycle and executes its issues unattended, spawning a fresh `claude -p --dangerously-skip-permissions` session in an isolated worktree per issue. Python, single-user, personal product.
 
-The design rationale (decisions taken, alternatives considered, kill condition) lives in `docs/design-decisions.md`. Read it before making architectural changes.
+**Guiding vision — read first: [`docs/vision.md`](docs/vision.md).** It is the project's north-star: stop being the thing that holds the work together, and build that thing once. Every decision, project, and ticket aligns to it; every analytics review and retro is grounded in it. Propose work against the vision; when a change conflicts with it, raise that explicitly rather than drifting.
+
+**Architecture that serves it: [`docs/architecture.md`](docs/architecture.md).** drain-cycle is the automated supervisory layer (Layer 1) over a pack of composable skills (Layer 2), split on an artifact boundary, so the same skills run by hand or unattended. Read it before making architectural changes.
+
+The design rationale (decisions taken, alternatives considered, kill condition) lives in `docs/design-decisions.md` — the running decision log, made in service of the vision above. Read both before making architectural changes.
 
 ## Linear workflow
 
