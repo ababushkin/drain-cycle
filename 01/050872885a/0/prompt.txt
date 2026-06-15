@@ -86,3 +86,7 @@ Path: graphite
 Pre-submission review findings: critical: 0, required: 0 (fixed: 0, deferred: 0). Plan-review on the design doc itself returned APPROVE with three non-blocking conditions, all resolved in-session (schema reference shipped at the design-doc surface, not deferred to a build node; remaining conditions are governance pointers for N02/N03/N04 task breakdown).
 </comment>
 </comment-thread>
+
+---
+
+this doc should be in drain-cycle, right? the old PR was in the wrong repo
