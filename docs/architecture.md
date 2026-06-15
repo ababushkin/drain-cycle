@@ -8,8 +8,6 @@ So the question this architecture answers: how do you build the thing that holds
 
 The answer is two layers over one shared record. **Layer 1 — supervision** (`drain-cycle`) drives the work and grades each result. **Layer 2 — workflow** (the Shaper pack) is the procedure itself, captured as composable skills. They meet at an **artifact boundary**: Layer 2 writes signals, Layer 1 reads them, and neither reaches inside the other. Both work off one **state plane** — a single authoritative record of where the work stands. The move that makes this real is small: `prompt.py` stops inlining the workflow and becomes a thin pointer at the workflow's front door, `exec:pickup`. The pack then owns the procedure, so any vendor's worker follows the same prose. The payoff removes both costs above — the workflow is captured once and a content-blind supervisor runs it unattended, so execution is consistent on every run instead of varying by the day, and the operator is needed only to point the system at planned work and to step in when a run halts.
 
-![Architecture overview: the operator points the control plane at planned work; a control plane (one per machine) spawns an execution-coordinator per unit; the coordinator drives a planned unit (project ⊃ milestone ⊃ task) whose task runs three Layer 2 phase spawns — exec:build, exec:review, exec:finish — while review rolls up the task, milestone, and project altitudes. Work fans down; verification rolls up.](images/architecture-overview.svg)
-
 ## 1. Split the work into two layers, one product
 
 The work splits into two layers:
@@ -21,18 +19,18 @@ The vision's three pieces map onto this split: "one place for state" is the stat
 
 ## 2. Layer 2 captures the workflow as composable skills
 
-The pack carries two verb namespaces, one per half of the lifecycle:
+The pack carries two types of skills:
 
-- **Planning — `shape:*`.** Four front-door skills: `shape:idea`, `shape:project`, `shape:design`, `shape:delivery`. (The "Consolidate Shaper's Lifecycle into Four Phase Skills" project tracks this work.)
+- **Planning — `shape:*`.**  `shape:idea`, `shape:project`, `shape:design`, `shape:delivery`. 
 
-- **Execution — `exec:*`.** The intra-issue graph, named delegations only, no inlined procedure:
+- **Execution — `exec:*`.** 
   
   ```
   exec:pickup → exec:breakdown → exec:build → (exec:debug | exec:simplify)
               → exec:review → exec:verify → exec:finish
   ```
   
-  `exec:pickup` is the front door; `exec:review` fans out reviewer personas; `exec:finish` is Graphite-first with a plain-git fallback and produces the trail artefacts (What/Why/Focus PR body, review-summary comment, Linear status move). The execution namespace is pinned by ADR 0004 / the Shaper `execution-workflow` design doc; that doc is authoritative for the graph and the handoff contract.
+  `exec:pickup` is the front door; `exec:review` fans out reviewer personas; `exec:finish` is Graphite-first with a plain-git fallback and produces the trail artefacts (What/Why/Focus PR body, review-summary comment, Linear status move).
 
 Every step is also a standalone skill, so a human can run any one by hand. A **handoff envelope** carries the issue's acceptance criteria from pickup through to review, so the spec-compliance persona can grade *built-the-wrong-thing*, not just *built-it-badly*.
 
@@ -40,7 +38,7 @@ Every step is also a standalone skill, so a human can run any one by hand. A **h
 
 `drain-cycle` owns process concerns only: spawn, guardrails, halt, revert, resume, recover, record, grade. It reads Linear state and the worker's artifacts to decide whether to advance to the next issue or stop. It does not contain workflow prose — the worker's prompt points at the entry skill and the procedure lives in Layer 2.
 
-The supervisor mechanics are the bulk of `docs/design-decisions.md`: worktree-per-issue (§3), resource guardrails (§9), group-kill on breach (§8), resume-on-rerun (§14), blocks-aware ordering (§12), and the watch overlay (§15).
+The supervisor mechanics are documented in `docs/design-decisions.md`.
 
 ## 4. Spawn a worker per phase, not per issue
 
@@ -60,8 +58,6 @@ The two layers meet at an artifact, not at a function call. **Layer 2 writes sig
 The placement test for any new behaviour: does `drain-cycle` need to know *what a role does* (Layer 2), or only *whether an artifact exists* (Layer 1)? Submitting a PR is "what a role does" — it belongs in a skill. Reading back the submitted PR URLs to decide whether to advance is "whether an artifact exists" — it belongs in the supervisor (see design decision §19).
 
 Keeping the boundary at the artifact is what makes Layer 1 content-blind, and content-blindness is what lets the same Layer 2 run under any worker.
-
-![The artifact boundary: Layer 2 (the workflow pack) writes signals down onto the boundary — Linear issue state, run-log fields, and .drain-handoff.json (pr_urls) — and Layer 1 (the supervisor) reads them to decide whether to advance or halt. Layer 1 never reads the workflow's steps, only the artifacts.](images/artifact-boundary.svg)
 
 ## 6. Dual-mode: the same skills by hand or unattended
 

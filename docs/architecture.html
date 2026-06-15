@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture — drain-cycle</title>
+<style>
+  :root {
+    --bg: #fcfcfd;
+    --surface: #ffffff;
+    --fg: #0a0a0f;
+    --fg-soft: #2e2e38;
+    --muted: #5f5f6a;
+    --rule: #e3e3ea;
+    --rule-soft: #f1f1f5;
+    --accent: #4a3bef;       --accent-soft: #efedff;
+    --ok:     #047a44;       --ok-soft:     #e6f5ed;
+    --info:   #1957c4;       --info-soft:   #e7f0fd;
+    --warn:   #8b4a05;       --warn-soft:   #fbf0e0;
+    --danger: #a82a3f;       --danger-soft: #fbe6ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0b10; --surface: #15151c;
+      --fg: #f4f4f7;
+      --fg-soft: #d6d6dd;
+      --muted: #9d9dab;
+      --rule: #2a2a35; --rule-soft: #1c1c24;
+      --accent: #a99dff;       --accent-soft: #2a2548;
+      --ok:     #6fd4a0;       --ok-soft:     #122922;
+      --info:   #8eb8ff;       --info-soft:   #14233b;
+      --warn:   #f0a35a;       --warn-soft:   #2a1f12;
+      --danger: #f08597;       --danger-soft: #29151b;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+  body {
+    font: 16px/1.65 "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv11", "ss01", "ss03", "kern", "liga";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace; }
+
+  .layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; max-width: 1200px; margin: 0 auto; }
+  .layout > * { min-width: 0; }
+
+  aside {
+    position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+    padding: 28px 22px; border-right: 1px solid var(--rule); background: var(--bg);
+  }
+  aside .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; margin-bottom: 28px; color: var(--fg); }
+  aside .brand .dot { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(135deg, var(--accent), #8c7bff); flex-shrink: 0; }
+  aside .kicker { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 22px 0 8px; font-weight: 700; }
+  aside .kicker:first-of-type { margin-top: 0; }
+  aside .kicker .sub { display: block; text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+  aside nav ul { list-style: none; padding: 0; margin: 0; }
+  aside nav li { margin: 2px 0; }
+  aside nav a {
+    display: flex; align-items: baseline; gap: 9px; padding: 7px 10px; border-radius: 6px;
+    color: var(--fg-soft); font-size: 14px; transition: background 0.12s, color 0.12s;
+  }
+  aside nav a .navnum { font: 700 11px/1.4 ui-monospace, monospace; color: var(--muted); flex-shrink: 0; min-width: 22px; }
+  aside nav a:hover { background: var(--rule-soft); color: var(--fg); text-decoration: none; }
+  aside nav a.active { background: var(--accent-soft); color: var(--accent); }
+  aside nav a.active .navnum { color: var(--accent); }
+  aside .status-block { font-size: 13px; color: var(--fg-soft); line-height: 1.5; }
+
+  main { padding: 40px 56px 80px; max-width: 880px; }
+
+  .doc-head { margin-bottom: 36px; }
+  .breadcrumbs { font-size: 13.5px; color: var(--muted); margin-bottom: 16px; }
+  .breadcrumbs span { color: var(--fg-soft); }
+  main h1 { font-size: 34px; line-height: 1.2; margin: 0 0 14px; letter-spacing: -0.02em; font-weight: 700; color: var(--fg); }
+  .doc-subtitle { font-size: 17px; line-height: 1.5; color: var(--fg-soft); margin: 0 0 20px; max-width: 70ch; }
+  .pill-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 0; }
+  .pill-row:empty { display: none; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px;
+    font: 600 13px/1 "Inter", ui-sans-serif, system-ui, sans-serif; letter-spacing: 0.01em; white-space: nowrap;
+  }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .pill-meta     { background: var(--rule-soft); color: var(--fg-soft); font-weight: 500; }
+  .pill-ok       { background: var(--ok-soft);     color: var(--ok); }
+  .pill-info     { background: var(--info-soft);   color: var(--info); }
+  .pill-warn     { background: var(--warn-soft);   color: var(--warn); }
+
+  .meta-grid {
+    display: grid; grid-template-columns: max-content 1fr; gap: 8px 22px;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 16px 20px; margin: 28px 0 0; font-size: 14px;
+  }
+  .meta-grid dt { color: var(--muted); font-weight: 600; }
+  .meta-grid dd { margin: 0; color: var(--fg); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13.5px; word-break: break-word; }
+
+  .preamble { margin: 36px 0 8px; padding: 0; color: var(--fg-soft); }
+  .preamble p { margin: 0 0 16px; }
+
+  /* act dividers */
+  .act-head { margin: 64px 0 8px; padding: 22px 24px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); scroll-margin-top: 20px; }
+  .act-head:first-of-type { margin-top: 40px; }
+  .act-kicker { font: 700 12px/1 ui-monospace, monospace; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .act-title { font-size: 24px; line-height: 1.25; margin: 0 0 10px; letter-spacing: -0.01em; font-weight: 700; color: var(--fg); }
+  .act-tldr { margin: 0; color: var(--fg-soft); font-size: 15.5px; line-height: 1.55; }
+
+  section.s { margin: 44px 0; scroll-margin-top: 20px; }
+  section.s > header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  section.s .ix { font: 700 12px/1 ui-monospace, monospace; color: var(--muted); padding: 4px 8px; border: 1px solid var(--rule); border-radius: 4px; flex-shrink: 0; }
+  main h2 { font-size: 21px; line-height: 1.3; margin: 0; letter-spacing: -0.01em; font-weight: 700; color: var(--fg); }
+
+  main p { margin: 0 0 16px; color: var(--fg-soft); }
+  main ul, main ol { margin: 0 0 16px; padding-left: 26px; color: var(--fg-soft); }
+  main li { margin: 6px 0; }
+  main pre { background: var(--rule-soft); padding: 16px 18px; border-radius: 8px; overflow-x: auto; font-size: 13.5px; line-height: 1.6; border: 1px solid var(--rule); color: var(--fg-soft); }
+  main code { font-size: 0.92em; padding: 2px 6px; background: var(--rule-soft); border-radius: 4px; color: var(--fg); }
+  main pre code { padding: 0; background: transparent; font-size: 1em; }
+  main em { color: var(--fg); font-style: italic; }
+  main table { border-collapse: collapse; margin: 18px 0; width: 100%; font-size: 14px; }
+  main th, main td { border-bottom: 1px solid var(--rule); padding: 10px 14px; text-align: left; vertical-align: top; }
+  main th { background: var(--rule-soft); font-weight: 700; color: var(--fg); font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; }
+  main td:first-child { white-space: nowrap; }
+
+  /* callouts */
+  .callout { margin: 22px 0; padding: 16px 20px; border: 1px solid var(--rule); border-left-width: 4px; border-radius: 0 10px 10px 0; background: var(--surface); }
+  .callout-label { font: 700 11.5px/1 ui-monospace, monospace; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; }
+  .callout p { margin: 0 0 10px; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout-info     { border-color: var(--accent); background: var(--accent-soft); }
+  .callout-info .callout-label { color: var(--accent); }
+  .callout-keystone { border-color: var(--info); background: var(--info-soft); }
+  .callout-keystone .callout-label { color: var(--info); }
+  .callout-keystone .callout-lead { font-size: 15.5px; font-weight: 600; color: var(--fg); margin-bottom: 12px; }
+  .callout-open { border-color: var(--warn); background: var(--warn-soft); }
+  .callout-open .callout-label { color: var(--warn); }
+  .callout-open .callout-lead { font-size: 15.5px; font-weight: 600; color: var(--fg); margin-bottom: 12px; }
+
+  /* three-pieces map */
+  .map { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .map li { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin: 0; }
+  .map-from { color: var(--fg-soft); font-size: 14px; text-align: right; }
+  .map-arrow { color: var(--accent); font-weight: 700; }
+  .map-to { font-weight: 650; color: var(--fg); font-size: 14px; }
+  @media (max-width: 540px) {
+    .map li { grid-template-columns: 1fr; gap: 2px; text-align: left; }
+    .map-from { text-align: left; } .map-arrow { display: none; }
+  }
+
+  /* exec pipeline strip */
+  .pipeline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 18px 0; padding: 16px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .pl-step { padding: 6px 11px; border-radius: 7px; background: var(--ok-soft); color: var(--ok); border: 1px solid var(--ok); font: 600 13px/1 ui-monospace, monospace; white-space: nowrap; }
+  .pl-step.pl-alt { background: var(--surface); border-style: dashed; }
+  .pl-arr { color: var(--muted); font-weight: 700; }
+
+  /* shared diagram chrome */
+  .diagram { margin: 22px 0; padding: 22px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); }
+  .dg-tag { font: 700 10px/1 ui-monospace, monospace; letter-spacing: 0.07em; text-transform: uppercase; align-self: flex-end; }
+  .dg-title { font-weight: 700; font-size: 14.5px; color: var(--fg); }
+  .dg-sub { font-size: 13px; color: var(--fg-soft); margin-top: 4px; }
+  .dg-card, .dg-phase, .dg-review { border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+  .dg-card ul { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--fg-soft); }
+  .dg-card li { margin: 3px 0; }
+  .dg-note { font-size: 11.5px; font-style: italic; color: var(--muted); margin-top: 6px; }
+  .dg-l1 { background: var(--info-soft); border-color: var(--info); }
+  .dg-l1 .dg-tag { color: var(--info); }
+  .dg-l2 { background: var(--ok-soft); border-color: var(--ok); }
+  .dg-l2 .dg-tag { color: var(--ok); }
+  .dg-amber { background: var(--warn-soft); border-color: var(--warn); }
+  .dg-amber .dg-tag { color: var(--warn); }
+  .dg-neutral { background: var(--bg); border-color: var(--rule); }
+  .dg-arrow { display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--muted); font-size: 12px; text-align: center; margin: 6px 0; }
+  .dg-arrow::after { content: "\2193"; font-size: 16px; line-height: 1; color: var(--muted); }
+
+  /* apex diagram */
+  .dg-op { align-self: center; min-width: 150px; text-align: center; align-items: center; font-weight: 700; }
+  .dg-unit { margin-top: 6px; }
+  .dg-cols { display: grid; grid-template-columns: 1fr 300px; gap: 18px; align-items: start; }
+  .dg-collabel { font: 700 11px/1.3 ui-monospace, monospace; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px; }
+  .dg-nest { border: 1.5px dashed var(--muted); border-radius: 10px; padding: 26px 14px 14px; position: relative; }
+  .dg-nest + .dg-nest, .dg-nest .dg-nest { margin-top: 0; }
+  .dg-nest-label { position: absolute; top: 7px; left: 12px; font: 700 11px/1 ui-monospace, monospace; letter-spacing: 0.06em; color: var(--muted); }
+  .dg-phase { gap: 2px; }
+  .dg-phase b { font: 700 14px/1 ui-monospace, monospace; }
+  .dg-phase span { font-size: 12.5px; color: var(--fg-soft); }
+  .dg-phase small { font-size: 11.5px; color: var(--muted); }
+  .dg-edge-note { font-size: 11.5px; font-style: italic; color: var(--danger); text-align: center; margin: 8px 0; }
+  .dg-edge-note::after { content: " \2193"; }
+  .dg-reviews { display: grid; gap: 10px; }
+  .dg-review { gap: 3px; }
+  .dg-review b { font-size: 13.5px; color: var(--fg); }
+  .dg-review span { font-size: 12px; color: var(--fg-soft); }
+  .dg-review small { font-size: 11px; color: var(--muted); }
+  .dg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--fg-soft); }
+  .dg-legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .dg-sw { width: 14px; height: 14px; border-radius: 4px; border: 1px solid; flex-shrink: 0; }
+  .dg-sw.l1 { background: var(--info-soft); border-color: var(--info); }
+  .dg-sw.l2 { background: var(--ok-soft); border-color: var(--ok); }
+  .dg-sw.rv { background: var(--warn-soft); border-color: var(--warn); }
+
+  /* boundary diagram */
+  .dg-wide { align-items: stretch; text-align: center; }
+  .dg-wide .dg-tag { align-self: center; }
+  .dg-writes { font: 600 12px/1 ui-monospace, monospace; color: var(--ok); margin-top: 6px; }
+  .dg-reads  { font: 600 12px/1 ui-monospace, monospace; color: var(--info); margin-bottom: 4px; }
+  .dg-boundary { margin: 14px 0; padding: 16px 0 4px; border-top: 2.5px dashed var(--warn); }
+  .dg-boundary-label { display: block; text-align: center; font: 600 12px/1 ui-monospace, monospace; color: var(--warn); margin-bottom: 12px; }
+  .dg-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  .dg-chip { padding: 7px 12px; border-radius: 8px; background: var(--warn-soft); border: 1px solid var(--warn); color: var(--fg); font: 600 12.5px/1 ui-monospace, monospace; }
+  .dg-caption { font-size: 13px; color: var(--muted); margin: 16px 0 0; line-height: 1.55; text-align: center; }
+
+  /* dual-mode before/after */
+  .dual { display: grid; grid-template-columns: 1fr; gap: 16px; margin: 20px 0; }
+  .dual figure { margin: 0; min-width: 0; }
+  .dual figcaption { font: 700 12px/1 ui-monospace, monospace; letter-spacing: 0.04em; margin-bottom: 8px; color: var(--fg); }
+  .dual .before figcaption { color: var(--muted); }
+  .dual .after figcaption { color: var(--ok); }
+  .dual pre { margin: 0; }
+  @media (max-width: 720px) { .dg-cols { grid-template-columns: 1fr; } }
+
+  footer { grid-column: 1 / -1; padding: 24px 56px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--rule); }
+  footer code { background: transparent; padding: 0; color: var(--fg-soft); }
+
+  @media print {
+    aside { display: none; }
+    .layout { grid-template-columns: 1fr; }
+    main { padding: 24px; max-width: none; }
+  }
+  @media (max-width: 880px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--rule); padding: 20px; }
+    aside nav ul { display: flex; flex-wrap: wrap; gap: 4px; }
+    aside .kicker { margin-top: 16px; }
+    main { padding: 28px 24px 60px; }
+    main table { display: block; overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <div class="brand"><span class="dot"></span><span>drain-cycle · architecture</span></div>
+
+    <p class="kicker">Lead</p>
+    <nav aria-label="Table of contents">
+      <ul>
+        <li><a href="#lead"><span class="navnum">—</span>The answer in one read</a></li>
+      </ul>
+    </nav>
+
+    <p class="kicker">Structure<span class="sub">The split: two layers, one record</span></p>
+    <nav><ul>
+      <li><a href="#s1"><span class="navnum">§1</span>Two layers, one product</a></li>
+      <li><a href="#s2"><span class="navnum">§2</span>Workflow as composable skills</a></li>
+      <li><a href="#s3"><span class="navnum">§3</span>Process, not procedure</a></li>
+      <li><a href="#s7"><span class="navnum">§7</span>The state plane</a></li>
+    </ul></nav>
+
+    <p class="kicker">Interface<span class="sub">How the layers meet</span></p>
+    <nav><ul>
+      <li><a href="#s5"><span class="navnum">§5</span>Writes signals; reads them</a></li>
+      <li><a href="#s4"><span class="navnum">§4</span>A worker per phase</a></li>
+      <li><a href="#s6"><span class="navnum">§6</span>Dual-mode</a></li>
+      <li><a href="#s8"><span class="navnum">§8</span>prompt.py becomes a pointer</a></li>
+    </ul></nav>
+
+    <p class="kicker">Scale<span class="sub">How far it runs</span></p>
+    <nav><ul>
+      <li><a href="#s9"><span class="navnum">§9</span>Extend the autonomy horizon</a></li>
+      <li><a href="#s10"><span class="navnum">§10</span>CLI to resident daemon</a></li>
+      <li><a href="#s11"><span class="navnum">§11</span>Execute a planned unit</a></li>
+      <li><a href="#s12"><span class="navnum">§12</span>Multi-altitude review</a></li>
+    </ul></nav>
+
+    <p class="kicker">Status</p>
+    <div class="status-block">Architecture reference for drain-cycle, rendered from docs/architecture.md. Slated to become the canonical view of the architecture.</div>
+  </aside>
+
+  <main>
+    <div class="doc-head">
+      <div class="breadcrumbs">drain-cycle <span>·</span> docs <span>·</span> architecture</div>
+      <h1>Architecture</h1>
+      <p class="doc-subtitle">Two layers over one shared record: a content-blind supervisor runs a workflow captured once as composable skills, the same way on every run.</p>
+      <div class="pill-row">
+        <span class="pill pill-meta">drain-cycle</span>
+        <span class="pill pill-info"><span class="dot"></span>Layer 1 — supervision</span>
+        <span class="pill pill-ok"><span class="dot"></span>Layer 2 — workflow</span>
+        <span class="pill pill-warn"><span class="dot"></span>review</span>
+      </div>
+      <dl class="meta-grid">
+        <dt>Pre-read</dt><dd><a href="vision.md">docs/vision.md</a> — the north-star</dd>
+        <dt>Source</dt><dd>docs/architecture.md</dd>
+        <dt>Decisions</dt><dd>docs/design-decisions.md</dd>
+      </dl>
+    </div>
+
+    <section class="s" id="lead">
+      <div class="preamble">
+        <p>Shipping a piece of agentic work is never one action — it is a sequence: code it, review it against the right standards, open the PR, make the description read well. A capable agent handles any one of these steps, one at a time, and driving each by hand holds up fine while the work is small. As the work grows more complex, that hand-driving breaks down — and what breaks reveals that the operator was holding three fused jobs together: the <strong>state</strong> (where the work stands), the <strong>steps</strong> (what runs, in what order, to what standard), and the <strong>supervision</strong> (moving each piece from one step to the next). Holding all three by hand carries two costs: execution quality swings with the operator's discipline on the day, and the operator must drive every transition by hand instead of planning the next work.</p>
+        <p>So the question this architecture answers: how do you build the thing that holds the work together once — so the workflow runs the same way every time, without a person driving it — and how do the pieces of that system fit together?</p>
+        <p>The answer is two layers over one shared record. <strong>Layer 1 — supervision</strong> (<code>drain-cycle</code>) drives the work and grades each result. <strong>Layer 2 — workflow</strong> (the Shaper pack) is the procedure itself, captured as composable skills. They meet at an <strong>artifact boundary</strong>: Layer 2 writes signals, Layer 1 reads them, and neither reaches inside the other. Both work off one <strong>state plane</strong> — a single authoritative record of where the work stands. The move that makes this real is small: <code>prompt.py</code> stops inlining the workflow and becomes a thin pointer at the workflow's front door, <code>exec:pickup</code>. The pack then owns the procedure, so any vendor's worker follows the same prose. The payoff removes both costs above — the workflow is captured once and a content-blind supervisor runs it unattended, so execution is consistent on every run instead of varying by the day, and the operator is needed only to point the system at planned work and to step in when a run halts.</p>
+      </div>
+
+      <div class="diagram diagram-apex" role="img" aria-label="Apex architecture diagram: operator points the control plane at planned work; the control plane spawns one execution-coordinator per unit; the coordinator drives a planned unit (project containing milestone containing task) through three Layer 2 phase skills, with review altitudes rolling up the right side.">
+        <div class="dg-card dg-neutral dg-op"><div class="dg-title">operator</div></div>
+        <div class="dg-arrow">points at planned work; queries · halts · resumes</div>
+
+        <div class="dg-card dg-l1">
+          <span class="dg-tag">Layer 1</span>
+          <div class="dg-title">Control plane — one per machine (resident daemon)</div>
+          <ul>
+            <li>owns process lifecycle · the queue of planned units to execute</li>
+            <li>steer API the operator queries: what's running · halt · resume</li>
+            <li>watches open PRs through the review-and-merge loop · responds to PR comments</li>
+          </ul>
+          <div class="dg-note">(horizon behaviour — only a resident process can watch a PR after it is open)</div>
+        </div>
+        <div class="dg-arrow">spawns one coordinator per unit in flight</div>
+
+        <div class="dg-card dg-l1">
+          <span class="dg-tag">Layer 1</span>
+          <div class="dg-title">Execution-coordinator — one per unit in flight (a tree walker)</div>
+          <ul>
+            <li>advances work by reading artifacts (§5) — never by reading inside a phase</li>
+            <li>halts on a missing or failed artifact</li>
+          </ul>
+        </div>
+        <div class="dg-arrow">drives one planned unit</div>
+
+        <div class="dg-unit">
+          <div class="dg-cols">
+            <div>
+              <div class="dg-collabel">↓ work fans down · decomposition</div>
+              <div class="dg-nest">
+                <span class="dg-nest-label">PROJECT</span>
+                <div class="dg-nest">
+                  <span class="dg-nest-label">MILESTONE</span>
+                  <div class="dg-nest">
+                    <span class="dg-nest-label">TASK — one issue</span>
+                    <div class="dg-phase dg-l2">
+                      <span class="dg-tag">Layer 2 skill</span>
+                      <b>exec:build</b>
+                      <span>goal: produce sliced artifacts</span>
+                      <small>(+ exec:debug, exec:simplify)</small>
+                    </div>
+                    <div class="dg-edge-note">the agent that produced an artifact never judges it</div>
+                    <div class="dg-phase dg-l2">
+                      <span class="dg-tag">Layer 2 skill</span>
+                      <b>exec:review</b>
+                      <span>goal: apply every quality lens</span>
+                      <small>(fans out reviewer personas)</small>
+                    </div>
+                    <div class="dg-arrow"></div>
+                    <div class="dg-phase dg-l2">
+                      <span class="dg-tag">Layer 2 skill</span>
+                      <b>exec:finish</b>
+                      <span>goal: land human-readable PRs</span>
+                      <small>(What/Why/Focus PR · summary comment · status move)</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="dg-reviews">
+              <div class="dg-collabel">↑ verification rolls up</div>
+              <div class="dg-review dg-amber">
+                <span class="dg-tag">review</span>
+                <b>Project review</b>
+                <span>· architecture review</span>
+                <span>· measurable stated goals</span>
+                <small>(partial — some goals deferred)</small>
+              </div>
+              <div class="dg-review dg-amber">
+                <span class="dg-tag">review</span>
+                <b>Milestone review</b>
+                <span>· integration / coherence / acceptance</span>
+                <span>· regression (outside this boundary)</span>
+                <small>after child PRs merge → new work, not reverts</small>
+              </div>
+              <div class="dg-review dg-amber">
+                <span class="dg-tag">review</span>
+                <b>Task review — diff-bounded</b>
+                <span>· spec-compliance · security</span>
+                <span>· reliability/resilience · code-quality · outcome</span>
+                <small>before the PR merges</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dg-legend">
+          <span><span class="dg-sw l1"></span>Layer 1 — supervision</span>
+          <span><span class="dg-sw l2"></span>Layer 2 — workflow skills</span>
+          <span><span class="dg-sw rv"></span>review — run by an agent that did not author the work</span>
+        </div>
+      </div>
+      <p class="dg-caption">The operator points the control plane at planned work. The control plane spawns one execution-coordinator per unit, which drives a single planned unit — project ⊃ milestone ⊃ task — by reading the artifacts each phase leaves behind, never by reading inside a phase. Work fans down the decomposition; verification rolls back up, each review altitude matching the altitude it reviews.</p>
+
+      <div class="callout callout-info">
+        <div class="callout-label">The vision's three pieces, mapped</div>
+        <ul class="map">
+          <li><span class="map-from">One place for state</span><span class="map-arrow">→</span><span class="map-to">the state plane (§7)</span></li>
+          <li><span class="map-from">The steps become skills</span><span class="map-arrow">→</span><span class="map-to">Layer 2</span></li>
+          <li><span class="map-from">The supervision becomes a supervisor</span><span class="map-arrow">→</span><span class="map-to">Layer 1</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ACT I -->
+    <div class="act-head" id="act1">
+      <div class="act-kicker">Structure</div>
+      <h2 class="act-title">The split: two layers, one record</h2>
+      <p class="act-tldr">Two layers over one authoritative record — a supervisor that drives and grades, a workflow pack that holds the procedure as skills.</p>
+    </div>
+
+    <section class="s" id="s1">
+      <header><span class="ix">§1</span><h2>Split the work into two layers, one product</h2></header>
+      <p>The work splits into two layers:</p>
+      <ul>
+        <li><strong>Layer 1 — supervision (<code>drain-cycle</code>).</strong> Picks up a body of planned work and spawns a worker per phase per issue, holding the guardrails — halting, reverting, resuming, or recovering as the run demands. It then records and grades each outcome. It is vendor-agnostic: each worker is a <code>claude -p</code> (or any equivalent) subprocess.</li>
+        <li><strong>Layer 2 — workflow (the Shaper pack).</strong> The intra-issue procedure, captured as composable skills: how a piece of work goes from picked-up to merged PR. This is the knowledge that used to live in the operator's head, written down once.</li>
+      </ul>
+      <p>The vision's three pieces map onto this split: "one place for state" is the state plane (§7), "the steps become skills" is Layer 2, and "the supervision becomes a supervisor" is Layer 1.</p>
+    </section>
+
+    <section class="s" id="s2">
+      <header><span class="ix">§2</span><h2>Layer 2 captures the workflow as composable skills</h2></header>
+      <p>The pack carries two types of skills:</p>
+      <ul>
+        <li><strong>Planning — <code>shape:*</code>.</strong> <code>shape:idea</code>, <code>shape:project</code>, <code>shape:design</code>, <code>shape:delivery</code>.</li>
+        <li><strong>Execution — <code>exec:*</code>.</strong></li>
+      </ul>
+      <div class="pipeline" aria-label="exec pipeline: exec:pickup to exec:breakdown to exec:build to (exec:debug or exec:simplify) to exec:review to exec:verify to exec:finish">
+        <span class="pl-step">exec:pickup</span><span class="pl-arr">→</span>
+        <span class="pl-step">exec:breakdown</span><span class="pl-arr">→</span>
+        <span class="pl-step">exec:build</span><span class="pl-arr">→</span>
+        <span class="pl-step pl-alt">(exec:debug | exec:simplify)</span><span class="pl-arr">→</span>
+        <span class="pl-step">exec:review</span><span class="pl-arr">→</span>
+        <span class="pl-step">exec:verify</span><span class="pl-arr">→</span>
+        <span class="pl-step">exec:finish</span>
+      </div>
+      <p><code>exec:pickup</code> is the front door; <code>exec:review</code> fans out reviewer personas; <code>exec:finish</code> is Graphite-first with a plain-git fallback and produces the trail artefacts (What/Why/Focus PR body, review-summary comment, Linear status move).</p>
+      <p>Every step is also a standalone skill, so a human can run any one by hand. A <strong>handoff envelope</strong> carries the issue's acceptance criteria from pickup through to review, so the spec-compliance persona can grade <em>built-the-wrong-thing</em>, not just <em>built-it-badly</em>.</p>
+    </section>
+
+    <section class="s" id="s3">
+      <header><span class="ix">§3</span><h2>Layer 1 owns process, not procedure</h2></header>
+      <p><code>drain-cycle</code> owns process concerns only: spawn, guardrails, halt, revert, resume, recover, record, grade. It reads Linear state and the worker's artifacts to decide whether to advance to the next issue or stop. It does not contain workflow prose — the worker's prompt points at the entry skill and the procedure lives in Layer 2.</p>
+      <p>The supervisor mechanics are documented in <code>docs/design-decisions.md</code>.</p>
+    </section>
+
+    <section class="s" id="s7">
+      <header><span class="ix">§7</span><h2>All state lives in one record — the state plane</h2></header>
+      <p>Everything works off one organized record of where the work stands. <strong>Linear is authoritative</strong> for issue status (design decision §1, §12). Beneath it sit the durable supervisor records: per-run logs (§4, §8), the atomic active-run marker (§11), and opt-in OpenTelemetry traces (§13).</p>
+      <p>These records are the <strong>delayed feedback loop</strong> that replaces live watching. Automating supervision deliberately gives up the operator's real-time view of each worker; observability is how that trade is paid back. Better observability widens the set of work that is safe to hand off (§9).</p>
+    </section>
+
+    <!-- ACT II -->
+    <div class="act-head" id="act2">
+      <div class="act-kicker">Interface</div>
+      <h2 class="act-title">How the layers meet</h2>
+      <p class="act-tldr">The layers meet at an artifact, not a function call: Layer 2 writes signals, Layer 1 reads them. Each phase spawns on its own, so the agent that wrote the code never reviews it — and one small move makes the whole split real.</p>
+    </div>
+
+    <section class="s" id="s5">
+      <header><span class="ix">§5</span><h2>Layer 2 writes signals; Layer 1 reads them</h2></header>
+      <p>The two layers meet at an artifact, not at a function call. <strong>Layer 2 writes signals; Layer 1 reads them.</strong> The supervisor never reads the workflow's steps — only the artifacts the workflow leaves behind: Linear issue state, run-log fields, and <code>.drain-handoff.json</code> (e.g. <code>pr_urls</code>).</p>
+
+      <div class="diagram diagram-boundary" role="img" aria-label="The artifact boundary: Layer 2, the workflow pack, writes down into the boundary; the boundary carries Linear issue state, run-log fields, and .drain-handoff.json (pr_urls); Layer 1, the supervisor, reads up from it.">
+        <div class="dg-card dg-l2 dg-wide">
+          <span class="dg-tag">Layer 2</span>
+          <div class="dg-title">Layer 2 — the workflow pack (skills)</div>
+          <div class="dg-sub">does the work, then leaves signals behind</div>
+          <div class="dg-writes">WRITES ↓</div>
+        </div>
+        <div class="dg-boundary">
+          <span class="dg-boundary-label">the artifact boundary</span>
+          <div class="dg-chips">
+            <span class="dg-chip">Linear issue state</span>
+            <span class="dg-chip">run-log fields</span>
+            <span class="dg-chip">.drain-handoff.json (pr_urls)</span>
+          </div>
+        </div>
+        <div class="dg-card dg-l1 dg-wide">
+          <span class="dg-tag">Layer 1</span>
+          <div class="dg-reads">READS ↓</div>
+          <div class="dg-title">Layer 1 — the supervisor</div>
+          <div class="dg-sub">advances to the next issue, or halts, on whether an artifact exists</div>
+        </div>
+        <p class="dg-caption">Layer 1 never reads the workflow's steps — only the artifacts it leaves behind. That content-blindness is what lets the same Layer 2 run under any worker.</p>
+      </div>
+
+      <p>The placement test for any new behaviour: does <code>drain-cycle</code> need to know <em>what a role does</em> (Layer 2), or only <em>whether an artifact exists</em> (Layer 1)? Submitting a PR is "what a role does" — it belongs in a skill. Reading back the submitted PR URLs to decide whether to advance is "whether an artifact exists" — it belongs in the supervisor (see design decision §19).</p>
+      <p>Keeping the boundary at the artifact is what makes Layer 1 content-blind, and content-blindness is what lets the same Layer 2 run under any worker.</p>
+    </section>
+
+    <section class="s" id="s4">
+      <header><span class="ix">§4</span><h2>Spawn a worker per phase, not per issue</h2></header>
+      <p>A worker does not run the whole <code>exec:*</code> chain. Each phase — code, review, finish — is its own spawn, with its own model tier, and the agent that produced an artifact never judges it. Two independent reasons force this:</p>
+      <ul>
+        <li><strong>Independent verification.</strong> A coder reviewing its own work rationalises its own choices. Spawning review as a separate agent that did not write the code makes review adversarial by construction, not by prompt wording.</li>
+        <li><strong>Per-phase model economics.</strong> Review anchors to a stronger (more expensive) model regardless of what coded the change. That asymmetry is only expressible if each phase is its own spawn with its own <code>--model</code> pin — a cheap model can build while an expensive one reviews.</li>
+      </ul>
+      <p>The three phase agents map onto the existing pack: code = <code>exec:build</code> (+<code>exec:debug</code>, <code>exec:simplify</code>), review = <code>exec:review</code>, finish = <code>exec:finish</code>. Each is a goal-shaped worker prompt, not a resident process — the goal ("produce sliced artifacts", "apply every quality lens", "land human-readable PRs") drives a sequence of skill delegations inside one spawn.</p>
+      <p>The cost accepted in return: every phase boundary pays a spawn plus artifact rehydration, so the handoff envelope (§5) must carry everything the next phase needs — a single worker kept that context in memory for free. This is the deliberate price of independence; see design decision §20.</p>
+    </section>
+
+    <section class="s" id="s6">
+      <header><span class="ix">§6</span><h2>Dual-mode: the same skills by hand or unattended</h2></header>
+      <p>Because the workflow is skills and the supervisor only reads artifacts, the same skills run two ways: the operator invokes them at the keyboard, or a spawned worker runs them unattended. There is one workflow, exercised two ways — not a manual path and a separate automated path that drift apart.</p>
+
+      <div class="dual">
+        <figure class="before">
+          <figcaption>Before — I am the connector</figcaption>
+          <pre><code>me     → "write the code for this"
+agent  → writes it
+me     → read it. "now review it against these standards"
+agent  → reviews it
+me     → "open a PR"
+agent  → opens it
+me     → "rewrite the PR description so it reads well"
+agent  → rewrites it
+me     → check it, mark it done
+       → then start the whole chain over for the next piece of work</code></pre>
+        </figure>
+        <figure class="after">
+          <figcaption>After — I built the connector</figcaption>
+          <pre><code>me         → "work through this project"
+supervisor → picks up the first piece of work
+           → runs build → review → PR → finish, checking each result
+           → marks it done, moves to the next
+           → ...
+           → hits one it can't get past review, stops, tells me why
+me         → review the finished work; step in only where it halted</code></pre>
+        </figure>
+      </div>
+
+      <p>Design decision §10 (config symlinked into each worktree) is what makes the headless worker's environment match an interactive session, so a skill behaves the same in both modes.</p>
+    </section>
+
+    <section class="s" id="s8">
+      <header><span class="ix">§8</span><h2>prompt.py becomes a pointer, not a script</h2></header>
+      <div class="callout callout-keystone">
+        <div class="callout-label">The keystone</div>
+        <p class="callout-lead">One move turns the split from a diagram into running code.</p>
+        <p>The move that realizes the whole split: <strong><code>prompt.py</code> becomes a thin pointer at <code>exec:pickup</code></strong> instead of inlining the workflow. The supervisor stops carrying procedure; the pack owns it; any vendor's worker follows the same prose. This is tracked by the "drain-cycle supervises; the pack owns the workflow" project and is the run-first step — everything else in this doc is a facet of it. Until it lands, the supervisor's prompt still names a few skills directly (e.g. the current <code>/code-review-and-quality</code> and <code>/shape:pr-finishing</code>); those references swap to <code>exec:*</code> at the keystone cutover.</p>
+      </div>
+    </section>
+
+    <!-- ACT III -->
+    <div class="act-head" id="act3">
+      <div class="act-kicker">Scale</div>
+      <h2 class="act-title">How far it runs</h2>
+      <p class="act-tldr">The supervisor reaches further as observability earns trust: from one-shot CLI to resident daemon, from one issue to a whole planned unit, with review rolling up the same tree the work was broken down along.</p>
+    </div>
+
+    <section class="s" id="s9">
+      <header><span class="ix">§9</span><h2>Extend the autonomy horizon as observability earns trust</h2></header>
+      <p>How far the supervisor runs without the operator. Today it drains a cycle transactionally — one issue, one worker, one diff — and halts when it runs out of runnable work or hits a result it cannot get past. The horizon extends outward as observability earns more trust: building on unmerged work, auto-merging trusted classes, and eventually a resident process that watches its own PRs through the review-and-merge loop. That extension is shaped in <a href="ideas/drain-past-the-merge-gate.md"><code>ideas/drain-past-the-merge-gate.md</code></a>.</p>
+      <p>The horizon is a deliberate trade, not a default: autonomy is applied selectively where the delayed feedback loop (§7) makes the loss of live intervention acceptable.</p>
+    </section>
+
+    <section class="s" id="s10">
+      <header><span class="ix">§10</span><h2>From a one-shot CLI to a resident daemon</h2></header>
+      <p>The supervisor is moving from a one-shot CLI to a resident process — the autonomy horizon of §9 made concrete. Two scopes, both Layer 1:</p>
+      <ul>
+        <li><strong>Control plane (one per machine).</strong> The long-lived daemon. Owns process lifecycle, the queue of planned units to execute, and an API the operator queries and steers: what is running, halt this issue, resume, and (the horizon behaviour) watch open PRs through the review-and-merge loop and respond to review comments.</li>
+        <li><strong>Execution-coordinator (one per unit in flight).</strong> Spawned by the control plane to drive a single cycle or project. It advances work by reading artifacts (§5) — never by reading inside a phase — and halts on a missing or failed artifact.</li>
+      </ul>
+      <p>The control plane stays a <strong>process, not a Claude skill</strong> (design decision §22). A <code>/execute-cycle</code> skill would run inside a Claude session and collapse the artifact boundary that makes the worker vendor-agnostic; the one-command ergonomics come instead from a thin CLI front-door (<code>drain-cycle run &lt;unit&gt;</code>). "Respond to PR comments" is a control-plane behaviour, not a pack skill, because it requires watching a PR after it is open — which only a resident process does.</p>
+    </section>
+
+    <section class="s" id="s11">
+      <header><span class="ix">§11</span><h2>Execute a planned unit — a cycle or a project</h2></header>
+      <p>The supervisor executes a <em>planned unit</em>. The atom is unchanged — one issue, with a worker per phase (§4) — and a cycle and a project differ only as containers with a hierarchy over them. "Drain a cycle" is one entry point, not the definition; project execution is out of scope today but is a later container, not a redesign (design decision §22). The tool keeps the name <code>drain-cycle</code>; the concept it serves is wider.</p>
+    </section>
+
+    <section class="s" id="s12">
+      <header><span class="ix">§12</span><h2>Roll review up the tree: multi-altitude review</h2></header>
+      <p><code>shape:delivery</code> decomposes committed work <em>downward</em> — project → milestones → nodes → tasks. Verification rolls <em>upward</em> along the same tree, with the review altitude matching the decomposition altitude:</p>
+      <table>
+        <thead>
+          <tr><th>Altitude</th><th>Fires when</th><th>Lenses</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Task</strong> (per issue)</td>
+            <td>a task's diff is ready, before its PR merges</td>
+            <td>spec-compliance · security · reliability/resilience · code-quality · outcome — diff-bounded</td>
+          </tr>
+          <tr>
+            <td><strong>Milestone</strong></td>
+            <td>a milestone's last child task lands</td>
+            <td>integration/coherence/acceptance (the task lens raised a level) · regression (did landing degrade anything outside this boundary?)</td>
+          </tr>
+          <tr>
+            <td><strong>Project</strong></td>
+            <td>a project's last milestone lands</td>
+            <td>architecture review · measurable stated goals (partial — some goals take time and are deferred)</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Work fans down; verification rolls up. The trigger is structural — a parent's review fires exactly when its last child completes — and the hierarchy itself is authoritative in Linear (milestones, projects), so the state plane (§7) reads it rather than holding a second copy.</p>
+      <p>Three consequences distinguish higher-altitude review from task review:</p>
+      <ol>
+        <li><strong>The execution-coordinator is a tree walker, not a queue drainer.</strong> It models the hierarchy, detects "this milestone's last child landed", and fires the milestone review.</li>
+        <li><strong>Higher-altitude review produces new work, not reverts.</strong> A task review can halt before a PR merges. A milestone or project review runs <em>after</em> its child PRs have merged — a merged slice cannot be cleanly reverted — so a failing review emits new remediation issues slotted back into the plan. This is a different halt semantic from task-level.</li>
+        <li><strong>Project review is partial and deferred.</strong> Some goals cannot be measured at completion. Project review measures what it can now and <em>schedules</em> the rest, which is only possible with the resident control plane (§10).</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer>Rendered from <code>docs/architecture.md</code> · regenerate to update.</footer>
+</div>
+
+<script>
+  const links = Array.from(document.querySelectorAll('aside nav a'));
+  const targets = links.map(a => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
+  const byId = new Map(targets.map((el, i) => [el.id, links[i]]));
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (e.isIntersecting) {
+        links.forEach(a => a.classList.remove('active'));
+        byId.get(e.target.id)?.classList.add('active');
+      }
+    }
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  targets.forEach(t => io.observe(t));
+</script>
+</body>
+</html>
