@@ -60,3 +60,7 @@ are there are any other core modules we've written that are worth highlighting i
 ---
 
 go
+
+---
+
+perform a /writing-refinement over the content written under "Scale" and "Section 9" - it feels like there are a lot of weird metaphors and other unnecessary things in there
