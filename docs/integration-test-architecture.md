@@ -1,6 +1,6 @@
 # Integration test architecture
 
-> **Tests Layer 1 (supervision).** This is the harness for the drain-cycle supervisor — spawn, halt, revert, resume — not the workflow skills (Layer 2, tested in the Shaper pack). It is orthogonal to the two-layer product split in [`docs/architecture.md`](architecture.md), which it supports by making Layer-1 behaviour testable without a real Linear cycle.
+> **Tests Layer 1 (supervision).** This is the harness for the drain-cycle supervisor — spawn, halt, revert, resume — not the workflow skills (Layer 2, tested in the Shaper pack). It is orthogonal to the two-layer product split in [`docs/architecture.html`](architecture.html), which it supports by making Layer-1 behaviour testable without a real Linear cycle.
 
 **Linear initiative:** [Test drain-cycle failure modes and resume without a real Linear cycle](https://linear.app/ababushkin/project/test-drain-cycle-failure-modes-and-resume-without-a-real-linear-cycle-910b954af13f)
 

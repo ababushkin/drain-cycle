@@ -1,8 +1,8 @@
 # Architecture diagrams
 
-These diagrams illustrate [`../architecture.md`](../architecture.md). The committed `.svg` files are clean, first-pass renders that display on GitHub today. They are meant to be **redrawn in the hand-drawn Excalidraw aesthetic** later; this file is the label/layout spec to redraw from, so the wording stays 1:1 with the doc.
+These diagrams illustrate [`../architecture.html`](../architecture.html). The committed `.svg` files are clean, first-pass renders that display on GitHub today. They are meant to be **redrawn in the hand-drawn Excalidraw aesthetic** later; this file is the label/layout spec to redraw from, so the wording stays 1:1 with the doc.
 
-**Rule that keeps the visuals honest:** the doc is authoritative. Every label here appears verbatim in `architecture.md`. Do not introduce friendlier or invented names when redrawing — if a term needs to change, change the doc first, then the diagram.
+**Rule that keeps the visuals honest:** the doc is authoritative. Every label here appears verbatim in `architecture.html`. Do not introduce friendlier or invented names when redrawing — if a term needs to change, change the doc first, then the diagram.
 
 ## Diagram 1 — `architecture-overview.svg` (apex visual, after the lead)
 
@@ -34,4 +34,4 @@ Two stacked boxes with the boundary between them.
 
 ## Diagram 3 — multi-altitude review (deferred)
 
-Not drawn. The overview (Diagram 1) already shows the fan-down/roll-up duality and all three review altitudes, and `architecture.md` §12 carries the per-altitude lens table. Add a dedicated diagram only if a future reader finds the roll-up idea underserved by those two.
+Not drawn. The overview (Diagram 1) already shows the fan-down/roll-up duality and all three review altitudes, and `architecture.html` §12 carries the per-altitude lens table. Add a dedicated diagram only if a future reader finds the roll-up idea underserved by those two.

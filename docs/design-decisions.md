@@ -2,7 +2,7 @@
 
 Design rationale for `drain-cycle`. Read this before making architectural changes — `AGENTS.md` points here.
 
-These decisions serve the project's guiding vision, [`docs/vision.md`](vision.md), and realize the architecture that serves it, [`docs/architecture.md`](architecture.md) — the two-layer supervisor/workflow split on an artifact boundary. Each decision below should hold the vision as its frame; a decision that no longer fits it is the signal to revisit the vision deliberately, not to drift from it silently.
+These decisions serve the project's guiding vision, [`docs/vision.md`](vision.md), and realize the architecture that serves it, [`docs/architecture.html`](architecture.html) — the two-layer supervisor/workflow split on an artifact boundary. Each decision below should hold the vision as its frame; a decision that no longer fits it is the signal to revisit the vision deliberately, not to drift from it silently.
 
 Twenty-two decisions are recorded so a future reader doesn't have to reverse-engineer them from the code. ADRs would be heavier than this tool needs.
 
@@ -290,7 +290,7 @@ gt submit --stack --no-interactive --publish
 
 ## 17. `/shape:task` runs inside the worker session; whole-project shaping stays at design-doc scope
 
-> **Forward-pointer.** Not stale today, but the target moved into the pack. Under the `exec:*` namespace (ADR 0004 / Shaper `execution-workflow` design doc), `/shape:task` folds into `exec:pickup`/`exec:breakdown` at the keystone cutover ([`architecture.md`](architecture.md) §8). The in/out contract below still describes what that step does.
+> **Forward-pointer.** Not stale today, but the target moved into the pack. Under the `exec:*` namespace (ADR 0004 / Shaper `execution-workflow` design doc), `/shape:task` folds into `exec:pickup`/`exec:breakdown` at the keystone cutover ([`architecture.html`](architecture.html) §8). The in/out contract below still describes what that step does.
 
 The M2 worker pipeline introduces a Task Shaper role — `/shape:task` — that runs before the implementer on verify-flow tickets. The initiative doc deferred the invocation interface to this ADR: whether whole-project shaping (via `/shape:planning-and-task-breakdown`) pre-computes per-ticket task lists that workers later read, or `/shape:task` runs inside each worker session on its own ticket.
 
@@ -335,9 +335,9 @@ All four run-log fields are additive and default to `null` (push-to-main repos, 
 
 ## 19. The worker owns PR submission via the finishing skill; the orchestrator reads `pr_urls` back
 
-This reverses the actor in §16 and §18. There, the orchestrator assembled and submitted the per-repo Graphite stack and posted the Linear comment. Now the **worker** does it: in drain mode the worker commits reviewable slices, then runs the finishing skill (`/shape:pr-finishing` today; `exec:finish` after the keystone cutover, [`architecture.md`](architecture.md) §8), which owns submission — it drives `gt`/`gh`, writes the submitted PR URLs into `.drain-handoff.json` (`pr_urls`), and posts the review-summary comment on the Linear issue. The orchestrator no longer assembles or submits anything; it **reads `pr_urls` back** as confirmation that submission succeeded, and a Done stack-mode issue with no `pr_urls` halts the run rather than letting the next issue stack on an unpushed branch.
+This reverses the actor in §16 and §18. There, the orchestrator assembled and submitted the per-repo Graphite stack and posted the Linear comment. Now the **worker** does it: in drain mode the worker commits reviewable slices, then runs the finishing skill (`/shape:pr-finishing` today; `exec:finish` after the keystone cutover, [`architecture.html`](architecture.html) §8), which owns submission — it drives `gt`/`gh`, writes the submitted PR URLs into `.drain-handoff.json` (`pr_urls`), and posts the review-summary comment on the Linear issue. The orchestrator no longer assembles or submits anything; it **reads `pr_urls` back** as confirmation that submission succeeded, and a Done stack-mode issue with no `pr_urls` halts the run rather than letting the next issue stack on an unpushed branch.
 
-**Why the reversal.** It is the artifact boundary applied ([`architecture.md`](architecture.md) §5). Submitting a stack is "what a role does" — Layer 2 — so it belongs in a skill that runs identically by hand or unattended. Reading back whether the PRs exist is "whether an artifact exists" — Layer 1 — so it stays in the supervisor. The §16/§18 design put a Layer-2 action inside Layer 1, which is exactly the coupling the two-layer split removes: an orchestrator that knows the `gt`/`gh` sequence cannot be the thin, vendor-agnostic supervisor the keystone (§8) requires.
+**Why the reversal.** It is the artifact boundary applied ([`architecture.html`](architecture.html) §5). Submitting a stack is "what a role does" — Layer 2 — so it belongs in a skill that runs identically by hand or unattended. Reading back whether the PRs exist is "whether an artifact exists" — Layer 1 — so it stays in the supervisor. The §16/§18 design put a Layer-2 action inside Layer 1, which is exactly the coupling the two-layer split removes: an orchestrator that knows the `gt`/`gh` sequence cannot be the thin, vendor-agnostic supervisor the keystone (§8) requires.
 
 **The verified `gt`/`gh` sequence in §16 is still correct** — it is just run by the finishing skill, not the orchestrator. §16's per-repo preconditions (`gt auth`, `gt init --trunk main`) and its stop-the-line restack policy carry over unchanged.
 
@@ -350,7 +350,7 @@ This reverses the actor in §16 and §18. There, the orchestrator assembled and 
 
 ## 20. A worker per phase, not a worker per issue
 
-Today one spawned worker runs the whole `exec:*` chain for an issue — pickup through finish — in a single session. The decision is to split it: each phase (code, review, finish) is its own spawn, with its own model tier, and the agent that produced an artifact never reviews it. See [`architecture.md`](architecture.md) §4.
+Today one spawned worker runs the whole `exec:*` chain for an issue — pickup through finish — in a single session. The decision is to split it: each phase (code, review, finish) is its own spawn, with its own model tier, and the agent that produced an artifact never reviews it. See [`architecture.html`](architecture.html) §4.
 
 **Why split.** Two independent reasons, either sufficient on its own:
 
@@ -366,7 +366,7 @@ Today one spawned worker runs the whole `exec:*` chain for an issue — pickup t
 
 ## 21. Review is multi-altitude; higher-altitude review yields new work, not reverts
 
-Review fires at three altitudes matching the delivery hierarchy `shape:delivery` already produces — task, milestone, project — not only per task. The full model is in [`architecture.md`](architecture.md) §12.
+Review fires at three altitudes matching the delivery hierarchy `shape:delivery` already produces — task, milestone, project — not only per task. The full model is in [`architecture.html`](architecture.html) §12.
 
 **Why multi-altitude.** A task review is diff-bounded: it grades one issue's change against its AC and the quality lenses. It cannot see whether the tasks of a milestone *cohere*, whether landing them degraded something *outside* their own boundary, or whether the project met its stated goals. Those are real defect classes that only exist at a higher altitude, so they need a review oriented to that altitude. Verification rolls up the same tree the work was decomposed down — the dual of the delivery hierarchy.
 
@@ -386,7 +386,7 @@ Review fires at three altitudes matching the delivery hierarchy `shape:delivery`
 
 Two coupled decisions about the supervisor's form and scope.
 
-**Scope — a planned unit, not specifically a cycle.** The supervisor executes a *planned unit of work*: a Linear cycle today, a whole project later. The execution atom is unchanged (one issue, a worker per phase, §20); a cycle and a project differ only as containers with a hierarchy over them (§21). "Drain a cycle" becomes one entry point rather than the definition. Project execution is out of scope now, but it is a later container on the same machinery, not a redesign — so vision and architecture are written in the generic terms ([`architecture.md`](architecture.md) §12). The tool keeps the name `drain-cycle`.
+**Scope — a planned unit, not specifically a cycle.** The supervisor executes a *planned unit of work*: a Linear cycle today, a whole project later. The execution atom is unchanged (one issue, a worker per phase, §20); a cycle and a project differ only as containers with a hierarchy over them (§21). "Drain a cycle" becomes one entry point rather than the definition. Project execution is out of scope now, but it is a later container on the same machinery, not a redesign — so vision and architecture are written in the generic terms ([`architecture.html`](architecture.html) §12). The tool keeps the name `drain-cycle`.
 
 **Form — a process with a CLI front-door, not a `/execute-cycle` skill.** It is tempting to encapsulate the supervisor itself as a Claude skill (`/execute-cycle`, `/execute-project`) for one-command ergonomics. Rejected: a skill runs *inside* a Claude session, which makes the supervisor Claude-shaped and collapses the artifact boundary (§2) that lets the worker be any vendor. The supervisor's whole value is being content-blind and vendor-agnostic; a skill cannot be that. The one-command ergonomics come instead from a thin CLI front-door (`drain-cycle run <unit>`), while Layer 2 stays skills.
 
@@ -396,3 +396,18 @@ Two coupled decisions about the supervisor's form and scope.
 
 - */execute-cycle as the primary entry point.* Rejected per above — collapses the vendor-agnostic boundary.
 - *Hybrid: a `/execute-cycle` skill that shells out to the process for interactive use.* Not adopted now, but not foreclosed — it is a thin convenience wrapper over `drain-cycle run`, addable later if the keyboard ergonomics warrant it, without moving any supervision logic into the skill.
+
+## 23. Responding to PR review feedback is a control-plane behaviour, not a pack skill
+
+An earlier plan framed PR-feedback response as a Layer-2 pack skill (`/shape:pr-respond`, ABA-331) driven by an operator-launched foreground polling loop (`drain-cycle pr-feedback`, ABA-332). Both are cancelled. Responding to review comments is a **Layer-1 control-plane behaviour** of the resident daemon ([architecture.html](architecture.html) §9–§10, §10 here), because it requires watching a PR *after it is open* — a liveness only a resident process has. A pack skill runs inside one worker session bounded to a single diff; it cannot watch a PR across review rounds. The responsibility belongs to the daemon, not the pack.
+
+**The idempotency contract (carried forward from the cancelled ABA-331).** The daemon must never address the same review comment twice across invocations. The run-log already carries the write target: `responder_runs[]`, an array of `{comment_ids[], invoked_at, result}` objects (shipped null/empty by ABA-321). "New" means a comment ID absent from every prior `responder_runs[].comment_ids[]` for the issue. A poll that finds no new comments exits cleanly without changes; running twice over the same comment produces neither a duplicate fix nor a duplicate log entry.
+
+**Mechanism (deferred to Gear 3).** The concrete loop — read new comments → revise in the issue's worktree → re-submit to the stack → append to `responder_runs[]` — is the Gear 3 PR-review lifecycle in [`ideas/drain-past-the-merge-gate.md`](ideas/drain-past-the-merge-gate.md), gated behind the merge-gate evolution. This decision records *where the responsibility lives and why*; the gear doc owns the *how* and its open questions.
+
+**Why this matters now.** PR-feedback response is part of the supervisor's autonomy horizon (§9): of the horizon behaviours, the merge-gate evolution is shaped but the feedback loop had only the two cancelled tickets to carry it. Recording the relocation keeps the behaviour — and the idempotency design it had already worked out — from being silently dropped when ABA-331/332 closed.
+
+**Alternatives considered.**
+
+- *Pack skill `/shape:pr-respond` + `drain-cycle pr-feedback` polling subcommand (the original plan).* Rejected: a skill is bounded to one worker session and one diff, so it cannot watch a PR after it is open; a foreground operator poller is a hand-cranked stand-in for the daemon's own liveness. Superseded by control-plane ownership.
+- *Resolve wrong-fix escalation here.* Deferred: if the daemon's revision for a comment is itself wrong, the operator has no automated escalation path. Left as a Gear 3 open question rather than decided now.

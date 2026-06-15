@@ -1,6 +1,6 @@
 # Drain past the merge gate
 
-> **Layer 1, gated behind the keystone.** This is pure supervision — the orchestrator's autonomy horizon — under the two-layer architecture in [`docs/architecture.md`](../architecture.md) (§8). It does not start until the boundary keystone lands (`prompt.py` stripped to a pointer at `exec:pickup`, §7). Read the [vision](../vision.md) first.
+> **Layer 1, gated behind the keystone.** This is pure supervision — the orchestrator's autonomy horizon — under the two-layer architecture in [`docs/architecture.html`](../architecture.html) (§8). It does not start until the boundary keystone lands (`prompt.py` stripped to a pointer at `exec:pickup`, §7). Read the [vision](../vision.md) first.
 
 ## Problem Statement
 How might we let a drain run keep doing useful work — and keep turning hands-free — when the only thing left blocking it is a human review-and-merge gate on PRs it already opened?
@@ -28,6 +28,8 @@ A **three-gear** evolution, each independently shippable, smallest-blast-radius 
 
 **Gear 3 — Resident daemon (the destination).** drain-cycle becomes a long-running process that owns the full lifecycle without owner relaunch: it watches its own PRs, on merge it (a) `gt restack`s affected downstream and (b) picks up newly-runnable work; on review feedback it routes the PR back through a revise-and-resubmit loop. This is where the future PR-review lifecycle lives. Interim, before the resident process exists, Gears 1–2 can run under a cron/`/loop` relaunch of the existing transactional orchestrator — same observable behaviour for the merge-watch slice, far less to build — but that is scaffolding toward the daemon, not a substitute for it.
 
+*The revise-and-resubmit loop, concretely.* Per watched PR: read review comments via the Graphite MCP → for each *new* comment, revise in the issue's existing worktree → re-submit to the stack → append `{comment_ids[], invoked_at, result}` to the run-log's `responder_runs[]`. The loop is **idempotent**: "new" means a comment ID absent from every prior `responder_runs[].comment_ids[]` for the issue, so the same comment is never addressed twice across passes, and a pass with no new comments exits cleanly without changes. This is a daemon behaviour, not a pack skill — only a resident process watches a PR after it is open (design decision §23, which supersedes the earlier `/shape:pr-respond` skill framing). The `responder_runs[]` field already exists in the run-log schema (shipped empty); Gear 3 is what first writes to it.
+
 ## Key Assumptions to Validate
 - [ ] **Review rarely invalidates upstream.** Measure: over the last N drained stacks, how often did review force upstream changes that would have invalidated optimistically-stacked downstream? If high, Gear 1 amplifies wasted work — kill it.
 - [ ] **Trusted classes are reliably classifiable.** Test with a single conservative label on a few low-risk issues; confirm gated-by-default holds and CI+review gate is enforced before any auto-merge.
@@ -51,3 +53,5 @@ Ship **Gear 2 on the interim relaunch host** first — removes the gate where it
 - Trust as a Linear label, an issue-type, or a per-issue risk score from the review skill?
 - For Gear 3, what's the merge-detection trigger — poll `gh`, a GitHub webhook, or piggyback on the existing cron pass?
 - When a restack conflicts, halt-and-park the chain (current behaviour) or escalate differently?
+- For the revise-and-resubmit loop: what's the Graphite MCP shape for reading review comments — comment-ID format, pagination, and the "unresolved" filter? (Flagged unverified by the cancelled ABA-331; verify against Graphite docs before building.)
+- When the daemon's revision for a comment is itself wrong, what's the escalation path — halt-and-flag the PR for the operator, or retry with a stronger model tier? The operator must not be left silently looping on a bad fix.
