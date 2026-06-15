@@ -290,7 +290,7 @@ gt submit --stack --no-interactive --publish
 
 ## 17. `/shape:task` runs inside the worker session; whole-project shaping stays at design-doc scope
 
-> **Forward-pointer.** Not stale today, but the target moved into the pack. Under the `exec:*` namespace (ADR 0004 / Shaper `execution-workflow` design doc), `/shape:task` folds into `exec:pickup`/`exec:breakdown` at the keystone cutover ([`architecture.html`](architecture.html) §8). The in/out contract below still describes what that step does.
+> **Forward-pointer.** Not stale today, but the target moved into the pack. Under the `exec:*` namespace (ADR 0004 / Shaper `execution-workflow` design doc), `/shape:task` folds into `exec:pickup`/`exec:breakdown` at the keystone cutover (§24). The in/out contract below still describes what that step does.
 
 The M2 worker pipeline introduces a Task Shaper role — `/shape:task` — that runs before the implementer on verify-flow tickets. The initiative doc deferred the invocation interface to this ADR: whether whole-project shaping (via `/shape:planning-and-task-breakdown`) pre-computes per-ticket task lists that workers later read, or `/shape:task` runs inside each worker session on its own ticket.
 
@@ -335,9 +335,9 @@ All four run-log fields are additive and default to `null` (push-to-main repos, 
 
 ## 19. The worker owns PR submission via the finishing skill; the orchestrator reads `pr_urls` back
 
-This reverses the actor in §16 and §18. There, the orchestrator assembled and submitted the per-repo Graphite stack and posted the Linear comment. Now the **worker** does it: in drain mode the worker commits reviewable slices, then runs the finishing skill (`/shape:pr-finishing` today; `exec:finish` after the keystone cutover, [`architecture.html`](architecture.html) §8), which owns submission — it drives `gt`/`gh`, writes the submitted PR URLs into `.drain-handoff.json` (`pr_urls`), and posts the review-summary comment on the Linear issue. The orchestrator no longer assembles or submits anything; it **reads `pr_urls` back** as confirmation that submission succeeded, and a Done stack-mode issue with no `pr_urls` halts the run rather than letting the next issue stack on an unpushed branch.
+This reverses the actor in §16 and §18. There, the orchestrator assembled and submitted the per-repo Graphite stack and posted the Linear comment. Now the **worker** does it: in drain mode the worker commits reviewable slices, then runs the finishing skill (`/shape:pr-finishing` today; `exec:finish` after the keystone cutover, §24), which owns submission — it drives `gt`/`gh`, writes the submitted PR URLs into `.drain-handoff.json` (`pr_urls`), and posts the review-summary comment on the Linear issue. The orchestrator no longer assembles or submits anything; it **reads `pr_urls` back** as confirmation that submission succeeded, and a Done stack-mode issue with no `pr_urls` halts the run rather than letting the next issue stack on an unpushed branch.
 
-**Why the reversal.** It is the artifact boundary applied ([`architecture.html`](architecture.html) §5). Submitting a stack is "what a role does" — Layer 2 — so it belongs in a skill that runs identically by hand or unattended. Reading back whether the PRs exist is "whether an artifact exists" — Layer 1 — so it stays in the supervisor. The §16/§18 design put a Layer-2 action inside Layer 1, which is exactly the coupling the two-layer split removes: an orchestrator that knows the `gt`/`gh` sequence cannot be the thin, vendor-agnostic supervisor the keystone (§8) requires.
+**Why the reversal.** It is the artifact boundary applied ([`architecture.html`](architecture.html) §5). Submitting a stack is "what a role does" — Layer 2 — so it belongs in a skill that runs identically by hand or unattended. Reading back whether the PRs exist is "whether an artifact exists" — Layer 1 — so it stays in the supervisor. The §16/§18 design put a Layer-2 action inside Layer 1, which is exactly the coupling the two-layer split removes: an orchestrator that knows the `gt`/`gh` sequence cannot be the thin, vendor-agnostic supervisor the keystone (§24) requires.
 
 **The verified `gt`/`gh` sequence in §16 is still correct** — it is just run by the finishing skill, not the orchestrator. §16's per-repo preconditions (`gt auth`, `gt init --trunk main`) and its stop-the-line restack policy carry over unchanged.
 
@@ -411,3 +411,13 @@ An earlier plan framed PR-feedback response as a Layer-2 pack skill (`/shape:pr-
 
 - *Pack skill `/shape:pr-respond` + `drain-cycle pr-feedback` polling subcommand (the original plan).* Rejected: a skill is bounded to one worker session and one diff, so it cannot watch a PR after it is open; a foreground operator poller is a hand-cranked stand-in for the daemon's own liveness. Superseded by control-plane ownership.
 - *Resolve wrong-fix escalation here.* Deferred: if the daemon's revision for a comment is itself wrong, the operator has no automated escalation path. Left as a Gear 3 open question rather than decided now.
+
+## 24. The keystone cutover: `prompt.py` collapses to a pointer at `exec:pickup`
+
+The architecture ([`architecture.html`](architecture.html) §3) describes Layer 1 as carrying no procedure: the worker's prompt points at the entry skill and the workflow lives in Layer 2. **Reaching that state in code is one concrete change — strip `prompt.py` from inlining the workflow down to a thin pointer at `exec:pickup`.** This is the keystone: the cutover that turns the two-layer split from a description into running code. Tracked by the "drain-cycle supervises; the pack owns the workflow" project.
+
+This entry, not the architecture doc, is where the cutover's status lives — the architecture describes the structure as designed, "as is"; a migration that hasn't fully landed is decision-log material, not architecture.
+
+**Current state and what the cutover changes.** Today `prompt.py` inlines the worker procedure as prose and names a few skills directly — the current `/code-review-and-quality` (review) and `/shape:pr-finishing` (finish). At the cutover those references swap to the `exec:*` namespace (`exec:review`, `exec:finish`; ADR 0004 / Shaper `execution-workflow` design doc), and the inlined procedure collapses to the single pointer. After it lands the supervisor names no workflow steps at all — only the entry skill — so any vendor's worker follows the same Layer-2 prose.
+
+**Why it's the keystone.** The properties the architecture describes — the content-blind artifact boundary, dual-mode, vendor-agnostic workers — all rest on the supervisor not carrying procedure. This is why §16/§18's orchestrator-assembles-the-stack design was reversed in §19: hard-coding the `gt`/`gh` sequence into Layer 1 keeps procedure in the supervisor and blocks the cutover.

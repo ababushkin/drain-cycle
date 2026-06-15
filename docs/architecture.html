@@ -131,9 +131,6 @@
   .callout p:last-child { margin-bottom: 0; }
   .callout-info     { border-color: var(--accent); background: var(--accent-soft); }
   .callout-info .callout-label { color: var(--accent); }
-  .callout-keystone { border-color: var(--info); background: var(--info-soft); }
-  .callout-keystone .callout-label { color: var(--info); }
-  .callout-keystone .callout-lead { font-size: 15.5px; font-weight: 600; color: var(--fg); margin-bottom: 12px; }
   .callout-open { border-color: var(--warn); background: var(--warn-soft); }
   .callout-open .callout-label { color: var(--warn); }
   .callout-open .callout-lead { font-size: 15.5px; font-weight: 600; color: var(--fg); margin-bottom: 12px; }
@@ -263,7 +260,6 @@
       <li><a href="#s5"><span class="navnum">§5</span>Writes signals; reads them</a></li>
       <li><a href="#s4"><span class="navnum">§4</span>A worker per phase</a></li>
       <li><a href="#s6"><span class="navnum">§6</span>Dual-mode</a></li>
-      <li><a href="#s8"><span class="navnum">§8</span>prompt.py becomes a pointer</a></li>
     </ul></nav>
 
     <p class="kicker">Scale<span class="sub">How far it runs</span></p>
@@ -460,7 +456,7 @@
     <div class="act-head" id="act2">
       <div class="act-kicker">Interface</div>
       <h2 class="act-title">How the layers meet</h2>
-      <p class="act-tldr">The layers meet at an artifact, not a function call: Layer 2 writes signals, Layer 1 reads them. Each phase spawns on its own, so the agent that wrote the code never reviews it — and one small move makes the whole split real.</p>
+      <p class="act-tldr">The layers meet at an artifact, not a function call: Layer 2 writes signals, Layer 1 reads them. Each phase spawns on its own, so the agent that wrote the code never reviews it.</p>
     </div>
 
     <section class="s" id="s5">
@@ -537,15 +533,6 @@ me         → review the finished work; step in only where it halted</code></pr
       </div>
 
       <p>Design decision §10 (config symlinked into each worktree) is what makes the headless worker's environment match an interactive session, so a skill behaves the same in both modes.</p>
-    </section>
-
-    <section class="s" id="s8">
-      <header><span class="ix">§8</span><h2>prompt.py becomes a pointer, not a script</h2></header>
-      <div class="callout callout-keystone">
-        <div class="callout-label">The keystone</div>
-        <p class="callout-lead">One move turns the split from a diagram into running code.</p>
-        <p>The move that realizes the whole split: <strong><code>prompt.py</code> becomes a thin pointer at <code>exec:pickup</code></strong> instead of inlining the workflow. The supervisor stops carrying procedure; the pack owns it; any vendor's worker follows the same prose. This is tracked by the "drain-cycle supervises; the pack owns the workflow" project and is the run-first step — everything else in this doc is a facet of it. Until it lands, the supervisor's prompt still names a few skills directly (e.g. the current <code>/code-review-and-quality</code> and <code>/shape:pr-finishing</code>); those references swap to <code>exec:*</code> at the keystone cutover.</p>
-      </div>
     </section>
 
     <!-- ACT III -->
