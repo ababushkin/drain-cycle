@@ -1,0 +1,211 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "6a6aa92e2922",
+  "session_id": "440dd9a4-0263-4c6b-8045-a5d910388559",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-15T09:24:38.393325Z",
+  "branch": "main",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "AGENTS.md",
+    "README.md",
+    "docs/architecture.md",
+    "docs/design-decisions.md",
+    "docs/ideas/drain-past-the-merge-gate.md",
+    "docs/ideas/stacked-pr-finishing.md",
+    "docs/initiative-multi-agent-collaboration.md",
+    "docs/integration-test-architecture.md",
+    "docs/tasks/us-a-unattended-cycle-drain.md",
+    "docs/tasks/us-c-artefacts-that-grade-the-krs.md",
+    "docs/vision.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8",
+  "turn_id": "e24045388c10",
+  "token_usage": {
+    "input_tokens": 48997,
+    "cache_creation_tokens": 327856,
+    "cache_read_tokens": 9766936,
+    "output_tokens": 61520,
+    "api_call_count": 82
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-commit-commands:commit-2026-06-15T09:24:12.35369Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "commit-commands:commit"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "e24045388c10",
+      "timestamp": "2026-06-15T09:24:12.35369Z",
+      "native": {
+        "command": "/commit-commands:commit"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/commit-commands:commit",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01A4D8gkTGcP3AWYLwJ27tcL",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-writing-refinement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "e24045388c10",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 26,
+        "end": 27,
+        "entry_ids": [
+          "01f743ac-1399-43c8-80e6-01173b846d65"
+        ],
+        "tool_use_id": "toolu_01A4D8gkTGcP3AWYLwJ27tcL"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01A4D8gkTGcP3AWYLwJ27tcL"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-writing-refinement",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01EV2wNB2SveyqLUsUoBv2dN",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-writing-refinement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "e24045388c10",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 134,
+        "end": 135,
+        "entry_ids": [
+          "91cf8bf9-98c4-43be-a19b-31e16098238b"
+        ],
+        "tool_use_id": "toolu_01EV2wNB2SveyqLUsUoBv2dN"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01EV2wNB2SveyqLUsUoBv2dN"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-writing-refinement",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-15T09:24:38.364858Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 16,
+    "human_removed": 165,
+    "total_committed": 99,
+    "total_lines_changed": 181,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 920,
+      "user_lines_removed": 162,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "AGENTS.md": 3,
+        "README.md": 2,
+        "docs/delivery-plans/orchestrator-enforced-completion/D1-recover-stranded-committed-work/N01-recover-stranded-committed-work.md": 100,
+        "docs/delivery-plans/orchestrator-enforced-completion/D1-recover-stranded-committed-work/_deliverable.md": 24,
+        "docs/delivery-plans/orchestrator-enforced-completion/README.md": 74,
+        "docs/delivery-plans/watch-pane-rich-rendering/D1-filter-never-breaks-the-pane/N01-crash-proof-filter.md": 72,
+        "docs/delivery-plans/watch-pane-rich-rendering/D1-filter-never-breaks-the-pane/_deliverable.md": 37,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N02-transcript-rendering-core.md": 94,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N03-ansi-color-layer.md": 69,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/N05-docs-pane-rendering.md": 71,
+        "docs/delivery-plans/watch-pane-rich-rendering/D2-claude-code-style-transcript/_deliverable.md": 42,
+        "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/N04-usage-status-and-footer.md": 75,
+        "docs/delivery-plans/watch-pane-rich-rendering/D3-live-usage-status/_deliverable.md": 35,
+        "docs/delivery-plans/watch-pane-rich-rendering/README.md": 89,
+        "docs/design-decisions.md": 2,
+        "docs/ideas/drain-past-the-merge-gate.md": 53,
+        "docs/initiative-multi-agent-collaboration.md": 2,
+        "docs/integration-test-architecture.md": 2,
+        "docs/vision.md": 74
+      },
+      "user_removed_per_file": {
+        "AGENTS.md": 1,
+        "docs/ideas/stacked-pr-finishing.md": 64,
+        "docs/tasks/us-a-unattended-cycle-drain.md": 60,
+        "docs/tasks/us-c-artefacts-that-grade-the-krs.md": 37
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 920,
+      "agent_lines_removed": 162
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 16,
+      "user_lines_removed": 19,
+      "agent_lines_added": 920,
+      "agent_lines_removed": 162,
+      "user_added_per_file": {
+        "docs/vision.md": 16
+      },
+      "user_removed_per_file": {
+        "docs/vision.md": 19
+      }
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 917,
+      "agent_lines_removed": 162
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 917,
+      "agent_lines_removed": 162
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1035,
+      "agent_lines_removed": 171
+    }
+  ]
+}

@@ -3,10 +3,11 @@
   "checkpoint_id": "6a6aa92e2922",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 9,
+  "checkpoints_count": 14,
   "files_touched": [
     "AGENTS.md",
     "README.md",
+    "docs/architecture.md",
     "docs/delivery-plans/orchestrator-enforced-completion/D1-recover-stranded-committed-work/N01-recover-stranded-committed-work.md",
     "docs/delivery-plans/orchestrator-enforced-completion/D1-recover-stranded-committed-work/_deliverable.md",
     "docs/delivery-plans/orchestrator-enforced-completion/README.md",
@@ -25,13 +26,19 @@
       "transcript": "/6a/6aa92e2922/0/full.jsonl",
       "content_hash": "/6a/6aa92e2922/0/content_hash.txt",
       "prompt": "/6a/6aa92e2922/0/prompt.txt"
+    },
+    {
+      "metadata": "/6a/6aa92e2922/1/metadata.json",
+      "transcript": "/6a/6aa92e2922/1/full.jsonl",
+      "content_hash": "/6a/6aa92e2922/1/content_hash.txt",
+      "prompt": "/6a/6aa92e2922/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 56312,
-    "cache_creation_tokens": 997093,
-    "cache_read_tokens": 23275808,
-    "output_tokens": 145461,
-    "api_call_count": 155
+    "input_tokens": 105309,
+    "cache_creation_tokens": 1324949,
+    "cache_read_tokens": 33042744,
+    "output_tokens": 206981,
+    "api_call_count": 237
   }
 }

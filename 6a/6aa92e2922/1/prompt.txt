@@ -1,0 +1,21 @@
+look through docs/vision.md and perform a /writing-refinement review over it, don't change anything just check over it first. i'm mostly interested in making sure its written well. especially check vocab, delete em dash characters and any other AI slop
+
+---
+
+apply
+
+---
+
+ok do another pass of the vision doc using the writing-refinement skill, removing all AI slop and em dashes etc
+
+---
+
+ok do another pass of the vision doc using the writing-refinement skill, removing all AI slop and em dashes etc
+
+---
+
+ok now review all the design docs and decisions i've made up to now and how it aligns against this vision doc as i want to make sure i'm on the right track
+
+---
+
+i'd rather add architecture and other design decisions as separate docs that support the vision, not deviate away from it. the vision should be soemthing i don't iterate on much
