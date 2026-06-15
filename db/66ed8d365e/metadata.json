@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "db66ed8d365e",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "docs/initiative-multi-agent-collaboration.html",
+    "docs/initiative-multi-agent-collaboration.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/db/66ed8d365e/0/metadata.json",
+      "transcript": "/db/66ed8d365e/0/full.jsonl",
+      "content_hash": "/db/66ed8d365e/0/content_hash.txt",
+      "prompt": "/db/66ed8d365e/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 20287,
+    "cache_creation_tokens": 43401,
+    "cache_read_tokens": 87209,
+    "output_tokens": 1178,
+    "api_call_count": 3
+  }
+}
