@@ -1,0 +1,137 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "01050872885a",
+  "session_id": "3689fb8b-b88f-4dbd-b4e1-c68716253509",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-15T14:56:29.914746Z",
+  "branch": "anton/aba-370-n01-thin-supervisor-contract-design-doc-before-build",
+  "checkpoints_count": 8,
+  "files_touched": [
+    "docs/adrs/0002-thin-supervisor-contract.md",
+    "docs/adrs/references/drain-handoff-schema-v2.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "73b05b6089a6",
+  "token_usage": {
+    "input_tokens": 38436,
+    "cache_creation_tokens": 295809,
+    "cache_read_tokens": 10314843,
+    "output_tokens": 137124,
+    "api_call_count": 95
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01JtfwZP6mTdZjPr3o8xBFpe",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "writing-refinement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "73b05b6089a6",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 913,
+        "end": 914,
+        "entry_ids": [
+          "e245a913-4997-466a-bf79-76992cdfda5e"
+        ],
+        "tool_use_id": "toolu_01JtfwZP6mTdZjPr3o8xBFpe"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01JtfwZP6mTdZjPr3o8xBFpe"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: writing-refinement",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 12
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-15T14:56:29.882388Z",
+    "agent_lines": 386,
+    "agent_removed": 0,
+    "human_added": 105,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 491,
+    "total_lines_changed": 491,
+    "agent_percentage": 78.61507128309573,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 20,
+      "agent_lines_removed": 1
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 48,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 35,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 7,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 40,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 8,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 40,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 9,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 462,
+      "agent_lines_removed": 0
+    }
+  ]
+}

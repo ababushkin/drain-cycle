@@ -1,0 +1,62 @@
+is this ticket still needed? ABA-331 (/shape:pr-respond skill: addresses new review comments idempotently and pushes fix to stack) or is it already addressed by work recently done in ~/src/agent-skills-shaper + how we're going execute Multi-agent collaboration for correctness ?
+
+---
+
+is there anything documented in the drain-cycle project on how i was intending to add support for responding/addressing PR feedback? i've been refining the vision + architecture today but this seems to be an omission
+
+---
+
+yes
+
+---
+
+no its ok, we should actually delete architecture.md. i want to design this pr response feature separatley and will create a simple design doc for it later
+
+---
+
+keep commit all changes
+
+---
+
+this is written in a weird way: prompt.py becomes a pointer, not a script
+The keystone
+One move turns the split from a diagram into running code.
+
+The move that realizes the whole split: prompt.py becomes a thin pointer at exec:pickup instead of inlining the workflow. The supervisor stops carrying procedure; the pack owns it; any vendor's worker follows the same prose. This is tracked by the "drain-cycle supervises; the pack owns the workflow" project and is the run-first step — everything else in this doc is a facet of it. Until it lands, the supervisor's prompt still names a few skills directly (e.g. the current /code-review-and-quality and /shape:pr-finishing); those references swap to exec:* at the keystone cutover.
+
+i don't really understand the purpose of this statement at all
+
+---
+
+is that just basically naming some work that is yet to be done? doesn't feel like this sort of statement belong here at all
+
+---
+
+lets refine the architecture.html
+
+i want to think about how to show the modules that are available in python
+think of it as if i was to run python interactively and then invoke this project
+
+in other words i want to show the high level concepts but then also show how it all comes together
+
+these snippets should be added at just the right time within the html file
+
+if you need to revise the structure slightly, or the headings, etc that's totally fine
+
+---
+
+ok but improve how its written
+you took my comments on python interactive too literally
+also it should have code formatting through out
+
+---
+
+how come i still don't see code formatting colors of any type?
+
+---
+
+are there are any other core modules we've written that are worth highlighting in the architecture html doc? later on when i add the "review workflow" (i.e. how the orchestrator will accept comments against a PR and perform edits + provide responses) i'll add this to the doc so want to see if there is anything similarlh consequential that's worth adding here
+
+---
+
+go
