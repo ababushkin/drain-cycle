@@ -1,0 +1,25 @@
+can these two projects be consolidated? 
+
+drain-cycle supervises; the pack owns the workflow
+
+Multi-agent collaboration for correctness
+
+they're both in linear
+
+---
+
+yes go ahead
+
+---
+
+yes
+
+---
+
+now do a review of all the tickets currently in to do / backlog. how many of them are still needed? is the order correct? do they all have the right blockers attached? also explain the purpose of the "flow" label that's being suggested in one of the tickets. is this really needed? if so for what purpose?
+
+---
+
+drop the whole flow thing - correctness is the guiding principle
+
+go ahead with your other recommendations
