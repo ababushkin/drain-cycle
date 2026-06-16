@@ -1,0 +1,70 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "1aba7c931d62",
+  "session_id": "155bd31f-b173-435a-9593-143e217cc162",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-16T04:35:34.448193Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "docs/design-decisions.md",
+    "drain_cycle/worker.py",
+    "tests/test_worker.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "668bbfa9d0fb",
+  "token_usage": {
+    "input_tokens": 20450,
+    "cache_creation_tokens": 157916,
+    "cache_read_tokens": 2814747,
+    "output_tokens": 20181,
+    "api_call_count": 34
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-agent-skills:build-2026-06-16T04:26:15.381632Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "agent-skills:build"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "668bbfa9d0fb",
+      "timestamp": "2026-06-16T04:26:15.381632Z",
+      "native": {
+        "command": "/agent-skills:build"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/agent-skills:build",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "initial_attribution": {
+    "calculated_at": "2026-06-16T04:35:34.432245Z",
+    "agent_lines": 89,
+    "agent_removed": 5,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 89,
+    "total_lines_changed": 94,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}

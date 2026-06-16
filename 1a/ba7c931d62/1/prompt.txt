@@ -1,0 +1,50 @@
+/agent-skills:build Work on Linear issue ABA-396:
+
+<issue identifier="ABA-396">
+<title>Stop-guard never fires: hook not wired into spawned workers</title>
+<description>
+## Symptom
+
+A drain run halted silently with no error. The worker finished the implementation (two clean commits) but stopped partway through the completion sequence — it launched `/code-review`, started reading the diff, then ended its turn with no further tool call. `claude -p` exited cleanly (`exit_code: 0`, `is_error: false`), so nothing surfaced as an error in the logs or the `-w` watch pane. The issue never reached Done, so the orchestrator halted the run with the generic not-Done line.
+
+Observed on the cycle-6 run (worktree `agent-skills-shaper/.worktrees/ABA-372`). Run log: `~/.drain-cycle/runs/9e17380f-…-20260616T034723272724Z.json`.
+
+## Root cause
+
+`drain_cycle/stop_guard.py` exists precisely to catch this: a Stop hook that re-injects "you're not done, run `/shape:pr-finishing`" when a worker tries to end its turn with work uncaptured (dirty tree, or in stack mode no `.drain-handoff.json`), and after `max_blocks` re-injections trips `.drain-guard-tripped` so the halt is tagged `worker_stopped_incomplete`.
+
+**It never runs.** The orchestrator plants the marker (`orchestrator.py:544` `write_marker`) and reads `read_tripped` afterward (`orchestrator.py:790`), but nothing ever invokes `stop_guard.run()`:
+
+* The worker's loaded `.claude/settings.json` registers only the `entire` Stop hook — both in the worktree and in the source repo's `.claude/settings.json`.
+* The global `~/.claude/settings.json` has no Stop hook.
+* `build_argv` (`worker.py:128`) passes no `--settings`.
+* The entrypoint `cli.py:105` (`_stop-guard` → `stop_guard.run()`) is wired into no settings file the worker loads.
+
+Evidence from the failed run: the planted marker `…/.worktrees/ABA-372/.drain-guard.json` is still at `count: 0` (the hook never incremented it), and there is no `.drain-guard-tripped` in the worktree. (The stale `.drain-guard-tripped` at the drain-cycle repo root is from June 11, gitignored, unrelated.)
+
+Net: the mechanism designed to catch a premature worker stop is inert, so the worker stopped early, nothing pushed it through, and the run halted with no error signal.
+
+## Fix — wire the Stop hook via `--settings` at spawn
+
+Inject the guard Stop hook into the spawned session through `claude --settings '<json>'` in `build_argv`, pointing at the `_stop-guard` entrypoint.
+
+Chosen over patching the worktree's `.claude/settings.json` because:
+
+* **Uniformly safe.** drain-cycle only symlinks `.claude` in when the repo gitignores it (`DEFAULT_WORKTREE_CONFIG_PATHS`). In that case, editing `worktree/.claude/settings.json` writes *through the symlink to the source repo*. `--settings` touches no file.
+* **No dirty-tree side effect.** In repos that track `.claude` (e.g. agent-skills-shaper), patching the file leaves a tracked-file modification that the guard's own `_git_dirty` check would misread as uncaptured work.
+* **Append-by-design.** Claude Code concatenates `hooks` arrays across all settings sources (user / project / `--settings`) — confirmed behavior — so the existing `entire` Stop hook and any future project hooks keep running alongside the guard. No merge logic for us to get wrong.
+
+## Acceptance criteria
+
+- [ ] Spawned worker sessions run the `_stop-guard` Stop hook at end of turn (verified by the marker `count` incrementing / a trip file appearing on a premature stop).
+- [ ] The existing `entire` Stop hook still runs (hooks are additive, not replaced).
+- [ ] A test asserts the spawned worker's effective settings include the `_stop-guard` Stop hook — the missing coverage that let this regress. `build_argv` emits the `--settings` payload with the guard Stop hook.
+- [ ] No file under the worktree's `.claude/` is mutated by the wiring.
+
+## Out of scope (follow-up)
+
+The same run showed `final_linear_state: "Todo"` even though the orchestrator sets In Progress itself before spawning (`orchestrator.py:519`) — `set_state` either silently failed or was read back wrong. Worth a separate issue.
+</description>
+<team name="Personal"/>
+<project name="Ops - bugs, maintenance, emergent">Container for non-initiative work. Not an initiative; no Goal or Key Results. Bugs, KTLO, compliance, one-offs. Pulled into each cycle's ops slot at planning.</project>
+</issue>
