@@ -1,0 +1,13 @@
+draw me a sequence or flow chart or any appropriate diagram to explain how the new supervisor contract works and the difference between the old and the new
+
+---
+
+thats good i also want a diagram to explain how the .drain_handoff file is used more broadly (eg agent is spawned --> it does work --> sends signal --> hand off file generated) etc
+
+---
+
+we should converge on just adding one lifecycle diagram into the ADR, which one should we pick if any of these?
+
+---
+
+yes
