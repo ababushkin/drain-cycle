@@ -206,7 +206,7 @@
         <li><strong>Resume semantics</strong> — halt mid-cycle, re-run, observe pickup of in-flight issues reverted to Todo</li>
         <li><strong>Session/usage tracking</strong> — <code>_UsageAccumulator</code> totals, cycle aggregates in runlog, per-issue caps triggering breaches</li>
       </ul>
-      <p>The drain has no native retry (deliberate, per <code>docs/design-decisions.md</code>); "retry" here means <strong>resume</strong> — a re-invocation against the same cycle.</p>
+      <p>The drain has no native retry (deliberate, per <code>docs/adrs/0018-resume-on-rerun.md</code>); "retry" here means <strong>resume</strong> — a re-invocation against the same cycle.</p>
     </section>
 
     <section class="s" id="system-context">

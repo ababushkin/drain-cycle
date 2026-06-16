@@ -209,7 +209,7 @@ class RunLog:
         startup diagnostics sit next to the run log they belong to and the
         run-start timestamp keeps re-runs from clobbering a prior capture.
         Only written when debug capture is enabled — see ``orchestrator.run``
-        and ``docs/design-decisions.md`` §10.
+        and ``docs/adrs/0014-worktree-config-symlink.md``.
         """
         return self.path.with_name(f"{self.path.stem}-{issue_identifier}.debug.log")
 

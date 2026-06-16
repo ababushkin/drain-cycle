@@ -10,7 +10,7 @@ Instructions for any coding agent (Claude Code, Codex, etc.) working in this rep
 
 **Architecture that serves it: [`docs/architecture.html`](docs/architecture.html).** drain-cycle is the automated supervisory layer (Layer 1) over a pack of composable skills (Layer 2), split on an artifact boundary, so the same skills run by hand or unattended. Read it before making architectural changes.
 
-The design rationale (decisions taken, alternatives considered, kill condition) lives in `docs/design-decisions.md` — the running decision log, made in service of the vision above. Read both before making architectural changes.
+The design rationale (decisions taken, alternatives considered, kill condition) lives as ADRs under `docs/adrs/` — one decision per record, made in service of the vision above. [`docs/adrs/README.md`](docs/adrs/README.md) indexes them. Read both before making architectural changes.
 
 ## Linear workflow
 
@@ -50,11 +50,11 @@ Do not write, in any comment or docstring:
 - Commit SHAs or PR numbers.
 - Fix-history narration: "added for…", "fixes the bug where…", "regression caused by…", "previously this…", dates an issue was discovered.
 
-That context belongs in the commit message, the PR description, the Linear issue, or `docs/design-decisions.md` — durable artefacts that carry process history without rotting into the code. A comment pointing at a closed ticket or a squashed commit is noise to everyone who reads the code later.
+That context belongs in the commit message, the PR description, the Linear issue, or an ADR under `docs/adrs/` — durable artefacts that carry process history without rotting into the code. A comment pointing at a closed ticket or a squashed commit is noise to everyone who reads the code later.
 
 When you find an existing comment that breaks this: strip the reference and keep the explanatory prose; reword if the label was the grammatical subject; inline the explanation if it lived inside the parenthetical; delete the whole comment if nothing of value remains.
 
-Not covered by this rule — leave these alone: identifiers used as **sample data** in tests (`_issue("ABA-1", …)`, `worktree_path=".../ABA-A"`) and comments describing that data; schema/format placeholders (`"issue_identifier": "ABA-NNN"`); and references to in-repo docs (`README §1`, `docs/design-decisions.md`).
+Not covered by this rule — leave these alone: identifiers used as **sample data** in tests (`_issue("ABA-1", …)`, `worktree_path=".../ABA-A"`) and comments describing that data; schema/format placeholders (`"issue_identifier": "ABA-NNN"`); and references to in-repo docs (`README §1`, `docs/adrs/0009-repo-label-targets-repo.md`).
 
 ## Git
 

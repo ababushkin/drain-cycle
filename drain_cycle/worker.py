@@ -242,8 +242,9 @@ def run_issue(
     ``debug_file``, when set, is passed to ``claude`` as ``--debug-file`` so
     the session writes its startup diagnostics — which settings sources,
     plugins, MCP servers, and hooks initialised — to that path. Opt-in only;
-    ``None`` (the default) passes no flag. See ``docs/design-decisions.md``
-    §10. (Ignored on the external path, where the orchestrator already baked
+    ``None`` (the default) passes no flag. See
+    ``docs/adrs/0014-worktree-config-symlink.md``. (Ignored on the external
+    path, where the orchestrator already baked
     it into the pane's argv.)
 
     ``on_progress``, when set, is called from the reader thread after each

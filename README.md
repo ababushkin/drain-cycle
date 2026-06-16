@@ -18,7 +18,7 @@ Today, executing a Linear cycle/project is manual: launch Claude per issue, watc
 This project is very much an experiment for me so if you're going to use it be aware that it has lots of sharp edges and is constantly changing. If anything I highly recommend you DO NOT use it, unless you like watching things explode.
 
 - **You need to be confident in your cycle planning.** `drain-cycle` executes the cycle you scoped — it does not reshape it. A poorly-scoped cycle drains faster than a manually-shepherded one — the multiplier works in both directions. Plan deliberately; this tool is the multiplier, not the safety net.
-- **Accept the risk profile.** Every spawned session runs with `--dangerously-skip-permissions`. The agent can write files, run shell commands, hit the network, and update Linear without asking. The blast radius is documented in [`docs/design-decisions.md`](docs/design-decisions.md). If that makes you uncomfortable, that's the right instinct — stick with manual `claude` runs until it doesn't. Comfort with unattended execution is earned, not assumed.
+- **Accept the risk profile.** Every spawned session runs with `--dangerously-skip-permissions`. The agent can write files, run shell commands, hit the network, and update Linear without asking. The blast radius is documented in [`docs/adrs/0006-accept-skip-permissions.md`](docs/adrs/0006-accept-skip-permissions.md). If that makes you uncomfortable, that's the right instinct — stick with manual `claude` runs until it doesn't. Comfort with unattended execution is earned, not assumed.
 - **Personal product, single operator.** One operator, one machine, one Linear workspace. Not designed for shared infra, production-touching cycles, or team workflows.
 
 ## Prerequisites
@@ -63,7 +63,7 @@ repos:
 
 Paths starting with `~` expand against `$HOME`. A missing or malformed `repos.yml` halts the CLI before any Linear traffic — exit 1, message on stderr, no run-log entry written. See [`docs/repos.example.yml`](docs/repos.example.yml) for a copyable template.
 
-By default each worker symlinks the repo's `.claude/` and `.mcp.json` into its worktree, so it loads the same project-scoped settings, hooks, agents, and skills as an interactive session at the repo root (see [Debug capture](#debug-capture) and [`docs/design-decisions.md`](docs/design-decisions.md) §10). To link a different set — for example to add a tool-specific directory like `.entire/` — add an optional `worktree_config_paths` list:
+By default each worker symlinks the repo's `.claude/` and `.mcp.json` into its worktree, so it loads the same project-scoped settings, hooks, agents, and skills as an interactive session at the repo root (see [Debug capture](#debug-capture) and [`docs/adrs/0014-worktree-config-symlink.md`](docs/adrs/0014-worktree-config-symlink.md)). To link a different set — for example to add a tool-specific directory like `.entire/` — add an optional `worktree_config_paths` list:
 
 ```yaml
 worktree_config_paths:
@@ -201,7 +201,7 @@ cycle_cost_usd: null        # disable the cycle cost cap entirely
 max_resume_attempts: 5      # allow more resumes for a flaky issue
 ```
 
-A key you omit keeps its default; a number overrides it; `null` turns that guardrail off. Each value must be a positive number or `null` — a malformed file halts startup rather than silently reverting to defaults. `max_resume_attempts` is integer-only (the count of times the orchestrator will respawn a halted issue across re-runs); see [`docs/design-decisions.md`](docs/design-decisions.md) §14. See [`docs/limits.example.yml`](docs/limits.example.yml) for the full annotated template. The defaults are deliberately generous starting points; recalibrate against your real run-log spend.
+A key you omit keeps its default; a number overrides it; `null` turns that guardrail off. Each value must be a positive number or `null` — a malformed file halts startup rather than silently reverting to defaults. `max_resume_attempts` is integer-only (the count of times the orchestrator will respawn a halted issue across re-runs); see [`docs/adrs/0018-resume-on-rerun.md`](docs/adrs/0018-resume-on-rerun.md). See [`docs/limits.example.yml`](docs/limits.example.yml) for the full annotated template. The defaults are deliberately generous starting points; recalibrate against your real run-log spend.
 
 ## Logs & grading
 
@@ -214,11 +214,11 @@ When a stack-mode issue reaches Done, the orchestrator assembles its branch into
 - Records `pr_url`, `pr_number`, `review_high`, and `parent_branch` in the run-log entry.
 - Posts a comment on the Linear issue with the PR link (and a `review:high` flag if the PR carries that label).
 
-For push-to-main repos and halted issues the fields are `null` and no comment is posted. A `gt`/`gh` failure during assembly is stop-the-line (the worktree is preserved for recovery); a Linear comment failure is logged and the drain continues. See [`docs/design-decisions.md`](docs/design-decisions.md) §16 and §18.
+For push-to-main repos and halted issues the fields are `null` and no comment is posted. A `gt`/`gh` failure during assembly is stop-the-line (the worktree is preserved for recovery); a Linear comment failure is logged and the drain continues. See [`docs/adrs/0020-graphite-stacking-sequence.md`](docs/adrs/0020-graphite-stacking-sequence.md) and [`docs/adrs/0022-pr-links-recorded.md`](docs/adrs/0022-pr-links-recorded.md) (both superseded by [`0023`](docs/adrs/0023-worker-owns-pr-submission.md)).
 
 ### Debug capture
 
-Workers spawn in an isolated worktree. drain-cycle symlinks the repo's project-scoped config (`.claude/`, `.mcp.json`, and any extra paths you configure — see Install) into each worktree, so a worker loads the same settings, hooks, agents, and skills as an interactive session at the repo root, including project-scoped hooks like entire.io's checkpointing. [`docs/design-decisions.md`](docs/design-decisions.md) §10 documents the mechanism.
+Workers spawn in an isolated worktree. drain-cycle symlinks the repo's project-scoped config (`.claude/`, `.mcp.json`, and any extra paths you configure — see Install) into each worktree, so a worker loads the same settings, hooks, agents, and skills as an interactive session at the repo root, including project-scoped hooks like entire.io's checkpointing. [`docs/adrs/0014-worktree-config-symlink.md`](docs/adrs/0014-worktree-config-symlink.md) documents the mechanism.
 
 To confirm that parity — to see exactly which settings sources, plugins, MCP servers, and hooks a worker initialised — run with debug capture on:
 
@@ -236,8 +236,8 @@ drain-cycle can emit OpenTelemetry traces to [Honeycomb](https://www.honeycomb.i
 echo 'HONEYCOMB_API_KEY=hcaik_…' >> ~/.drain-cycle/.env
 ```
 
-Each invocation then emits one trace: a `drain.cycle` root span, a `drain.issue` span per attempted issue, and under those the spawned-session (`drain.worker.session`, carrying token/cost/turn usage), worktree (`drain.worktree.add`/`.remove`), and Linear (`linear.*`, wrapping the auto-instrumented `httpx` calls) spans. Traces land in a Honeycomb dataset named `drain-cycle`. Optional overrides: `HONEYCOMB_API_ENDPOINT` (default `https://api.honeycomb.io`; set the EU host for an EU team) and `OTEL_SERVICE_NAME` (default `drain-cycle`, which is also the dataset). See [`docs/design-decisions.md`](docs/design-decisions.md) §13.
+Each invocation then emits one trace: a `drain.cycle` root span, a `drain.issue` span per attempted issue, and under those the spawned-session (`drain.worker.session`, carrying token/cost/turn usage), worktree (`drain.worktree.add`/`.remove`), and Linear (`linear.*`, wrapping the auto-instrumented `httpx` calls) spans. Traces land in a Honeycomb dataset named `drain-cycle`. Optional overrides: `HONEYCOMB_API_ENDPOINT` (default `https://api.honeycomb.io`; set the EU host for an EU team) and `OTEL_SERVICE_NAME` (default `drain-cycle`, which is also the dataset). See [`docs/adrs/0017-opentelemetry-tracing.md`](docs/adrs/0017-opentelemetry-tracing.md).
 
 ## Design
 
-Design decisions, alternatives considered, and deliberate out-of-scope choices live in [`docs/design-decisions.md`](docs/design-decisions.md).
+Design decisions, alternatives considered, and deliberate out-of-scope choices live as ADRs under [`docs/adrs/`](docs/adrs/).

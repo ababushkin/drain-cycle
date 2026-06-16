@@ -1,6 +1,6 @@
 # Drain past the merge gate
 
-> **Layer 1, gated behind the keystone.** This is pure supervision — the orchestrator's autonomy horizon — under the two-layer architecture in [`docs/architecture.html`](../architecture.html). It does not start until the keystone lands: `prompt.py` stripped to a pointer at `exec:pickup`, the cutover recorded in [`design-decisions.md`](../design-decisions.md) §24. Read the [vision](../vision.md) first.
+> **Layer 1, gated behind the keystone.** This is pure supervision — the orchestrator's autonomy horizon — under the two-layer architecture in [`docs/architecture.html`](../architecture.html). It does not start until the keystone lands: `prompt.py` stripped to a pointer at `exec:pickup`, the cutover recorded in [ADR 0028](../adrs/0028-keystone-cutover.md). Read the [vision](../vision.md) first.
 
 ## Problem Statement
 How might we let a drain run keep doing useful work — and keep turning hands-free — when the only thing left blocking it is a human review-and-merge gate on PRs it already opened?

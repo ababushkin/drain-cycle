@@ -294,7 +294,7 @@
       </div>
       <dl class="meta-grid">
         <dt>Pre-read</dt><dd><a href="vision.md">docs/vision.md</a> — the north-star</dd>
-        <dt>Decisions</dt><dd>docs/design-decisions.md</dd>
+        <dt>Decisions</dt><dd><a href="adrs/README.md">docs/adrs/</a></dd>
       </dl>
     </div>
 
@@ -450,7 +450,7 @@
     <section class="s" id="s3">
       <header><span class="ix">§3</span><h2>Layer 1 owns process, not procedure</h2></header>
       <p><code>drain-cycle</code> owns process concerns only: spawn, guardrails, halt, revert, resume, recover, record, grade. It reads Linear state and the worker's artifacts to decide whether to advance to the next issue or stop. It does not contain workflow prose — the worker's prompt points at the entry skill and the procedure lives in Layer 2.</p>
-      <p>The supervisor mechanics are documented in <code>docs/design-decisions.md</code>.</p>
+      <p>The supervisor mechanics are documented in the ADRs under <code>docs/adrs/</code>.</p>
     </section>
 
     <section class="s" id="s7">

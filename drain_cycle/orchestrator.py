@@ -31,7 +31,7 @@ _DEBUG_ENV_VAR = "DRAIN_CYCLE_DEBUG"
 turns it on; the worker then writes each session's startup diagnostics
 (settings sources, plugins, MCP servers, hooks) beside the run log. Off by
 default — the diagnostic exists for one-shot investigation, not steady state.
-See ``docs/design-decisions.md`` §10."""
+See ``docs/adrs/0014-worktree-config-symlink.md``."""
 _UNRESOLVED_WORKTREE_DISPLAY = "<unresolved>"
 """Worktree-path placeholder for the pre-spawn resolution-halt path.
 No path has been chosen yet — the issue couldn't be mapped to a target

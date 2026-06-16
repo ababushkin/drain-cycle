@@ -2,8 +2,8 @@
 
 Each issue gets ``.worktrees/<issue-identifier>/`` branched off ``main``,
 used once, then removed on Done — or preserved on halt so a later re-run
-can resume against the committed work (see ``docs/design-decisions.md``
-§14).
+can resume against the committed work (see
+``docs/adrs/0018-resume-on-rerun.md``).
 
 ``git worktree`` stderr is captured and surfaced in the raised
 ``RuntimeError`` on failure. The orchestrator's pre-spawn try/except
