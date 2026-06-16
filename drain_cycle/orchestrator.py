@@ -63,6 +63,7 @@ def _commits_beyond_base(worktree_path: Path, base: str) -> bool:
             ["git", "merge-base", "--is-ancestor", base, "HEAD"],
             cwd=str(worktree_path),
             capture_output=True,
+            timeout=10,
         )
         if ancestor_check.returncode != 0:
             return False
@@ -71,9 +72,10 @@ def _commits_beyond_base(worktree_path: Path, base: str) -> bool:
             cwd=str(worktree_path),
             capture_output=True,
             text=True,
+            timeout=10,
         )
         return count_result.returncode == 0 and int(count_result.stdout.strip()) > 0
-    except (ValueError, OSError):
+    except (ValueError, OSError, subprocess.TimeoutExpired):
         return False
 
 
@@ -823,6 +825,22 @@ def _drain_one_issue(
                     })
                     finished_at = _finishing_finished
                     submitted = handoff.read(worktree_path)
+                    # Refresh state name: the finishing agent may have moved the
+                    # issue away from Done (e.g. back to In Progress on partial
+                    # failure). Without this, _revert_to_pre_halt_state reports
+                    # the wrong pre-revert state on revert failure.
+                    _refreshed_post = linear.get_issue(issue["id"])
+                    post_spawn_state = _refreshed_post["state"]["name"]
+                    # Propagate any verdicts the finishing agent wrote so the
+                    # verifier gate below reads the freshest signal.
+                    if submitted is not None:
+                        _fhov, _fhpv = handoff.read_partial(worktree_path)
+                        if _fhov is not None or _fhpv is not None:
+                            outcome = dataclass_replace(
+                                outcome,
+                                outcome_verdict=_fhov if _fhov is not None else outcome.outcome_verdict,
+                                prep_verdict=_fhpv if _fhpv is not None else outcome.prep_verdict,
+                            )
 
                 if stack and submitted is None:
                     original_state_name = issue["state"]["name"]
@@ -895,6 +913,7 @@ def _drain_one_issue(
                     finished_at=finished_at,
                     exit_code=result.exit_code,
                     outcome=outcome,
+                    finishing_runs=finishing_runs,
                 )
                 # set_cycle_halt is called here (not via the _run() cycle-cap
                 # path) because the spec requires cycle_halt_reason to name the
