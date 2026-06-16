@@ -1,8 +1,10 @@
 # drain-cycle
 
-Unattended execution of a Linear cycle/project. One invocation, no prompts; each issue runs in an isolated worktree under a fresh `claude -p` session - works with your regular Claude subscription (for now). 
+Run `drain-cycle` and watch it methodically build all of the deliverables in your planned project. 
 
-Future releases will include support for other models so you can control the cost of your builds as well as other task management systems so that you're not coupled to Linear.
+Each task is built in an isolated worktree using a fresh `claude -p` session so it works with your regular Claude subscription (for now - until Anthropic change their license model). 
+
+Future releases will include support for other models and other task management systems so that you're not coupled to Linear or Claude.
 
 ## Why this exists
 
