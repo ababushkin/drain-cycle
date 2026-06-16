@@ -444,7 +444,7 @@
         <span class="pl-step">exec:finish</span>
       </div>
       <p><code>exec:pickup</code> is the front door; <code>exec:review</code> fans out reviewer personas; <code>exec:finish</code> is Graphite-first with a plain-git fallback and produces the trail artefacts (What/Why/Focus PR body, review-summary comment, Linear status move).</p>
-      <p>Every step is also a standalone skill, so a human can run any one by hand. A <strong>handoff envelope</strong> carries the issue's acceptance criteria from pickup through to review, so the spec-compliance persona can grade <em>built-the-wrong-thing</em>, not just <em>built-it-badly</em>.</p>
+      <p>Every step is also a standalone skill, so a human can run any one by hand. The <strong>execution-state file</strong> carries the issue's acceptance criteria from pickup through to review, so the spec-compliance persona can grade <em>built-the-wrong-thing</em>, not just <em>built-it-badly</em>.</p>
     </section>
 
     <section class="s" id="s3">
@@ -468,9 +468,9 @@
 
     <section class="s" id="s5">
       <header><span class="ix">§5</span><h2>Layer 2 writes signals; Layer 1 reads them</h2></header>
-      <p>The two layers meet at an artifact, not at a function call. <strong>Layer 2 writes signals; Layer 1 reads them.</strong> The supervisor never reads the workflow's steps — only the artifacts the workflow leaves behind: Linear issue state, run-log fields, and <code>.drain-handoff.json</code> (e.g. <code>pr_urls</code>).</p>
+      <p>The two layers meet at an artifact, not at a function call. <strong>Layer 2 writes signals; Layer 1 reads them.</strong> The supervisor never reads the workflow's steps — only the artifacts the workflow leaves behind: Linear issue state, run-log fields, and the <strong>execution-state file</strong> the workflow writes in the worktree (today <code>.drain-handoff.json</code>). That file is the workflow's own: it holds one section per phase and has two readers. The next phase's skill reads the handoff sections it needs — the acceptance criteria, the diff — and the supervisor reads only the fields it gates on (<code>verdict</code>, <code>pr_urls</code>). The supervisor is a reader of that file, never its author: the skill that ran a phase writes that phase's section. See design decision §26.</p>
 
-      <div class="diagram diagram-boundary" role="img" aria-label="The artifact boundary: Layer 2, the workflow pack, writes down into the boundary; the boundary carries Linear issue state, run-log fields, and .drain-handoff.json (pr_urls); Layer 1, the supervisor, reads up from it.">
+      <div class="diagram diagram-boundary" role="img" aria-label="The artifact boundary: Layer 2, the workflow pack, writes down into the boundary; the boundary carries Linear issue state, run-log fields, and the execution-state file (AC, verdict, pr_urls); Layer 1, the supervisor, reads up from it.">
         <div class="dg-card dg-l2 dg-wide">
           <span class="dg-tag">Layer 2</span>
           <div class="dg-title">Layer 2 — the workflow pack (skills)</div>
@@ -482,7 +482,7 @@
           <div class="dg-chips">
             <span class="dg-chip">Linear issue state</span>
             <span class="dg-chip">run-log fields</span>
-            <span class="dg-chip">.drain-handoff.json (pr_urls)</span>
+            <span class="dg-chip">execution-state file (AC · verdict · pr_urls)</span>
           </div>
         </div>
         <div class="dg-card dg-l1 dg-wide">
@@ -494,7 +494,7 @@
         <p class="dg-caption">Layer 1 never reads the workflow's steps — only the artifacts it leaves behind. That content-blindness is what lets the same Layer 2 run under any worker.</p>
       </div>
 
-      <p>The placement test for any new behaviour: does <code>drain-cycle</code> need to know <em>what a role does</em> (Layer 2), or only <em>whether an artifact exists</em> (Layer 1)? Submitting a PR is "what a role does" — it belongs in a skill. Reading back the submitted PR URLs to decide whether to advance is "whether an artifact exists" — it belongs in the supervisor (see design decision §19).</p>
+      <p>The placement test for any new behaviour: does <code>drain-cycle</code> need to know <em>what a role does</em> (Layer 2), or only <em>whether an artifact exists</em> (Layer 1)? Submitting a PR is "what a role does" — it belongs in a skill. Reading back the submitted PR URLs to decide whether to advance is "whether an artifact exists" — it belongs in the supervisor (see design decision §19). The same test governs state in the execution-state file: a field only the supervisor needs is requested through the worker's prompt, never written into a skill (§26).</p>
       <p>Keeping the boundary at the artifact is what makes Layer 1 content-blind, and content-blindness is what lets the same Layer 2 run under any worker.</p>
     </section>
 
@@ -530,7 +530,7 @@
         <li><strong>Per-phase model economics.</strong> Review anchors to a stronger (more expensive) model regardless of what coded the change. That asymmetry is only expressible if each phase is its own spawn with its own <code>--model</code> pin — a cheap model can build while an expensive one reviews.</li>
       </ul>
       <p>The three phase agents map onto the existing pack: code = <code>exec:build</code> (+<code>exec:debug</code>, <code>exec:simplify</code>), review = <code>exec:review</code>, finish = <code>exec:finish</code>. Each is a goal-shaped worker prompt, not a resident process — the goal ("produce sliced artifacts", "apply every quality lens", "land human-readable PRs") drives a sequence of skill delegations inside one spawn.</p>
-      <p>The cost accepted in return: every phase boundary pays a spawn plus artifact rehydration, so the handoff envelope (§5) must carry everything the next phase needs — a single worker kept that context in memory for free. This is the deliberate price of independence; see design decision §20.</p>
+      <p>The cost accepted in return: every phase boundary pays a spawn plus artifact rehydration, so the execution-state file (§5) must carry everything the next phase needs — a single worker kept that context in memory for free. This is the deliberate price of independence; see design decision §20.</p>
     </section>
 
     <section class="s" id="s6">
