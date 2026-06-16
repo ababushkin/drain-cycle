@@ -17,7 +17,7 @@ from typing import Callable, TextIO
 
 from opentelemetry.trace import Span
 
-from . import console, flow, grade_draft, handoff, linear, model, progress, prompt, runlog, stop_guard, telemetry, worker, worktree
+from . import console, grade_draft, handoff, linear, model, progress, prompt, runlog, stop_guard, telemetry, worker, worktree
 from . import watch as watch_pane
 from .limits import Limits, check_cycle
 from .linear import DependencyCycleError
@@ -174,8 +174,6 @@ class _WorkerOutcome:
 def _set_verdict_span_attrs(
     issue_span: Span,
     outcome: _WorkerOutcome,
-    *,
-    flow_name: str | None,
 ) -> None:
     """Record the verdict/responder span attributes shared by the worker-backed
     halt branches and the Done append, so the recorded shape can't drift."""
@@ -185,10 +183,6 @@ def _set_verdict_span_attrs(
         )
     if outcome.prep_verdict is not None:
         issue_span.set_attribute("issue.prep_verdict", outcome.prep_verdict["result"])
-    if flow_name is not None:
-        issue_span.set_attribute(
-            "issue.responder_run_count", len(outcome.responder_runs)
-        )
 
 
 @dataclass(frozen=True)
@@ -207,8 +201,6 @@ class _HaltContext:
     issue_span: Span
     identifier: str
     started_at: str
-    flow_name: str | None
-    shape_task_invoked: bool
 
     def record(
         self,
@@ -237,8 +229,6 @@ class _HaltContext:
             final_linear_state=final_linear_state,
             worktree_path=worktree_path,
             halt_reason=halt_reason,
-            flow=self.flow_name,
-            shape_task_invoked=self.shape_task_invoked,
             **entry_fields,
         )
         self.issue_span.set_attribute("issue.final_linear_state", final_linear_state)
@@ -413,21 +403,12 @@ def _drain_one_issue(
         issue_span.set_attribute("issue.total", total)
         console.worker_event(identifier, f"picked: {issue['title']}")
 
-        flow_name = flow.resolve(issue)
-        if flow_name is not None:
-            issue_span.set_attribute("issue.flow", flow_name)
-            issue_span.set_attribute("issue.responder_run_count", 0)
-
         started_at = _now_iso()
-        is_verify = prompt.is_verify_flow(issue)
-        issue_span.set_attribute("issue.verify_flow", is_verify)
         halt_ctx = _HaltContext(
             log=log,
             issue_span=issue_span,
             identifier=identifier,
             started_at=started_at,
-            flow_name=flow_name,
-            shape_task_invoked=is_verify,
         )
         try:
             target_repo = repos.resolve(issue)
@@ -544,7 +525,7 @@ def _drain_one_issue(
         stop_guard.write_marker(worktree_path, mode="stack" if stack else "push")
 
         agent_prompt = prompt.build(
-            issue, worktree_path, resumed=handle.resumed, stack=stack, base=base
+            issue, worktree_path, resumed=handle.resumed, base=base
         )
         issue_span.set_attribute("issue.resumed", handle.resumed)
         worker_model = model.resolve(issue)
@@ -623,7 +604,6 @@ def _drain_one_issue(
                 )
             return _cb
 
-        # Verify-flow verdict and responder data — populated by M2+ roles.
         outcome_verdict: dict | None = None
         prep_verdict: dict | None = None
         responder_runs: list[dict] = []
@@ -675,7 +655,7 @@ def _drain_one_issue(
                     f"; revert to {original_state_name!r} failed: {revert_error}"
                 )
             issue_span.set_attribute("issue.exit_code", result.exit_code)
-            _set_verdict_span_attrs(issue_span, outcome, flow_name=flow_name)
+            _set_verdict_span_attrs(issue_span, outcome)
             halt_ctx.record(
                 slug="err-per-issue-breach",
                 halt_reason=halt_reason,
@@ -757,14 +737,12 @@ def _drain_one_issue(
                 final_linear_state=post_spawn_state,
                 worktree_path=str(worktree_path),
                 halt_reason=remove_error,
-                flow=flow_name,
                 outcome_verdict=outcome.outcome_verdict,
                 prep_verdict=outcome.prep_verdict,
                 responder_runs=outcome.responder_runs,
-                shape_task_invoked=is_verify,
                 **_worker_log_fields(outcome.result),
             )
-            _set_verdict_span_attrs(issue_span, outcome, flow_name=flow_name)
+            _set_verdict_span_attrs(issue_span, outcome)
             try:
                 draft_path = grade_draft.write_draft_from_entry(
                     identifier, log.entries[-1]
@@ -796,7 +774,7 @@ def _drain_one_issue(
             )
         # halt_reason carries the same string also printed to stderr below
         # so the on-disk and terminal surfaces cannot drift.
-        _set_verdict_span_attrs(issue_span, outcome, flow_name=flow_name)
+        _set_verdict_span_attrs(issue_span, outcome)
         halt_ctx.record(
             slug="err-issue-not-done",
             halt_reason=halt_reason,
