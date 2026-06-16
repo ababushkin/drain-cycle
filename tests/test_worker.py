@@ -417,6 +417,36 @@ def test_build_argv_omits_optional_flags_when_none() -> None:
     assert argv[-1] == "P"
 
 
+def test_build_argv_injects_stop_guard_hook_via_settings() -> None:
+    """Every spawned session carries the stop-guard Stop hook through
+    ``--settings`` so the guard fires regardless of the target repo's own
+    ``.claude/settings.json`` — the wiring that was missing and let a worker
+    stop silently mid-completion. The payload is inline JSON (no file under the
+    worktree's ``.claude/`` is touched), and Claude Code concatenates ``hooks``
+    arrays across sources so the existing ``entire`` Stop hook still runs."""
+    argv = worker.build_argv(
+        ["claude", "-p", "--dangerously-skip-permissions"],
+        model="claude-opus-4-8",
+        prompt="THE-PROMPT",
+        cost_limit_usd=None,
+        debug_file=None,
+    )
+
+    assert "--settings" in argv
+    settings = json.loads(argv[argv.index("--settings") + 1])
+    stop_hooks = settings["hooks"]["Stop"]
+    commands = [
+        h["command"]
+        for entry in stop_hooks
+        for h in entry["hooks"]
+        if h.get("type") == "command"
+    ]
+    assert any("_stop-guard" in c for c in commands)
+    # ``--settings`` must precede the trailing prompt positional.
+    assert argv.index("--settings") < argv.index("THE-PROMPT")
+    assert argv[-1] == "THE-PROMPT"
+
+
 # ---------------------------------------------------------------------------
 # External-stream (watch) path
 # ---------------------------------------------------------------------------
