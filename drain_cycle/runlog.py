@@ -50,6 +50,7 @@ Schema:
           "outcome_verdict":    null | {"result": "pass"|"fail", "findings": [...], "invoked_at": "<iso-8601>"},
           "prep_verdict":       null | {"result": "<str>", "route": "human-review"|"auto-merge", "reasoning": "<str>"},
           "responder_runs":     [],
+          "finishing_runs":     [],
           "shape_task_invoked": null | <bool>,
         },
         ...
@@ -170,6 +171,7 @@ class RunLog:
         outcome_verdict: dict[str, Any] | None = None,
         prep_verdict: dict[str, Any] | None = None,
         responder_runs: list[dict[str, Any]] | None = None,
+        finishing_runs: list[dict[str, Any]] | None = None,
         shape_task_invoked: bool | None = None,
     ) -> None:
         if duration_seconds is None:
@@ -197,6 +199,7 @@ class RunLog:
                 "outcome_verdict": outcome_verdict,
                 "prep_verdict": prep_verdict,
                 "responder_runs": responder_runs if responder_runs is not None else [],
+                "finishing_runs": finishing_runs if finishing_runs is not None else [],
                 "shape_task_invoked": shape_task_invoked,
             }
         )
