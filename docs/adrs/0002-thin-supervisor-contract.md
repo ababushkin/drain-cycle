@@ -198,23 +198,27 @@ The concrete supervisor-side removals this implies (build work, owned by N02): `
 
 ### Prompt-segment allocation
 
-**Alt P1 — Process facts + minimal context + one pointer (chosen).** The 12-line template above. *Blast radius if wrong:* low — a miss surfaces immediately at KR3's `wc -l` brake; worker behaviour degrades gracefully because the skill, not the prompt, owns the procedure; recovery is a one-line template edit. *Reversal cost:* low — the template lives in one file (`drain_cycle/prompt_template.txt`).
+The choice is how much the worker prompt carries. P1 sends structured facts plus one pointer; P2 adds inlined resume prose on resumed runs; P3 sends only the pointer and pushes the facts out to env vars or sidecar files.
 
-**Alt P2 — Same, with the resume directive inlined as prose on resumed runs.** Two prompt-template variants (fresh, resume). *Rejected:* the resume prose is exactly the shape KR3's grep hunts for ("inspect → decide → continue"), and two templates must stay in sync. The resume case is already representable as a structured marker (`resume: true|false`) the skill consumes — inlining the prose pushes a workflow concern back into the supervisor. *Reversal cost:* medium.
+**Alt P1 — facts + one pointer (chosen).** *Keeps the prompt inspectable and under the line brake while the skill, not the prompt, owns every procedure step.* The 12-line template above. A miss surfaces immediately at KR3's `wc -l` brake; behaviour degrades gracefully because the procedure lives in the skill; recovery is a one-line template edit. *Reversal cost:* low — the template is one file (`drain_cycle/prompt_template.txt`).
 
-**Alt P3 — Pointer-only; every fact carried in env vars or sidecar files.** *Rejected:* env-var conventions vary by worker runtime (codex's exposure ≠ Claude Code's); prompt-log inspectability drops (an operator inspecting a halted run can no longer see what the worker knew); the skill must treat a missing file as a recoverable case, spreading supervisor-coupling into the pack. *Reversal cost:* high — once one runtime binds to env-var names, the others must be retrofitted.
+**Alt P2 — P1 plus inlined resume prose (rejected).** *Buys a more explicit resume instruction at the cost of two templates that must stay in sync.* Resumed runs get a second template variant whose prose tells the worker to inspect, decide, and continue — exactly the procedure shape KR3's grep hunts for. The resume case is already a structured marker (`resume: true|false`) the skill reads, so the prose re-imports a workflow concern the marker already covers. *Reversal cost:* medium.
 
-**Decision: P1.** It wins the brake (template under cap), the portability NFR (no runtime-specific assumptions), and the prompt-log inspectability constraint. P2's resume prose is the cleanest counter-argument refused: the resume marker is a process *fact*, not a workflow step.
+**Alt P3 — bare pointer, facts in env vars or sidecar files (rejected).** *Shrinks the prompt to one line but scatters the facts and couples the pack to the supervisor.* Env-var conventions differ by runtime (codex's exposure is not Claude Code's); an operator inspecting a halted run can no longer read what the worker knew; and the skill must treat a missing file as recoverable, spreading supervisor-coupling into the pack. *Reversal cost:* high — once one runtime binds to env-var names, every other runtime must be retrofitted.
+
+**Decision: P1.** It is the only option that clears all three binding constraints at once: the `wc -l` brake (template under cap), the portability NFR (no runtime-specific facts), and prompt-log inspectability (the operator reads the worker's inputs straight from the prompt). P2 fails the brake and the grep; P3 fails portability and inspectability. P2 is the closest call — its resume prose looks like useful guidance — but the resume marker is a process *fact*, not a workflow step, so it stays a structured field.
 
 ### Handoff schema v2
 
-**Alt H1 — Flat extension of v1 (chosen).** v1 carries `pr_urls`, `final_linear_state`, `exit_code`; v2 adds three fields: `outcome_verdict`, `prep_verdict`, `halt_reason`. No `schema_version` field; no nested envelopes. The reader treats a missing v2 field as v1 — backwards compatible by absence. *Blast radius:* low — additive fields; a renamed field is caught by the schema-fitness check; a missing required field on the exit path is caught by the writer's exit gate. *Reversal cost:* low.
+The choice is how the verdict data is structured across files and versions. H1 adds fields to the one existing file; H2 wraps that file in a version envelope; H3 splits the data into one file per skill.
 
-**Alt H2 — Versioned envelope (`schema_version: 2`, nested `v1` + `v2` records).** *Rejected:* forces every writer to set the version field; mismatched values silently route to the wrong reader; there is no current divergence between readers (the supervisor is the only one), so the envelope encodes a problem we do not have. *Reversal cost:* medium.
+**Alt H1 — flat extension of v1 (chosen).** *Adds three fields to the existing file; a reader ignores any field it does not recognise.* v1 carries `pr_urls`, `final_linear_state`, `exit_code`; v2 adds `outcome_verdict`, `prep_verdict`, `halt_reason`. No `schema_version` field, no nesting — a missing v2 field reads as v1, backwards compatible by absence. A renamed field is caught by the schema-fitness check; a missing required field on a Done exit is caught by the writer's exit gate. *Reversal cost:* low.
 
-**Alt H3 — Per-skill handoff files (`.exec-verify.json`, `.exec-finish.json`, …).** *Rejected:* the supervisor would depend on a *set* of files in a known order; partial writes (a halt between `exec:verify` and `exec:finish`) leave a torn state; the run-log loses its single grade-point. *Reversal cost:* high.
+**Alt H2 — versioned envelope (rejected).** *Tracks versions explicitly but forces every writer to set a field that solves a problem we do not have.* `schema_version: 2` wraps nested `v1` and `v2` records. Every writer must stamp the version; a mismatched value routes silently to the wrong reader; and there is only one reader today (the supervisor), so the envelope encodes a divergence that does not exist. *Reversal cost:* medium.
 
-**Decision: H1.** Flat extension; one file, additive fields, single grade-point.
+**Alt H3 — per-skill handoff files (rejected).** *Gives each skill its own file at the cost of a torn multi-file state the supervisor must reassemble.* `.exec-verify.json`, `.exec-finish.json`, and so on. The supervisor would depend on a set of files in a known order; a halt between `exec:verify` and `exec:finish` leaves the set half-written; and the run-log loses its single grade-point. *Reversal cost:* high.
+
+**Decision: H1.** One file, additive fields, one grade-point. H2 adds versioning machinery for a second reader that does not exist; H3 trades the single grade-point for a multi-file state that tears on any mid-run halt.
 
 ## Consequences
 
