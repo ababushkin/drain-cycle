@@ -733,6 +733,53 @@ def _drain_one_issue(
                 )
                 return 1, pane_id
 
+            # Outcome-verifier gate: a fail verdict stops the cycle and leaves
+            # the worktree intact for operator inspection. Also fires when the
+            # verify flow was active but no verdict was written — default-to-halt,
+            # not default-to-continue. Any other result value (including "pass")
+            # is treated as a pass and lets the drain continue.
+            verifier_fail = (
+                outcome.outcome_verdict is not None
+                and outcome.outcome_verdict.get("result") == "fail"
+            )
+            verifier_missing = is_verify and outcome.outcome_verdict is None
+            if verifier_fail or verifier_missing:
+                original_state_name = issue["state"]["name"]
+                effective_state, revert_error = _revert_to_pre_halt_state(
+                    issue["id"],
+                    target_state_name=original_state_name,
+                    pre_revert_state_name=post_spawn_state,
+                )
+                if verifier_fail:
+                    findings = outcome.outcome_verdict.get("findings") or []
+                    detail = f"outcome verifier fail ({len(findings)} finding(s))"
+                else:
+                    detail = "outcome verifier did not complete (crash or timeout)"
+                halt_reason = (
+                    f"{_halt_message(identifier, effective_state, worktree_path)}"
+                    f" — {detail}"
+                )
+                if revert_error is not None:
+                    halt_reason += (
+                        f"; revert to {original_state_name!r} failed: {revert_error}"
+                    )
+                _set_verdict_span_attrs(issue_span, outcome, flow_name=flow_name)
+                halt_ctx.record(
+                    slug="err-outcome-verifier-fail",
+                    halt_reason=halt_reason,
+                    final_linear_state=effective_state,
+                    worktree_path=str(worktree_path),
+                    finished_at=finished_at,
+                    exit_code=result.exit_code,
+                    outcome=outcome,
+                )
+                # set_cycle_halt is called here (not via the _run() cycle-cap
+                # path) because the spec requires cycle_halt_reason to name the
+                # verifier findings so downstream tooling can distinguish this
+                # halt type from a cap breach or a worker not-Done.
+                halt_ctx.log.set_cycle_halt(halt_reason)
+                return 1, pane_id
+
             if submitted is not None:
                 # Hand the baton to the next same-repo issue and record the
                 # submitted PRs as the orchestrator's confirmation line.

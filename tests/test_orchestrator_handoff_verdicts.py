@@ -28,6 +28,11 @@ _OUTCOME_VERDICT = {
     "findings": [],
     "invoked_at": "2026-01-01T00:00:00Z",
 }
+_FAIL_VERDICT = {
+    "result": "fail",
+    "findings": ["tests still failing", "missing edge-case coverage"],
+    "invoked_at": "2026-01-01T00:00:00Z",
+}
 _PREP_VERDICT = {
     "result": "ok",
     "route": "auto-merge",
@@ -36,6 +41,16 @@ _PREP_VERDICT = {
 _HANDOFF = {
     "pr_urls": [],  # empty — tests run with no_stack=True, gate is bypassed
     "outcome_verdict": _OUTCOME_VERDICT,
+    "prep_verdict": _PREP_VERDICT,
+}
+_FAIL_HANDOFF = {
+    "pr_urls": [],
+    "outcome_verdict": _FAIL_VERDICT,
+    "prep_verdict": _PREP_VERDICT,
+}
+_NO_VERDICT_HANDOFF = {
+    "pr_urls": [],
+    "outcome_verdict": None,
     "prep_verdict": _PREP_VERDICT,
 }
 
@@ -69,6 +84,32 @@ def _write_done_script(tmp_path: Path, done_marker: Path) -> Path:
         "#!/bin/sh\n"
         f'printf "%s\\n" "$(basename "$PWD")" >> "{done_marker}"\n'
         # Write the handoff into the current worktree directory.
+        f"printf '%s' '{handoff_json}' > .drain-handoff.json\n"
+    )
+    script.chmod(0o755)
+    return script
+
+
+def _write_done_fail_verdict_script(tmp_path: Path, done_marker: Path) -> Path:
+    """Script that marks Done but writes a fail verdict in the handoff."""
+    handoff_json = json.dumps(_FAIL_HANDOFF)
+    script = tmp_path / "fake-claude.sh"
+    script.write_text(
+        "#!/bin/sh\n"
+        f'printf "%s\\n" "$(basename "$PWD")" >> "{done_marker}"\n'
+        f"printf '%s' '{handoff_json}' > .drain-handoff.json\n"
+    )
+    script.chmod(0o755)
+    return script
+
+
+def _write_done_no_verdict_script(tmp_path: Path, done_marker: Path) -> Path:
+    """Script that marks Done but omits the outcome_verdict from the handoff."""
+    handoff_json = json.dumps(_NO_VERDICT_HANDOFF)
+    script = tmp_path / "fake-claude.sh"
+    script.write_text(
+        "#!/bin/sh\n"
+        f'printf "%s\\n" "$(basename "$PWD")" >> "{done_marker}"\n'
         f"printf '%s' '{handoff_json}' > .drain-handoff.json\n"
     )
     script.chmod(0o755)
@@ -169,3 +210,129 @@ def test_halt_path_entry_carries_halt_reason_and_partial_verdicts(
     # Verdicts from the partial handoff are carried despite the halt.
     assert entry["outcome_verdict"] == _OUTCOME_VERDICT
     assert entry["prep_verdict"] == _PREP_VERDICT
+
+
+def _make_stateful_fakes(
+    issue: dict,
+    done_marker: Path,
+) -> tuple[object, object, object]:
+    """Return (fake_pending_issues, fake_get_issue, fake_set_state) that track
+    state through explicit set_state calls.
+
+    done_marker is still used to detect when the worker has marked the issue
+    Done (via the shell script), but an explicit set_state call always takes
+    precedence on the next get_issue — so the revert from Done→Todo is visible.
+    """
+    # None = no explicit set_state call yet; fall back to done_marker detection.
+    explicit_state: list[dict | None] = [None]
+
+    def fake_pending_issues(cycle_id: str) -> object:
+        completed = (
+            {line for line in done_marker.read_text().splitlines() if line}
+            if done_marker.exists()
+            else set()
+        )
+        return linear._plan(
+            [i for i in [issue] if i["identifier"] not in completed]
+        )
+
+    def fake_get_issue(issue_id: str) -> dict:
+        if explicit_state[0] is not None:
+            return {**issue, "state": explicit_state[0]}
+        if done_marker.exists() and issue["identifier"] in done_marker.read_text():
+            return {**issue, "state": {"type": "completed", "name": "Done"}}
+        return issue
+
+    def fake_set_state(issue_id: str, state_name: str) -> None:
+        if state_name == "Done":
+            explicit_state[0] = {"type": "completed", "name": "Done"}
+        elif state_name == "In Progress":
+            # Pre-spawn transition; keep explicit_state as None so get_issue
+            # still picks up Done from done_marker after the worker runs.
+            pass
+        else:
+            explicit_state[0] = {"type": "unstarted", "name": state_name}
+
+    return fake_pending_issues, fake_get_issue, fake_set_state
+
+
+def test_verifier_fail_verdict_halts_cycle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Worker marks Done but outcome_verdict.result == 'fail' → cycle halts,
+    worktree intact, halt_reason names the fail, cycle_halt_reason is set."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    only = _issue("ABA-V3", sort_order=1.0)
+    done_marker = tmp_path / "done.txt"
+    fake_pending_issues, fake_get_issue, fake_set_state = _make_stateful_fakes(
+        only, done_marker
+    )
+
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "stub-cycle-id")
+    monkeypatch.setattr(linear, "pending_issues", fake_pending_issues)
+    monkeypatch.setattr(linear, "get_issue", fake_get_issue)
+    monkeypatch.setattr(linear, "set_state", fake_set_state)
+    monkeypatch.setattr(
+        orchestrator,
+        "_CLAUDE_CMD",
+        [str(_write_done_fail_verdict_script(tmp_path, done_marker))],
+    )
+
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), no_stack=True)
+    assert exit_code == 1
+
+    payload = _run_log(tmp_path)
+    (entry,) = payload["entries"]
+    assert entry["halt_reason"] is not None
+    assert "outcome verifier fail" in entry["halt_reason"]
+    assert entry["final_linear_state"] != "Done"
+    assert entry["outcome_verdict"] == _FAIL_VERDICT
+    # cycle_halt_reason is set so grade can identify verifier-fail halts.
+    assert payload["cycle_halt_reason"] is not None
+    assert "outcome verifier fail" in payload["cycle_halt_reason"]
+
+
+def test_verifier_missing_in_verify_flow_halts_cycle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """In the verify flow, no outcome_verdict in the handoff → default-to-halt."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    only = {
+        **_issue("ABA-V4", sort_order=1.0),
+        "labels": ["repo:test-repo", "verify"],
+    }
+    done_marker = tmp_path / "done.txt"
+    fake_pending_issues, fake_get_issue, fake_set_state = _make_stateful_fakes(
+        only, done_marker
+    )
+
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "stub-cycle-id")
+    monkeypatch.setattr(linear, "pending_issues", fake_pending_issues)
+    monkeypatch.setattr(linear, "get_issue", fake_get_issue)
+    monkeypatch.setattr(linear, "set_state", fake_set_state)
+    monkeypatch.setattr(
+        orchestrator,
+        "_CLAUDE_CMD",
+        [str(_write_done_no_verdict_script(tmp_path, done_marker))],
+    )
+
+    exit_code = orchestrator.run(repos.Repos(mapping={"test-repo": repo}), no_stack=True)
+    assert exit_code == 1
+
+    payload = _run_log(tmp_path)
+    (entry,) = payload["entries"]
+    assert entry["halt_reason"] is not None
+    assert "did not complete" in entry["halt_reason"]
+    assert entry["final_linear_state"] != "Done"
+    assert payload["cycle_halt_reason"] is not None
+    assert "did not complete" in payload["cycle_halt_reason"]
