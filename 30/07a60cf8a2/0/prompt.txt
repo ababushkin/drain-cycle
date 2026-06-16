@@ -1,0 +1,5 @@
+push
+
+---
+
+review the whole ADR with /writing-refinement specifically looking at the language. it feels like there's a lot of AI slop in there and it's just not very human friendly. the ADR is for me at the end of the day so it should be written with the human-reader in mind. look for opportunities where things can be deleted because they're adding unnecessary implementation details or remove strange things that make sense only if you have prior context (eg there's a lot of reference to "KRs", but this is a project artefact. the goals of the design should be encapsulated in the doc itself as this is more durable

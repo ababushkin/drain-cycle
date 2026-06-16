@@ -1,0 +1,135 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "3007a60cf8a2",
+  "session_id": "10755336-9ce6-4395-9a79-1aded556761f",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-16T02:45:53.034604Z",
+  "branch": "anton/aba-370-n01-thin-supervisor-contract-design-doc-before-build",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "docs/adrs/0002-thin-supervisor-contract.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "764277c8e8c9",
+  "checkpoint_transcript_start": 657,
+  "transcript_lines_at_start": 657,
+  "token_usage": {
+    "input_tokens": 364,
+    "cache_creation_tokens": 140339,
+    "cache_read_tokens": 773913,
+    "output_tokens": 26880,
+    "api_call_count": 9
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-commit-commands:commit-2026-06-16T02:37:13.638494Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "commit-commands:commit"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "637e38fe938c",
+      "timestamp": "2026-06-16T02:37:13.638494Z",
+      "native": {
+        "command": "/commit-commands:commit"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/commit-commands:commit",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01F9194EHtzR2cY3RPsu7C4a",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape:plan-review"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "764277c8e8c9",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 277,
+        "end": 278,
+        "entry_ids": [
+          "52fb63fe-fefd-4196-b09e-853d68ded605"
+        ],
+        "tool_use_id": "toolu_01F9194EHtzR2cY3RPsu7C4a"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01F9194EHtzR2cY3RPsu7C4a"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape:plan-review",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01DKvbDZKCcFwVYTBKZQKgDa",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "writing-refinement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "764277c8e8c9",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 596,
+        "end": 597,
+        "entry_ids": [
+          "78d9c601-4841-4631-bb10-3a3b13672a77"
+        ],
+        "tool_use_id": "toolu_01DKvbDZKCcFwVYTBKZQKgDa"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01DKvbDZKCcFwVYTBKZQKgDa"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: writing-refinement",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 11
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-16T02:45:53.008114Z",
+    "agent_lines": 27,
+    "agent_removed": 26,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 27,
+    "total_lines_changed": 53,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
