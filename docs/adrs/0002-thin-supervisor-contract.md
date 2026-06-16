@@ -3,7 +3,9 @@
 **Date:** 2026-06-16
 **Status:** Accepted (plan-review at `docs/adrs/references/0002-thin-supervisor-contract-plan-review.md`)
 
-Decides the contract between the drain-cycle supervisor and the worker it spawns: the ≤15-line worker prompt template and how its lines are allocated, the `.drain-handoff.json` schema (v2), and where the line between process and workflow falls across every `drain_cycle/` concern. It extends the pack's execution-workflow design doc (`agent-skills-shaper/docs/design-docs/execution-workflow/design-doc.md`) — which owns the `exec:*` skill graph — with the supervisor's half of the contract: what it hands the worker, and what the worker leaves behind. It does not re-open that skill graph.
+The supervisor hands the worker process facts and one skill pointer — never the procedure itself; the pack owns every workflow step. Two mechanical checks keep it thin: the prompt template stays within 15 lines (`wc -l`) and a grep finds no procedure verbs in `drain_cycle/`.
+
+This ADR pins that split: the 15-line worker prompt template and how its lines are allocated, the `.drain-handoff.json` schema (v2), and where the line between process and workflow falls across every `drain_cycle/` concern. It extends the pack's execution-workflow design doc (`agent-skills-shaper/docs/design-docs/execution-workflow/design-doc.md`) — which owns the `exec:*` skill graph — with the supervisor's half of the contract: what it hands the worker, and what the worker leaves behind. It does not re-open that skill graph.
 
 ## Context
 
@@ -22,8 +24,6 @@ One supervisor-computed fact has to survive that move: **stack mode**. The super
 `drain_cycle/flow.py` today gates a multi-role verify pipeline (Task-Shaper → Implementer → Outcome Verifier → PR Preparer) on the issue's `verify` label; without the label a drain runs the default single-worker flow. **This contract makes verification universal**: the Outcome Verifier and PR Preparer run on every drain, not a labelled subset, so the gate selects nothing. `flow.py` deletes, the `verify` label stops being a routing input, and the handoff carries no `flow` field — there is one flow, so there is no path to record. The boundary chart below allocates the deletion.
 
 Two related decisions live in the pack repo: its ADR 0003 (persona-dispatch — vendor-specific branching stays inside `exec:review`) and ADR 0004 (the `exec:*` verb namespace).
-
-The whole point of this contract is to keep the supervisor *thin*, and it commits to two checks that say whether it stayed that way: the worker prompt template is at most 15 lines (`wc -l`), and a grep for procedure-verb slash-commands across `drain_cycle/` comes back empty. Both run in the pre-merge check, so neither needs a judgement call to enforce.
 
 ### Constraints
 
@@ -67,7 +67,7 @@ Pick up this issue and drain it to Done by invoking the skill below.    [11]
 /exec:pickup                                                            [12]
 ```
 
-12 lines. Three-line margin under the cap absorbs future single-line additions (e.g., a `Cycle: ` line if cycle context starts to matter) without rebreaching the brake.
+12 lines — three lines under the 15-line limit, room for a future single-line addition (e.g., a `Cycle: ` line) without breaching it.
 
 **Segment classification:**
 
@@ -82,7 +82,7 @@ Pick up this issue and drain it to Done by invoking the skill below.    [11]
 | 8–9 | Issue body | context | Linear payload |
 | 11–12 | Pointer prose + slash-command | pointer | template constant |
 
-**Process segments are counted inside the budget.** Lines 3–6 are four of the twelve — the brake forces every process fact to earn its line.
+**Process segments are counted inside the budget.** Lines 3–6 are four of the twelve — the 15-line limit forces every process fact to earn its line.
 
 **The procedure-verb grep.** The second thinness check scans the supervisor source for any procedure verb that leaked back in:
 
@@ -180,13 +180,7 @@ sequenceDiagram
 | Verify pipeline gating (`verify`-label check) | `flow.py` | deleted — verification runs on every drain | removed |
 | Run-log entry writing | `runlog.py` | supervisor reads `.drain-handoff.json` and appends to `~/.drain-cycle/runs/*.json` | process |
 
-**The ambiguous edges, named:**
-
-1. *Verify pipeline gating.* Today `flow.py` gates the verify pipeline on the `verify` label. This contract makes verification universal, so the gate selects nothing and **`flow.py` deletes** — it is not relocated into `exec:pickup`. No `flow` field records a path, because every drain runs the one flow. The `verify` label stops being a routing input; label-driven supervisor decisions (`repo:`, `model:`, `review:`) are resolved before spawn and never reach the worker.
-2. *`/shape:task` directive.* The verb is workflow (it is a pack skill). Today `prompt.py` emits the directive only on verify-flow runs (`is_verify_flow`); with verification universal, breakdown is a step every drain runs. **Allocation: folds entirely into `exec:pickup`'s breakdown step; the directive deletes from the supervisor.**
-3. *Stack-mode signal.* The decision *that the user runs in stack mode* is operational policy (CLI flag, config), so it is process. The decision *what stack mode means at PR-submission* (Graphite vs gh code path) is workflow. **Allocation: supervisor emits the flag on line 5; `shape:pr-finishing` switches on it.**
-
-The concrete supervisor-side removals this implies, deferred to the build-out: `flow.py` deletes; `prompt.py`'s `is_verify_flow()` and `_shape_task_directive()` delete; `orchestrator.py`'s `flow.resolve()` call and `issue.verify_flow` telemetry attribute delete; `runlog.py`'s `flow` field drops to match this schema. Verification becomes unconditional.
+The concrete supervisor-side removals, deferred to the build-out: `flow.py` deletes; `prompt.py`'s `is_verify_flow()` and `_shape_task_directive()` delete; `orchestrator.py`'s `flow.resolve()` call and `issue.verify_flow` telemetry attribute delete; `runlog.py`'s `flow` field drops to match this schema. Verification becomes unconditional.
 
 ### Vendor-agnostic prose constraints
 
@@ -207,7 +201,7 @@ The choice is how much the worker prompt carries. P1 sends structured facts plus
 
 **Alt P3 — bare pointer, facts in env vars or sidecar files (rejected).** *Shrinks the prompt to one line but scatters the facts and couples the pack to the supervisor.* Env-var conventions differ by runtime (codex's exposure is not Claude Code's); an operator inspecting a halted run can no longer read what the worker knew; and the skill must treat a missing file as recoverable, spreading supervisor-coupling into the pack. *Reversal cost:* high — once one runtime binds to env-var names, every other runtime must be retrofitted.
 
-**Decision: P1.** It is the only option that clears all three binding constraints at once: the `wc -l` brake (template under cap), the portability NFR (no runtime-specific facts), and prompt-log inspectability (the operator reads the worker's inputs straight from the prompt). P2 fails the brake and the grep; P3 fails portability and inspectability. P2 is the closest call — its resume prose looks like useful guidance — but the resume marker is a process *fact*, not a workflow step, so it stays a structured field.
+**Decision: P1.** It is the only option that clears all three binding constraints at once: the `wc -l` check (template within the limit), the portability NFR (no runtime-specific facts), and prompt-log inspectability (the operator reads the worker's inputs straight from the prompt). P2 fails the size check and the grep; P3 fails portability and inspectability. P2 is the closest call — its resume prose looks like useful guidance — but the resume marker is a process *fact*, not a workflow step, so it stays a structured field.
 
 ### Handoff schema v2
 
@@ -233,7 +227,7 @@ The choice is how the verdict data is structured across files and versions. H1 a
 
 **Negative.**
 
-- The 12-line template has three lines of margin to absorb future facts. If a fifth process segment appears (e.g., a per-run sandbox identifier), the brake must be re-negotiated — not silently raised.
+- The 12-line template has three lines of margin to absorb future facts. If a fifth process segment appears (e.g., a per-run sandbox identifier), the limit must be re-negotiated — not silently raised.
 - Verification is universal: every drain runs the Outcome Verifier and PR Preparer, even a trivial doc-only issue, with no per-ticket opt-out. This is the accepted cost of one correctness contract — the verify pipeline's runtime is paid on every run. If a class of issues later proves to need a lighter path, that is a new contract decision, not a label toggle.
 - The `halt_reason` taxonomy is a closed set. A halt cause outside it must extend the set before the run-log will validate — a one-line schema edit and a writer change. Speculative additions are out of scope.
 
@@ -285,6 +279,6 @@ Each step is independently reversible without coordinated cross-repo work; the c
 
 ## Revisit conditions
 
-- If the ≤15-line template proves too tight for genuine process context, the cap is re-negotiated at plan-review — never silently raised.
+- If the 15-line template proves too tight for genuine process context, the limit is re-negotiated at plan-review — never silently raised.
 - If universal verification proves too heavy on a class of issues, a lighter path comes back as a new contract decision, not an ad-hoc label gate.
 - If a fourth halt path appears, extend the `halt_reason` taxonomy (one schema edit + one writer change) rather than widening the field to an open string.
