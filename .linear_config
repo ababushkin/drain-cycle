@@ -1,0 +1,4 @@
+# Linear instance metadata for this repo. Read by the Workflow pack's capture recipes.
+# team accepts a Linear team name or ID; ops_project names the standing non-initiative container.
+team: Personal
+ops_project: Ops - bugs, maintenance, emergent
