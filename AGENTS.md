@@ -14,48 +14,11 @@ The design rationale (decisions taken, alternatives considered, kill condition) 
 
 ## Linear workflow
 
-Linear is authoritative for status. Local task lists are fine for within-session bookkeeping; they don't replace a Linear issue.
+The Linear lifecycle (cycle model, issue workflow, completion gate), the comment rules, and the git conventions are governed by the **workflow-hooks** pack — injected at session start, full rubric in its `rules/`. drain-cycle adds only the repo-specific points below.
 
 **Project:** https://linear.app/ababushkin/project/autonomous-cycle-drain-eliminate-manual-shepherding-75daa8863063 (team ABA / Personal).
 
-**Cycles.** Work is planned across cycles, often spanning multiple projects at once. When picking up an issue, prefer ones already in the current cycle. If you start something not in the cycle, decide explicitly whether to pull it in or defer — don't silently expand cycle scope. Use `mcp__linear-server__list_cycles` to see the current cycle.
+**Commit + push mode.** The completion gate's commit+push step branches by how the issue runs:
 
-**On start of any issue:**
-- Move to **In Progress** via `mcp__linear-server__save_issue`.
-- If the issue isn't yet in the current cycle and you intend to ship it this cycle, assign it to the current cycle.
-
-**On completion:** Before an issue moves to **Done**, all of these must pass in order:
-
-1. **Review** — Run `/code-review-and-quality` against the working-tree changes.
-2. **Fix** — Address any Critical or Required findings. Lower-severity findings are at the agent's discretion (fix or note in the summary comment).
-3. **Commit + push** — The path here branches by how the issue is being executed:
-   - **Direct mode** (interactive session, not spawned by drain-cycle): commit the reviewed version and push to main. This repo pushes directly to main; PRs only when the owner asks. An issue isn't Done if work only exists locally.
-   - **Drain mode** (spawned by the drain-cycle orchestrator in a worktree): commit the reviewed changes to the issue branch as reviewable slices (one logical change per commit), then run `/shape:pr-finishing`. That skill owns submission — it drives `gt`/`gh` to submit the stacked PR(s), writes the submitted PR URLs into `.drain-handoff.json` (`pr_urls`), and posts the review-summary comment on the Linear issue. The worker does not run `gt`/`gh` by hand, does not push by hand, and does not hand-author `.drain-handoff.json`. The orchestrator no longer assembles or submits anything; it reads `pr_urls` back as its confirmation that submission succeeded — and a Done stack-mode issue with no `pr_urls` halts the run rather than letting the next issue stack on an unpushed branch. When the prompt names a base branch other than `main` (the orchestrator chains consecutive same-repo issues so each worktree branches off the prior issue's branch), pass that base to `/shape:pr-finishing` so it slices `<base>..HEAD` rather than `main..HEAD`.
-4. **Summary comment** — In drain mode the `pr-finishing` skill posts the review-summary comment (findings by severity plus the submitted PR links) as part of submission — the worker does not post a second comment. In direct mode, post a short review-summary comment on the issue via `mcp__claude_ai_Linear__save_comment`.
-5. **Done** — Transition to Done via `mcp__claude_ai_Linear__save_issue`.
-
-Status updates happen at the moment of state change — not batched at end of session.
-
-**Blocked** = leave In Progress + add a blocker comment naming the blocker. Don't silently park work.
-
-**New work surfaced mid-flight** becomes a new Linear issue, slotted into a cycle deliberately. Don't silently expand scope.
-
-## Comments
-
-A code comment explains the code **as it stands** — an invariant, a non-obvious constraint, a workaround the next reader would otherwise be surprised by. It does not narrate how the code came to look this way.
-
-Do not write, in any comment or docstring:
-
-- Linear issue / ticket IDs (`ABA-NNN`), user-story labels (`US-A`…`US-D`), or task numbers (`Task 3`, `AC2`).
-- Commit SHAs or PR numbers.
-- Fix-history narration: "added for…", "fixes the bug where…", "regression caused by…", "previously this…", dates an issue was discovered.
-
-That context belongs in the commit message, the PR description, the Linear issue, or an ADR under `docs/adrs/` — durable artefacts that carry process history without rotting into the code. A comment pointing at a closed ticket or a squashed commit is noise to everyone who reads the code later.
-
-When you find an existing comment that breaks this: strip the reference and keep the explanatory prose; reword if the label was the grammatical subject; inline the explanation if it lived inside the parenthetical; delete the whole comment if nothing of value remains.
-
-Not covered by this rule — leave these alone: identifiers used as **sample data** in tests (`_issue("ABA-1", …)`, `worktree_path=".../ABA-A"`) and comments describing that data; schema/format placeholders (`"issue_identifier": "ABA-NNN"`); and references to in-repo docs (`README §1`, `docs/adrs/0009-repo-label-targets-repo.md`).
-
-## Git
-
-Conventional-commit-ish prefixes: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`. Subject line ≤ 70 chars; details in the body if needed. Do not add `Co-Authored-By` trailers.
+- **Direct mode** (interactive session, not spawned by drain-cycle): commit the reviewed version and push to main. This repo pushes directly to main; PRs only when the owner asks.
+- **Drain mode** (spawned by the orchestrator in a worktree): commit the reviewed changes to the issue branch as reviewable slices (one logical change per commit), then run `/shape:pr-finishing`. That skill owns submission — it drives `gt`/`gh` to submit the stacked PR(s), writes the submitted PR URLs into `.drain-handoff.json` (`pr_urls`), and posts the review-summary comment on the issue. The worker does not run `gt`/`gh`, push, post the comment, or hand-author `.drain-handoff.json` by hand. The orchestrator reads `pr_urls` back as confirmation that submission succeeded — and a Done stack-mode issue with no `pr_urls` halts the run rather than letting the next issue stack on an unpushed branch. When the prompt names a base branch other than `main` (the orchestrator chains consecutive same-repo issues so each worktree branches off the prior issue's branch), pass that base to `/shape:pr-finishing` so it slices `<base>..HEAD` rather than `main..HEAD`.
