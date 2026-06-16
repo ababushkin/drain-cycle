@@ -8,7 +8,7 @@ Future releases will include support for other models and other task management 
 
 ## Why this exists
 
-Today, executing a Linear cycle/project is manual: launch Claude per issue, watch it run, approve permissions, update Linear, repeat. Execution shepherding consumes time that should go to *scoping the next cycle* and *validating delivered work*. `drain-cycle` removes that shepherding so attention shifts back to scoping and validation. The full goal / KRs / kill condition live in the Linear project description.
+Today, executing a Linear cycle/project is manual: launch Claude per issue, watch it run, approve permissions, update Linear, repeat. Execution shepherding consumes time that should go to *scoping the next cycle* and *validating delivered work*. `drain-cycle` removes that shepherding so attention shifts back to scoping and validation.
 
 - **Guiding vision:** [`docs/vision.md`](docs/vision.md)
 - **Architecture:** [`docs/architecture.html`](docs/architecture.html)
