@@ -123,6 +123,30 @@ Expected output: empty. The only execution slash-command named in `drain_cycle/`
 
 **This table amends A/N04's inter-skill handoff table in place.** A/N04 stops at `exec:finish`'s emits column (review verdict + verify result + PR body); these rows carry those verdicts forward into `.drain-handoff.json` so the supervisor — which never reads `pickup-envelope.json` — can grade the run from one file.
 
+**Lifecycle — when each field lands.** The file is written across the run by the pack, then stamped and read once by the supervisor at the seam. The worker's process exit is a bare signal; the meaning of the run lives in the file.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as Pack skills (exec:*)
+    participant FS as .drain-handoff.json
+    participant S as Supervisor
+
+    Note over FS: file does not exist yet
+    P->>FS: exec:verify writes outcome_verdict
+    P->>FS: shape:pr-prepare writes prep_verdict
+    P->>FS: shape:pr-finishing writes pr_urls + final_linear_state
+    Note over P,S: worker process exits (bare signal)
+    S->>FS: stamp exit_code
+    alt final_linear_state == Done
+        S->>FS: halt_reason = null
+    else non-Done halt
+        S->>FS: stamp halt_reason (closed set)
+    end
+    S->>FS: read back as the run's single grade-point
+    S->>S: grade · append run-log entry
+```
+
 **Halt-reason taxonomy** (the closed set `halt_reason` draws from):
 
 | Code | Meaning | Set by |
