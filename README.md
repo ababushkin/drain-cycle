@@ -15,7 +15,7 @@ Today, executing a Linear cycle/project is manual: launch Claude per issue, watc
 
 ## Is this for you?
 
-This project is very much an experiment for me so if you're going to use be aware that it has lots of sharp edges and is constantly changing.
+This project is very much an experiment for me so if you're going to use it be aware that it has lots of sharp edges and is constantly changing. If anything I highly recommend you DO NOT use it, unless you like watching things explode.
 
 - **You need to be confident in your cycle planning.** `drain-cycle` executes the cycle you scoped — it does not reshape it. A poorly-scoped cycle drains faster than a manually-shepherded one — the multiplier works in both directions. Plan deliberately; this tool is the multiplier, not the safety net.
 - **Accept the risk profile.** Every spawned session runs with `--dangerously-skip-permissions`. The agent can write files, run shell commands, hit the network, and update Linear without asking. The blast radius is documented in [`docs/design-decisions.md`](docs/design-decisions.md). If that makes you uncomfortable, that's the right instinct — stick with manual `claude` runs until it doesn't. Comfort with unattended execution is earned, not assumed.
