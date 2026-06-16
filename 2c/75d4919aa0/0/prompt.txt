@@ -1,0 +1,38 @@
+now review the ADR against these guidelines: 1. The Principle of Concision
+The secret to effective writing is to strip every sentence to its cleanest components
+. A document is too long if it contains words that do not do "new work"
+. William Zinsser notes that most first drafts can be cut by 50 percent without losing any essential information or the author’s voice
+.
+2. The 30-Second Rule
+Regardless of the total page count, the document is poorly structured if the reader cannot grasp the entire thinking—including the context, the problem, and the proposed solution—within the first 30 seconds of reading
+. If the reader must "wrestle in the dark" to find the main point, the document is functionally too long
+.
+3. Balanced Concision vs. Operational Integrity
+While you should prune "verbal sludge," you must never sacrifice operational integrity
+. In a design document, concision must not lead to the removal of:
+Essential technical assumptions
+.
+Key risks
+.
+Technical dependencies
+. If the document is so short that it omits these "tangible" details, it fails the "Hand-Product" test
+.
+4. Reader Mental Energy
+A document contains "too much text" when it exceeds the reader's limited amount of mental energy
+. Inefficient writing forces the reader to waste energy interpreting words or "scrabbling about" to find relationships between disjointed points
+. The most "economical" length is one where fewer words would not have served the turn, and more would have been superfluous
+.
+5. The "Think Small" Approach
+To avoid an unwieldy writing task that drains both the writer's and reader's enthusiasm, you should "think small"
+. Every successful piece of nonfiction should aim to leave the reader with exactly one provocative thought
+. If a document attempts to be a "definitive" summary of every possible detail, it becomes a "drain on enthusiasm" and a failure of compression
+.
+Summary Checklist for Document Length:
+Can the main point be grasped in 30 seconds?
+Is every word doing new work?
+Have you preserved essential technical dependencies while pruning?
+Does it focus on one provocative thought or objective?
+
+---
+
+also i want you to remove the whole "brake" / "cap" metaphor
