@@ -29,3 +29,7 @@ overall i'm finding when claude writes it leans too heavily into metaphors and w
 ---
 
 continue
+
+---
+
+commit in agent-skills-shaper
