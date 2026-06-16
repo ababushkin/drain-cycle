@@ -6,6 +6,13 @@ Each task is built in an isolated worktree using a fresh `claude -p` session so 
 
 Future releases will include support for other models and other task management systems so that you're not coupled to Linear or Claude.
 
+## Recommended companion plugins
+
+Spawned sessions use whatever skills you've installed globally. The pairing it was designed for:
+
+- [**`ababushkin/agent-skills-shaper`**](https://github.com/ababushkin/agent-skills-shaper)
+- [**`ababushkin/workflow-hooks`**](https://github.com/ababushkin/workflow-hooks)
+
 ## Why this exists
 
 Today, executing a Linear cycle/project is manual: launch Claude per issue, watch it run, approve permissions, update Linear, repeat. Execution shepherding consumes time that should go to *scoping the next cycle* and *validating delivered work*. `drain-cycle` removes that shepherding so attention shifts back to scoping and validation.
@@ -174,15 +181,6 @@ $ echo $?
 After the run, one JSON log per invocation is at `~/.drain-cycle/runs/<cycle-id>-<run-timestamp>.json`. On halt, the worktree at `<target-repo>/.worktrees/<issue-identifier>/` is preserved for inspection; on success it's removed.
 
 Re-run `drain-cycle` against the same cycle to resume a halted issue. The orchestrator reuses the preserved worktree and tells the spawned agent to read the committed work before continuing. After `max_resume_attempts` resumes (default `3`: one fresh attempt plus three resumes), it refuses to spawn for that issue and writes a cap-halt entry. Set `max_resume_attempts: null` in [Limits](#limits) to disable the cap.
-
-## Recommended companion skills
-
-Spawned sessions use whatever skills you've installed globally. The pairing it was designed for:
-
-- [**`ababushkin/pde-skills`**](https://github.com/ababushkin/pde-skills) — planning + engineering skill pack. Use it to *shape* the cycle (initiative, KRs, slices) before draining it. `drain-cycle` only multiplies execution; the quality of the cycle is upstream of this tool.
-- [**`addyosmani/agent-skills`**](https://github.com/addyosmani/agent-skills) — Addy Osmani's pack covers complementary build / test / review skills the spawned sessions lean on.
-
-Both are skill packs for Claude Code — install them globally and the spawned `claude -p` sessions will pick them up automatically.
 
 ## Limits
 
