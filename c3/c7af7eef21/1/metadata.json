@@ -1,0 +1,124 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "c3c7af7eef21",
+  "session_id": "91fcd0b4-19fb-4b40-9590-836f10000b70",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-16T12:19:23.439943Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "AGENTS.md",
+    "README.md",
+    "docs/adrs/0005-agent-self-updates-linear.md",
+    "docs/adrs/0006-accept-skip-permissions.md",
+    "docs/adrs/0007-worktree-per-issue.md",
+    "docs/adrs/0008-run-log-per-invocation.md",
+    "docs/adrs/0009-repo-label-targets-repo.md",
+    "docs/adrs/0010-uv-tool-install-and-secret.md",
+    "docs/adrs/0011-worker-model-default-and-override.md",
+    "docs/adrs/0012-stream-json-usage-accounting.md",
+    "docs/adrs/0013-resource-guardrails.md",
+    "docs/adrs/0014-worktree-config-symlink.md",
+    "docs/adrs/0015-active-run-marker.md",
+    "docs/adrs/0016-execution-order-blocks-aware.md",
+    "docs/adrs/0017-opentelemetry-tracing.md",
+    "docs/adrs/0018-resume-on-rerun.md",
+    "docs/adrs/0019-watch-in-tmux-pane.md",
+    "docs/adrs/0020-graphite-stacking-sequence.md",
+    "docs/adrs/0021-shape-task-in-worker.md",
+    "docs/adrs/0022-pr-links-recorded.md",
+    "docs/adrs/0023-worker-owns-pr-submission.md",
+    "docs/adrs/0024-worker-per-phase.md",
+    "docs/adrs/0025-multi-altitude-review.md",
+    "docs/adrs/0026-supervisor-is-a-process.md",
+    "docs/adrs/0027-pr-feedback-control-plane.md",
+    "docs/adrs/0028-keystone-cutover.md",
+    "docs/adrs/0029-stop-guard-via-settings.md",
+    "docs/adrs/0030-execution-state-file.md",
+    "docs/adrs/README.md",
+    "docs/architecture.html",
+    "docs/design-decisions.md",
+    "docs/ideas/drain-past-the-merge-gate.md",
+    "docs/integration-test-architecture.html",
+    "docs/integration-test-architecture.md",
+    "docs/limits.example.yml",
+    "drain_cycle/orchestrator.py",
+    "drain_cycle/runlog.py",
+    "drain_cycle/worker.py",
+    "drain_cycle/worktree.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "4dac1a8c883c",
+  "token_usage": {
+    "input_tokens": 23856,
+    "cache_creation_tokens": 298185,
+    "cache_read_tokens": 16782969,
+    "output_tokens": 104582,
+    "api_call_count": 107
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-commit-commands:commit-2026-06-16T12:15:26.97407Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "commit-commands:commit"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "4dac1a8c883c",
+      "timestamp": "2026-06-16T12:15:26.97407Z",
+      "native": {
+        "command": "/commit-commands:commit"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/commit-commands:commit",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-16T12:19:23.415272Z",
+    "agent_lines": 552,
+    "agent_removed": 474,
+    "human_added": 0,
+    "human_modified": 13,
+    "human_removed": 6,
+    "total_committed": 559,
+    "total_lines_changed": 1045,
+    "agent_percentage": 98.18181818181819,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 31,
+      "user_lines_removed": 8,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/architecture.html": 6,
+        "docs/design-decisions.md": 25
+      },
+      "user_removed_per_file": {
+        "docs/architecture.html": 6,
+        "docs/design-decisions.md": 2
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 590,
+      "agent_lines_removed": 480
+    }
+  ]
+}

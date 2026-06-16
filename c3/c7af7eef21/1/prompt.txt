@@ -1,0 +1,5 @@
+fix how design decisions are recorded
+currently there is a design-decisions.md
+and an adrs folder
+
+all design decisions should be their own ADR in the adrs folder
