@@ -648,10 +648,13 @@ def _drain_one_issue(
             if session is not None:
                 session.cleanup()
         finished_at = _now_iso()
+        # Read any verdicts the worker recorded in the handoff. M2+-populated
+        # locals take precedence; handoff fills the gap when they are None.
+        _hov, _hpv = handoff.read_partial(worktree_path)
         outcome = _WorkerOutcome(
             result=result,
-            outcome_verdict=outcome_verdict,
-            prep_verdict=prep_verdict,
+            outcome_verdict=outcome_verdict if outcome_verdict is not None else _hov,
+            prep_verdict=prep_verdict if prep_verdict is not None else _hpv,
             responder_runs=responder_runs,
         )
 
