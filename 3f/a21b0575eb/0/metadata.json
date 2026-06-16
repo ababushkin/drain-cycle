@@ -1,0 +1,59 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "3fa21b0575eb",
+  "session_id": "0ea14c36-4388-4f5f-9e9c-7327e3607066",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-16T12:20:58.980734Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "9982a6ef6acf",
+  "checkpoint_transcript_start": 753,
+  "transcript_lines_at_start": 753,
+  "token_usage": {
+    "input_tokens": 137,
+    "cache_creation_tokens": 3892,
+    "cache_read_tokens": 717779,
+    "output_tokens": 1784,
+    "api_call_count": 4
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01VfX2qkWKfrgwSwg8wNuWdC",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "delivery"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "9982a6ef6acf",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 611,
+        "end": 612,
+        "entry_ids": [
+          "bf9cc454-cfd0-48c1-b64d-71b593e30431"
+        ],
+        "tool_use_id": "toolu_01VfX2qkWKfrgwSwg8wNuWdC"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01VfX2qkWKfrgwSwg8wNuWdC"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: delivery",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 8
+  }
+}
