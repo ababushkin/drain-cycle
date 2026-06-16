@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from drain_cycle.handoff import HANDOFF_FILE, HandoffData, PullRequest, read, write
+from drain_cycle.handoff import HANDOFF_FILE, HandoffData, PullRequest, read, read_partial, write
 
 
 def _valid_data() -> HandoffData:
@@ -95,3 +95,79 @@ def test_write_creates_file_at_expected_path(tmp_path: Path) -> None:
 def test_read_never_raises_on_empty_file(tmp_path: Path) -> None:
     (tmp_path / HANDOFF_FILE).write_text("")
     assert read(tmp_path) is None
+
+
+# --- schema-v2 verdict fields ---
+
+
+def test_write_then_read_includes_verdicts(tmp_path: Path) -> None:
+    ov = {"result": "pass", "findings": [], "invoked_at": "2026-01-01T00:00:00Z"}
+    pv = {"result": "ok", "route": "auto-merge", "reasoning": "looks good"}
+    data = HandoffData(
+        pr_urls=_valid_data().pr_urls,
+        outcome_verdict=ov,
+        prep_verdict=pv,
+    )
+    write(tmp_path, data)
+    result = read(tmp_path)
+    assert result is not None
+    assert result.outcome_verdict == ov
+    assert result.prep_verdict == pv
+
+
+def test_read_verdict_fields_are_optional(tmp_path: Path) -> None:
+    write(tmp_path, _valid_data())  # no verdicts
+    result = read(tmp_path)
+    assert result is not None
+    assert result.outcome_verdict is None
+    assert result.prep_verdict is None
+
+
+def test_read_ignores_non_dict_verdict(tmp_path: Path) -> None:
+    payload = {
+        "pr_urls": [{"title": "t", "url": "https://x/pull/1"}],
+        "outcome_verdict": "not-a-dict",
+        "prep_verdict": 42,
+    }
+    (tmp_path / HANDOFF_FILE).write_text(json.dumps(payload))
+    result = read(tmp_path)
+    assert result is not None
+    assert result.outcome_verdict is None
+    assert result.prep_verdict is None
+
+
+# --- read_partial ---
+
+
+def test_read_partial_returns_verdicts_without_pr_urls(tmp_path: Path) -> None:
+    ov = {"result": "pass", "findings": []}
+    pv = {"result": "ok", "route": "auto-merge", "reasoning": "fine"}
+    (tmp_path / HANDOFF_FILE).write_text(
+        json.dumps({"outcome_verdict": ov, "prep_verdict": pv})
+    )
+    got_ov, got_pv = read_partial(tmp_path)
+    assert got_ov == ov
+    assert got_pv == pv
+
+
+def test_read_partial_returns_none_none_on_missing_file(tmp_path: Path) -> None:
+    assert read_partial(tmp_path) == (None, None)
+
+
+def test_read_partial_returns_none_none_on_malformed_json(tmp_path: Path) -> None:
+    (tmp_path / HANDOFF_FILE).write_text("not json{{{")
+    assert read_partial(tmp_path) == (None, None)
+
+
+def test_read_partial_returns_none_none_on_non_dict_payload(tmp_path: Path) -> None:
+    (tmp_path / HANDOFF_FILE).write_text(json.dumps([1, 2, 3]))
+    assert read_partial(tmp_path) == (None, None)
+
+
+def test_read_partial_reads_verdicts_from_complete_handoff(tmp_path: Path) -> None:
+    ov = {"result": "fail", "findings": ["f1"]}
+    data = HandoffData(pr_urls=_valid_data().pr_urls, outcome_verdict=ov)
+    write(tmp_path, data)
+    got_ov, got_pv = read_partial(tmp_path)
+    assert got_ov == ov
+    assert got_pv is None
