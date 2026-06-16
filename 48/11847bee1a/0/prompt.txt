@@ -1,0 +1,45 @@
+validate the direction of this project based on the architecture
+
+any adjacent skill pack that "builds" or "reviews" code that this project utilises is self contained and is not coupled to this project
+
+this project's value add is that it coordinates these skills together, so therefore, for example the drain_handoff artefacts etc are all managed and created by the supervisor or supervising processes
+
+is that correct?
+
+i say that because i noticed when i worked on linear issue aba-372 it authored a whole bunch of tight coupling to drain-cycle in agent-skills-shaper and that caught me off guard (i'm already fixing this in another session, but want to make sure we're directionally tight and it was a problem with the linear ticket and how it was written)
+
+---
+
+i know writing that file is harmless, but i'd rather figure out a way that the skills don't have to do that OR the drain-cycle project needs to be the container that holds these execution skills and delegates downwards (which doesn't seem right to me either)
+
+---
+
+is there an option where the drain-cycle process supervisor ensures that the execution state is written instead?
+
+supervisor
+
+--> pick up task
+--> spawn agent with thin instructions to execute the task AND to write an execution state
+--> checks if the execution state has been written before proceedig to the next step
+
+---
+
+first sketch it up for me so i can visualize it - i want to see the lifecycle between the supervisor picking up a task, a task being coded through to the supervising writing the execution state that can be used for the subsequent review task - an entire lifecycle is preferable (pick up --> write code --> review code / outcomes --> open it for review)
+
+---
+
+its hard to read it in ascii, can yo do it in another forma, either svg or mermaid
+
+---
+
+first write it up in markdown as a design decision. follow the writing guidelines carefully it should be written in plain english
+
+---
+
+no but is there anything that should change about the architecture doc to make this fact more obvious?
+
+---
+
+can we not uise the word "envelope" its some kind of weird jargon
+
+ok go
