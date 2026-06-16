@@ -1,0 +1,31 @@
+ok i'm going to approve/merge the pr - do any of my downstream tasks need to change/be informed about this
+
+---
+
+yes
+
+---
+
+change the numbers so that they better match the milestones, n02 makes it look like it should be the next item in the sequence of things i pick up
+
+---
+
+so "grade the outcome" milestone should be the last one? i can reorder it manually
+
+---
+
+and yes apply the renumbering on the linear issues
+
+---
+
+i have /writing-refinement but it seems to not be working as i'd like. i had to go through many rounds of reviews of the ADR you wrote to try and make it more human readable but it still wasn't that great. it seems like asking to do a refinement on a document is too much and i might need to build a specific document review/refinement workflow that does things in smaller chunks, but i'd like to get your read on the situation first
+
+---
+
+yes lets plan out the concrete change to the skill
+also whilst i agree that human taste is important, if i look at a doc and it makes my eyes go crazy then the whole writing failed
+overall i'm finding when claude writes it leans too heavily into metaphors and weird jargon ("bets", "gates", etc) - i need it to lean more into writing in plain english and no metaphors unless i ask for one - afterall i'm writing technical documents not children stories
+
+---
+
+continue
