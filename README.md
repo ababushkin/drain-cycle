@@ -10,11 +10,12 @@ Future releases will include support for other models and other task management 
 
 Today, executing a Linear cycle/project is manual: launch Claude per issue, watch it run, approve permissions, update Linear, repeat. Execution shepherding consumes time that should go to *scoping the next cycle* and *validating delivered work*. `drain-cycle` removes that shepherding so attention shifts back to scoping and validation. The full goal / KRs / kill condition live in the Linear project description.
 
-**Guiding vision:** [`docs/vision.md`](docs/vision.md) — drain-cycle as the automated supervisory layer over a pack of composable skills, replacing the operator's mechanical supervision so attention moves to higher-order work. Every decision and review aligns to it. The architecture that serves it — the two layers, the artifact boundary, the dual-mode property — is [`docs/architecture.html`](docs/architecture.html).
+- **Guiding vision:** [`docs/vision.md`](docs/vision.md)
+- **Architecture:** [`docs/architecture.html`](docs/architecture.html)
 
 ## Is this for you?
 
-Read this section before installing — `drain-cycle` is deliberately not for everyone.
+This project is very much an experiment for me so if you're going to use be aware that it has lots of sharp edges and is constantly changing.
 
 - **You need to be confident in your cycle planning.** `drain-cycle` executes the cycle you scoped — it does not reshape it. A poorly-scoped cycle drains faster than a manually-shepherded one — the multiplier works in both directions. Plan deliberately; this tool is the multiplier, not the safety net.
 - **Accept the risk profile.** Every spawned session runs with `--dangerously-skip-permissions`. The agent can write files, run shell commands, hit the network, and update Linear without asking. The blast radius is documented in [`docs/design-decisions.md`](docs/design-decisions.md). If that makes you uncomfortable, that's the right instinct — stick with manual `claude` runs until it doesn't. Comfort with unattended execution is earned, not assumed.
