@@ -455,7 +455,7 @@
 
     <section class="s" id="s7">
       <header><span class="ix">§7</span><h2>All state lives in one record — the state plane</h2></header>
-      <p>Everything works off one organized record of where the work stands. <strong>Linear is authoritative</strong> for issue status (design decision §1, §12). Beneath it sit the durable supervisor records: per-run logs (§4, §8), the atomic active-run marker (§11), and opt-in OpenTelemetry traces (§13).</p>
+      <p>Everything works off one organized record of where the work stands. <strong>Linear is authoritative</strong> for issue status (ADR 0005, ADR 0016). Beneath it sit the durable supervisor records: per-run logs (ADR 0008, ADR 0012), the atomic active-run marker (ADR 0015), and opt-in OpenTelemetry traces (ADR 0017).</p>
       <p>These records are the <strong>delayed feedback loop</strong> that replaces live watching. Automating supervision deliberately gives up the operator's real-time view of each worker; observability is how that trade is paid back. Better observability widens the set of work that is safe to hand off (§9).</p>
     </section>
 
@@ -468,7 +468,7 @@
 
     <section class="s" id="s5">
       <header><span class="ix">§5</span><h2>Layer 2 writes signals; Layer 1 reads them</h2></header>
-      <p>The two layers meet at an artifact, not at a function call. <strong>Layer 2 writes signals; Layer 1 reads them.</strong> The supervisor never reads the workflow's steps — only the artifacts the workflow leaves behind: Linear issue state, run-log fields, and the <strong>execution-state file</strong> the workflow writes in the worktree (today <code>.drain-handoff.json</code>). That file is the workflow's own: it holds one section per phase and has two readers. The next phase's skill reads the handoff sections it needs — the acceptance criteria, the diff — and the supervisor reads only the fields it gates on (<code>verdict</code>, <code>pr_urls</code>). The supervisor is a reader of that file, never its author: the skill that ran a phase writes that phase's section. See design decision §26.</p>
+      <p>The two layers meet at an artifact, not at a function call. <strong>Layer 2 writes signals; Layer 1 reads them.</strong> The supervisor never reads the workflow's steps — only the artifacts the workflow leaves behind: Linear issue state, run-log fields, and the <strong>execution-state file</strong> the workflow writes in the worktree (today <code>.drain-handoff.json</code>). That file is the workflow's own: it holds one section per phase and has two readers. The next phase's skill reads the handoff sections it needs — the acceptance criteria, the diff — and the supervisor reads only the fields it gates on (<code>verdict</code>, <code>pr_urls</code>). The supervisor is a reader of that file, never its author: the skill that ran a phase writes that phase's section. See ADR 0030.</p>
 
       <div class="diagram diagram-boundary" role="img" aria-label="The artifact boundary: Layer 2, the workflow pack, writes down into the boundary; the boundary carries Linear issue state, run-log fields, and the execution-state file (AC, verdict, pr_urls); Layer 1, the supervisor, reads up from it.">
         <div class="dg-card dg-l2 dg-wide">
@@ -494,7 +494,7 @@
         <p class="dg-caption">Layer 1 never reads the workflow's steps — only the artifacts it leaves behind. That content-blindness is what lets the same Layer 2 run under any worker.</p>
       </div>
 
-      <p>The placement test for any new behaviour: does <code>drain-cycle</code> need to know <em>what a role does</em> (Layer 2), or only <em>whether an artifact exists</em> (Layer 1)? Submitting a PR is "what a role does" — it belongs in a skill. Reading back the submitted PR URLs to decide whether to advance is "whether an artifact exists" — it belongs in the supervisor (see design decision §19). The same test governs state in the execution-state file: a field only the supervisor needs is requested through the worker's prompt, never written into a skill (§26).</p>
+      <p>The placement test for any new behaviour: does <code>drain-cycle</code> need to know <em>what a role does</em> (Layer 2), or only <em>whether an artifact exists</em> (Layer 1)? Submitting a PR is "what a role does" — it belongs in a skill. Reading back the submitted PR URLs to decide whether to advance is "whether an artifact exists" — it belongs in the supervisor (see ADR 0023). The same test governs state in the execution-state file: a field only the supervisor needs is requested through the worker's prompt, never written into a skill (ADR 0030).</p>
       <p>Keeping the boundary at the artifact is what makes Layer 1 content-blind, and content-blindness is what lets the same Layer 2 run under any worker.</p>
     </section>
 
@@ -530,7 +530,7 @@
         <li><strong>Per-phase model economics.</strong> Review anchors to a stronger (more expensive) model regardless of what coded the change. That asymmetry is only expressible if each phase is its own spawn with its own <code>--model</code> pin — a cheap model can build while an expensive one reviews.</li>
       </ul>
       <p>The three phase agents map onto the existing pack: code = <code>exec:build</code> (+<code>exec:debug</code>, <code>exec:simplify</code>), review = <code>exec:review</code>, finish = <code>exec:finish</code>. Each is a goal-shaped worker prompt, not a resident process — the goal ("produce sliced artifacts", "apply every quality lens", "land human-readable PRs") drives a sequence of skill delegations inside one spawn.</p>
-      <p>The cost accepted in return: every phase boundary pays a spawn plus artifact rehydration, so the execution-state file (§5) must carry everything the next phase needs — a single worker kept that context in memory for free. This is the deliberate price of independence; see design decision §20.</p>
+      <p>The cost accepted in return: every phase boundary pays a spawn plus artifact rehydration, so the execution-state file (§5) must carry everything the next phase needs — a single worker kept that context in memory for free. This is the deliberate price of independence; see ADR 0024.</p>
     </section>
 
     <section class="s" id="s6">
@@ -563,7 +563,7 @@ me         → review the finished work; step in only where it halted</code></pr
         </figure>
       </div>
 
-      <p>Design decision §10 (config symlinked into each worktree) is what makes the headless worker's environment match an interactive session, so a skill behaves the same in both modes.</p>
+      <p>ADR 0014 (config symlinked into each worktree) is what makes the headless worker's environment match an interactive session, so a skill behaves the same in both modes.</p>
     </section>
 
     <section class="s" id="sspine">
@@ -631,12 +631,12 @@ me         → review the finished work; step in only where it halted</code></pr
         <li><strong>Control plane (one per machine).</strong> The long-lived daemon. Owns process lifecycle, the queue of planned units to execute, and an API the operator queries and steers: what is running, halt this issue, resume, and (the horizon behaviour) watch open PRs through the review-and-merge loop and respond to review comments.</li>
         <li><strong>Execution-coordinator (one per unit in flight).</strong> Spawned by the control plane to drive a single cycle or project. It advances work by reading artifacts (§5) — never by reading inside a phase — and halts on a missing or failed artifact.</li>
       </ul>
-      <p>The control plane stays a <strong>process, not a Claude skill</strong> (design decision §22). A <code>/execute-cycle</code> skill would run inside a Claude session and collapse the artifact boundary that makes the worker vendor-agnostic; the one-command ergonomics come instead from a thin CLI front-door (<code>drain-cycle run &lt;unit&gt;</code>). "Respond to PR comments" is a control-plane behaviour, not a pack skill, because it requires watching a PR after it is open — which only a resident process does.</p>
+      <p>The control plane stays a <strong>process, not a Claude skill</strong> (ADR 0026). A <code>/execute-cycle</code> skill would run inside a Claude session and collapse the artifact boundary that makes the worker vendor-agnostic; the one-command ergonomics come instead from a thin CLI front-door (<code>drain-cycle run &lt;unit&gt;</code>). "Respond to PR comments" is a control-plane behaviour, not a pack skill, because it requires watching a PR after it is open — which only a resident process does.</p>
     </section>
 
     <section class="s" id="s11">
       <header><span class="ix">§11</span><h2>Execute a planned unit — a cycle or a project</h2></header>
-      <p>The supervisor executes a <em>planned unit</em>. The atom is unchanged — one issue, with a worker per phase (§4) — and a cycle and a project differ only as containers with a hierarchy over them. "Drain a cycle" is one entry point, not the definition; project execution is out of scope today but is a later container, not a redesign (design decision §22). The tool keeps the name <code>drain-cycle</code>; the concept it serves is wider.</p>
+      <p>The supervisor executes a <em>planned unit</em>. The atom is unchanged — one issue, with a worker per phase (§4) — and a cycle and a project differ only as containers with a hierarchy over them. "Drain a cycle" is one entry point, not the definition; project execution is out of scope today but is a later container, not a redesign (ADR 0026). The tool keeps the name <code>drain-cycle</code>; the concept it serves is wider.</p>
     </section>
 
     <section class="s" id="s12">
