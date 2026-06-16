@@ -1,0 +1,17 @@
+do i still need the Linear workflow stuff in the AGENTS.md? i have a workflow-governance hook installed globally so not sure if this is still needed
+
+---
+
+its ok if it just helps claude
+
+are there things in the linear workflow that should make their way into the global workflow hooks project?
+
+---
+
+thats ok lets leave it as is, i'll just delete everything from the linear block
+
+what about the comments and git stuff? is that already covered in the workflow hooks?
+
+---
+
+yes lets fix it so that agent.md doesn't have anything unnecessary. move upstream anything that's useful from here to there instead.
