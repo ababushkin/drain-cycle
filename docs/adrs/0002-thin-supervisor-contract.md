@@ -38,7 +38,7 @@ Two related decisions live in the pack repo: ADR 0003 (persona-dispatch — vend
 | Worker prompt template size | ≤15 lines including blanks | `wc -l drain_cycle/prompt_template.txt` ≤ 15 on the rendered template skeleton (before issue-body substitution) |
 | Procedure-verb absence | No execution slash-command in the supervisor source other than `/exec:pickup` | `git grep -nE '/(code-review\|shape:(pr-\|verify-\|task)\|exec:(build\|review\|verify\|finish\|breakdown\|debug\|simplify))' drain_cycle/` returns empty |
 | Schema-v2 fitness | `.drain-handoff.json` produced by any worker exit parses against the JSON Schema in `docs/adrs/references/drain-handoff-schema-v2.md` and every required field is present per its writer's exit gate | Extract the fenced JSON Schema, validate every `~/.drain-cycle/runs/*.json` against it; exit 0 on every fixture and every live run |
-| Vendor portability | The prompt template contains zero references to `Claude`, `Anthropic`, `Skill` (capitalised), `Agent` (capitalised), or any tool-search call | `grep -iE '(claude\|anthropic\|toolsearch\|agent tool)' drain_cycle/prompt_template.txt` returns empty |
+| Vendor portability | Zero vendor tool-names in the rendered template (exact list in §Vendor-agnostic prose constraints) | `grep -iE '(claude\|anthropic\|toolsearch\|agent tool)' drain_cycle/prompt_template.txt` returns empty |
 
 ## Decision
 
@@ -120,7 +120,7 @@ Expected output: empty. The only execution slash-command named in `drain_cycle/`
 
 **This table extends the execution-workflow doc's handoff table.** That doc stops at `exec:finish`'s outputs (review verdict, verify result, PR body); these rows carry those verdicts into `.drain-handoff.json`, so the supervisor — which never reads `pickup-envelope.json` — can grade the whole run from one file.
 
-**Lifecycle — when each field lands.** The file is written across the run by the pack, then stamped and read once by the supervisor at the seam. The worker's process exit is a bare signal; the meaning of the run lives in the file.
+**Lifecycle — when each field lands.** The file is written across the run by the pack, then stamped and read once by the supervisor at the worker's exit. The worker's process exit is a bare signal; the meaning of the run lives in the file.
 
 ```mermaid
 sequenceDiagram
@@ -162,9 +162,9 @@ sequenceDiagram
 | Worker spawn (subprocess invocation) | `orchestrator.py` | unchanged | process |
 | Worktree creation / cleanup | `orchestrator.py` | unchanged | process |
 | Halt on timeout / repeated exit-1 | `orchestrator.py` | unchanged | process |
-| Resume detection (continuation marker) | `orchestrator.py` | unchanged; surfaces as line 6 | process |
+| Resume detection (continuation marker) | `orchestrator.py` | unchanged; appears as line 6 | process |
 | Grade the run (read `.drain-handoff.json`) | `grade.py` | unchanged; new fields available | process |
-| Per-run `stack` flag resolution | `orchestrator.py` | unchanged; surfaces as line 5 | process |
+| Per-run `stack` flag resolution | `orchestrator.py` | unchanged; appears as line 5 | process |
 | Per-issue label resolution (`repo:`, `model:`, `review:`) | `linear.py` / `model.py` / `repos.py` | unchanged; resolved before spawn, not passed to the worker | process |
 | Pickup envelope creation | inlined in prompt preamble | `exec:pickup` | workflow |
 | Breakdown into tasks | `/shape:task` directive in tail | `exec:breakdown` (invoked by `exec:pickup`) | workflow |
@@ -176,7 +176,7 @@ sequenceDiagram
 | Verify pipeline gating (`verify`-label check) | `flow.py` | deleted — verification runs on every drain | removed |
 | Run-log entry writing | `runlog.py` | supervisor reads `.drain-handoff.json` and appends to `~/.drain-cycle/runs/*.json` | process |
 
-The concrete supervisor-side removals, deferred to the build-out: `flow.py` deletes; `prompt.py`'s `is_verify_flow()` and `_shape_task_directive()` delete; `orchestrator.py`'s `flow.resolve()` call and `issue.verify_flow` telemetry attribute delete; `runlog.py`'s `flow` field drops to match this schema. Verification becomes unconditional.
+The concrete supervisor-side removals, deferred to the build-out: `flow.py` deletes; `prompt.py`'s `is_verify_flow()` and `_shape_task_directive()` delete; `orchestrator.py`'s `flow.resolve()` call and `issue.verify_flow` telemetry attribute delete; `runlog.py`'s `flow` field drops to match this schema.
 
 ### Vendor-agnostic prose constraints
 
@@ -191,7 +191,7 @@ The concrete supervisor-side removals, deferred to the build-out: `flow.py` dele
 
 The choice is how much the worker prompt carries. P1 sends structured facts plus one pointer; P2 adds inlined resume prose on resumed runs; P3 sends only the pointer and pushes the facts out to env vars or sidecar files.
 
-**Alt P1 — facts + one pointer (chosen).** *Keeps the prompt inspectable and under the line budget while the skill, not the prompt, owns every procedure step.* The 12-line template above. A miss surfaces immediately at the `wc -l` check; behaviour degrades gracefully because the procedure lives in the skill; recovery is a one-line template edit. *Reversal cost:* low — the template is one file (`drain_cycle/prompt_template.txt`).
+**Alt P1 — facts + one pointer (chosen).** *Keeps the prompt inspectable and under the line budget while the skill, not the prompt, owns every procedure step.* The 12-line template above. A miss shows immediately at the `wc -l` check; behaviour degrades gracefully because the procedure lives in the skill; recovery is a one-line template edit. *Reversal cost:* low — the template is one file (`drain_cycle/prompt_template.txt`).
 
 **Alt P2 — P1 plus inlined resume prose (rejected).** *Buys a more explicit resume instruction at the cost of two templates that must stay in sync.* Resumed runs get a second template variant whose prose tells the worker to inspect, decide, and continue — exactly the procedure shape the grep is built to catch. The resume case is already a structured marker (`resume: true|false`) the skill reads, so the prose re-imports a workflow concern the marker already covers. *Reversal cost:* medium.
 
@@ -215,17 +215,15 @@ The choice is how the verdict data is structured across files and versions. H1 a
 
 **Positive.**
 
-- One contract that the prompt template, the schema, and the pack-skill workflows all bind to. Drift surfaces at one of three named fitness checks (template `wc -l`, supervisor grep, schema parse).
-- Both thinness checks are mechanical — `wc -l` and `git grep`. Nothing to interpret at review time.
-- The handoff carries enough to build the run-log *and* enough to drive a future "post review-summary to Linear" automation off one file.
+- One contract that the prompt template, the schema, and the pack-skill workflows all bind to. Drift is caught at one of three named fitness checks (template `wc -l`, supervisor grep, schema parse) — all mechanical, nothing to interpret at review time.
+- The handoff carries enough to drive a future "post review-summary to Linear" automation entirely off one file.
 - A non-Claude worker can be pointed at this prompt and the published `exec:*` skills with no further glue; the only Claude-Code-specific code path is the persona-dispatch branch inside `exec:review`, which has a documented inline-sequential fallback.
-- `pickup-envelope.json` and `.drain-handoff.json` are separated by lifetime: the envelope flows skill→skill in memory of the worker; the handoff is the exit record the supervisor reads. Each has one writer per field; readers are named.
 
 **Negative.**
 
-- The 12-line template has three lines of margin to absorb future facts. If a fifth process segment appears (e.g., a per-run sandbox identifier), the limit must be re-negotiated — not silently raised.
+- The 12-line template has three lines of margin to absorb future facts. If a fifth process segment appears (e.g., a per-run sandbox identifier), the limit is re-negotiated at plan-review — not silently raised.
 - Verification is universal: every drain runs the Outcome Verifier and PR Preparer, even a trivial doc-only issue, with no per-ticket opt-out. This is the accepted cost of one correctness contract — the verify pipeline's runtime is paid on every run. If a class of issues later proves to need a lighter path, that is a new contract decision, not a label toggle.
-- The `halt_reason` taxonomy is a closed set. A halt cause outside it must extend the set before the run-log will validate — a one-line schema edit and a writer change. Speculative additions are out of scope.
+- The `halt_reason` taxonomy is a closed set. A halt cause outside it must extend the set before the run-log will validate — a one-line schema edit and a writer change, never a widening of the field to an open string. Speculative additions are out of scope.
 
 **No separate walking skeleton.** The whole design surface is two files — the prompt template and the schema. The first real drain through the new template *is* the skeleton; this contract just unblocks it.
 
@@ -235,14 +233,14 @@ The choice is how the verdict data is structured across files and versions. H1 a
 
 - `outcome_verdict.result` rate — verify-pass rate across every drain.
 - `prep_verdict.route` distribution — auto-merge vs human-review split.
-- `halt_reason` histogram — surfaces which halt path dominates.
+- `halt_reason` histogram — shows which halt path dominates.
 - Wall-clock time per run — for cycle-throughput grading.
 
 **Structured logs.** The supervisor emits one stderr JSON line per run boundary (`{event: "run-start" | "run-end", run_id, issue_id, exit_code, halt_reason}`). No vendor SDK in the log line.
 
 **Traces.** Not required at this stage — drain volume is low and single-user. If volume grows past ~10 drains/day, add a span per `exec:*` skill invocation parented to the pickup span (deferred).
 
-**Alerts.** None — single-user CLI; halts surface on stderr and in the run-log.
+**Alerts.** None — single-user CLI; halts appear on stderr and in the run-log.
 
 **Rollback.**
 
@@ -272,9 +270,3 @@ Each step is independently reversible without coordinated cross-repo work; the c
 |---|---|
 | **Q1.** When `prep_verdict.route == "human-review"`, does the run halt (worker exits non-zero, operator merges by hand) or finish in a Done-equivalent state with a different Linear status? | Halt with `halt_reason: human-review-requested`; the supervisor records a Done-equivalent run-log outcome but leaves the issue untransitioned. Settled when the supervisor wiring lands. |
 | **Q2.** Does the per-task model annotation belong on the handoff (so the run-log can grade model-tier coverage), or only on `pickup-envelope.json`? | Keep it envelope-internal; the handoff records verdict-level facts only. Settled when the schema tests are written; re-open if a grader ever needs model-tier columns. |
-
-## Revisit conditions
-
-- If the 15-line template proves too tight for genuine process context, the limit is re-negotiated at plan-review — never silently raised.
-- If universal verification proves too heavy on a class of issues, a lighter path comes back as a new contract decision, not an ad-hoc label gate.
-- If a fourth halt path appears, extend the `halt_reason` taxonomy (one schema edit + one writer change) rather than widening the field to an open string.
