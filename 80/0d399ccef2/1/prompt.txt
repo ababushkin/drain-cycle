@@ -1,0 +1,16 @@
+my previous drain-cycle run finished without any pr_urls being passed down the chain
+i saw this error in the watch log:
+
+SessionEnd hook [node "${CLAUDE_PLUGIN_ROOT}/scripts/session-lifecycle-hook.mjs" SessionEnd] failed: mise ERROR error parsing config file: ~/src/drain-cycle/.worktrees/ABA-334/mise.toml
+mise ERROR Config files in ~/src/drain-cycle/.worktrees/ABA-334/mise.toml are not trusted.
+Trust them with `mise trust`. See https://mise.jdx.dev/cli/trust.html for more information.
+mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information
+
+mise ERROR error parsing config file: ~/src/drain-cycle/.worktrees/ABA-334/mise.toml
+mise ERROR Config files in ~/src/drain-cycle/.worktrees/ABA-334/mise.toml are not trusted.
+Trust them with `mise trust`. See https://mise.jdx.dev/cli/trust.html for more information.
+mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information
+mise ERROR error parsing config file: ~/src/drain-cycle/.worktrees/ABA-334/mise.toml
+mise ERROR Config files in ~/src/drain-cycle/.worktrees/ABA-334/mise.toml are not trusted.
+Trust them with `mise trust`. See https://mise.jdx.dev/cli/trust.html for more information.
+mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information

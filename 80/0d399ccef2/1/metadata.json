@@ -1,0 +1,54 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "800d399ccef2",
+  "session_id": "aa44615b-0574-43ae-ba73-c375f172efe7",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-17T12:15:38.727188Z",
+  "branch": "ABA-398",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".gitignore",
+    "docs/adrs/0002-thin-supervisor-contract.md",
+    "docs/adrs/references/0002-thin-supervisor-contract-plan-review.md",
+    "docs/adrs/references/0030-execution-state-file-plan-review.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "67175362e92a",
+  "token_usage": {
+    "input_tokens": 24863,
+    "cache_creation_tokens": 42036,
+    "cache_read_tokens": 138143,
+    "output_tokens": 6176,
+    "api_call_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-17T12:15:38.720706Z",
+    "agent_lines": 0,
+    "agent_removed": 136,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 2,
+    "total_committed": 2,
+    "total_lines_changed": 138,
+    "agent_percentage": 98.55072463768117,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 3,
+      "user_lines_removed": 3,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/adrs/0002-thin-supervisor-contract.md": 2,
+        "docs/adrs/references/drain-handoff-schema-v2.md": 1
+      },
+      "user_removed_per_file": {
+        "docs/adrs/0002-thin-supervisor-contract.md": 2,
+        "docs/adrs/references/drain-handoff-schema-v2.md": 1
+      }
+    }
+  ]
+}
