@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from drain_cycle.handoff import HANDOFF_FILE, HandoffData, PullRequest, read, read_partial, write
+from drain_cycle.handoff import EXEC_STATE_FILE, HANDOFF_FILE, HandoffData, PullRequest, read, read_partial, write
 
 
 def _valid_data() -> HandoffData:
@@ -250,3 +250,73 @@ def test_read_partial_reads_verdicts_from_complete_handoff(tmp_path: Path) -> No
     got_ov, got_pv = read_partial(tmp_path)
     assert got_ov == ov
     assert got_pv is None
+
+
+# --- exec-state.json dual-read ---
+
+
+def _valid_exec_state_payload() -> dict:
+    return {
+        "pr_urls": [
+            {"title": "feat: crash-proof filter", "url": "https://github.com/o/r/pull/1"},
+        ]
+    }
+
+
+def test_read_prefers_exec_state_file_over_legacy(tmp_path: Path) -> None:
+    exec_payload = {
+        "pr_urls": [{"title": "from exec-state", "url": "https://github.com/o/r/pull/10"}]
+    }
+    legacy_payload = {
+        "pr_urls": [{"title": "from legacy", "url": "https://github.com/o/r/pull/20"}]
+    }
+    (tmp_path / EXEC_STATE_FILE).write_text(json.dumps(exec_payload))
+    (tmp_path / HANDOFF_FILE).write_text(json.dumps(legacy_payload))
+
+    result = read(tmp_path)
+    assert result is not None
+    assert result.pr_urls[0].title == "from exec-state"
+    assert result.pr_urls[0].url == "https://github.com/o/r/pull/10"
+
+
+def test_read_falls_back_to_legacy_when_exec_state_absent(tmp_path: Path) -> None:
+    (tmp_path / HANDOFF_FILE).write_text(
+        json.dumps({"pr_urls": [{"title": "legacy", "url": "https://github.com/o/r/pull/5"}]})
+    )
+    result = read(tmp_path)
+    assert result is not None
+    assert result.pr_urls[0].title == "legacy"
+
+
+def test_read_falls_back_to_legacy_when_exec_state_invalid(tmp_path: Path) -> None:
+    (tmp_path / EXEC_STATE_FILE).write_text("not valid json{{{")
+    (tmp_path / HANDOFF_FILE).write_text(
+        json.dumps({"pr_urls": [{"title": "legacy", "url": "https://github.com/o/r/pull/5"}]})
+    )
+    result = read(tmp_path)
+    assert result is not None
+    assert result.pr_urls[0].title == "legacy"
+
+
+def test_read_falls_back_to_legacy_when_exec_state_has_empty_pr_urls(tmp_path: Path) -> None:
+    (tmp_path / EXEC_STATE_FILE).write_text(json.dumps({"pr_urls": []}))
+    (tmp_path / HANDOFF_FILE).write_text(
+        json.dumps({"pr_urls": [{"title": "legacy", "url": "https://github.com/o/r/pull/5"}]})
+    )
+    result = read(tmp_path)
+    assert result is not None
+    assert result.pr_urls[0].title == "legacy"
+
+
+def test_read_returns_none_when_both_absent(tmp_path: Path) -> None:
+    assert read(tmp_path) is None
+
+
+def test_read_returns_none_when_both_invalid(tmp_path: Path) -> None:
+    (tmp_path / EXEC_STATE_FILE).write_text("bad{")
+    (tmp_path / HANDOFF_FILE).write_text("bad{")
+    assert read(tmp_path) is None
+
+
+def test_exec_state_file_constant_value() -> None:
+    assert EXEC_STATE_FILE == "exec-state.json"

@@ -28,10 +28,16 @@ from drain_cycle import linear, orchestrator, repos
 # Shell fragment a fake stack-mode worker appends to emit the handoff a real
 # `/shape:pr-finishing` run would write — the orchestrator reads its non-empty
 # ``pr_urls`` as proof the issue's PRs were submitted before tearing down.
+# Dual-write mirrors the migration period: exec-state.json is the primary file
+# the orchestrator now reads, with .drain-handoff.json kept as the legacy copy.
+_HANDOFF_PAYLOAD = '{\"pr_urls\":[{\"title\":\"feat\",\"url\":\"https://x/pull/1\"}]}'
 _HANDOFF_LINE = (
-    "printf '%s' "
-    "'{\"pr_urls\":[{\"title\":\"feat\",\"url\":\"https://x/pull/1\"}]}'"
-    " > .drain-handoff.json\n"
+    f"printf '%s' '{_HANDOFF_PAYLOAD}' > exec-state.json\n"
+    f"printf '%s' '{_HANDOFF_PAYLOAD}' > .drain-handoff.json\n"
+)
+# Variant that writes only exec-state.json (pack has fully cut over).
+_EXEC_STATE_ONLY_LINE = (
+    f"printf '%s' '{_HANDOFF_PAYLOAD}' > exec-state.json\n"
 )
 
 
@@ -237,6 +243,47 @@ def test_stack_mode_chains_same_repo_worktrees_off_prior_branch(
     main_b = _git_log_hashes(repo_b, "main")
     hashes_3 = _git_log_hashes(repo_b, "ABA-3")
     assert main_b[0] in hashes_3
+
+
+def test_stack_mode_exec_state_only_handoff_accepted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A worker that writes only exec-state.json (no legacy .drain-handoff.json)
+    must be accepted: the orchestrator's handoff.read() prefers exec-state.json."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    issue = _issue("ABA-1", repo_name="alpha", sort_order=1.0)
+    issues_by_id = {issue["id"]: issue}
+    marker = tmp_path / "done.txt"
+
+    def fake_pending_issues(cycle_id: str):
+        completed = set(_lines(marker))
+        return linear._plan([i for i in [issue] if i["identifier"] not in completed])
+
+    def fake_get_issue(issue_id: str) -> dict:
+        if issues_by_id[issue_id]["identifier"] in set(_lines(marker)):
+            return {**issues_by_id[issue_id], "state": {"type": "completed", "name": "Done"}}
+        return issues_by_id[issue_id]
+
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "cycle-id")
+    monkeypatch.setattr(linear, "pending_issues", fake_pending_issues)
+    monkeypatch.setattr(linear, "get_issue", fake_get_issue)
+    monkeypatch.setattr(linear, "set_state", lambda issue_id, name: None)
+
+    script = tmp_path / "exec-state-claude.sh"
+    script.write_text(
+        "#!/bin/sh\n"
+        f'printf "%s\\n" "$(basename "$PWD")" >> "{marker}"\n'
+        f"{_EXEC_STATE_ONLY_LINE}"
+    )
+    script.chmod(0o755)
+    monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(script)])
+
+    exit_code = orchestrator.run(repos.Repos(mapping={"alpha": repo}))
+    assert exit_code == 0
 
 
 def test_stack_mode_done_without_handoff_halts_and_preserves_worktree(

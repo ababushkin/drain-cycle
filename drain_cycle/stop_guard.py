@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, TextIO
 
-from .handoff import HANDOFF_FILE, read as _read_handoff
+from .handoff import EXEC_STATE_FILE, HANDOFF_FILE, read as _read_handoff
 from .worktree import BASE_FILE
 
 MARKER_FILE = ".drain-guard.json"
@@ -110,7 +110,7 @@ def read_tripped(worktree: Path) -> str | None:
 # expected to be untracked. ``_git_dirty`` filters them out so the guard
 # doesn't see itself (or the handoff file written *after* the commit) as
 # uncaptured work.
-_OWN_ARTEFACTS = frozenset({MARKER_FILE, TRIPPED_FILE, HANDOFF_FILE, BASE_FILE})
+_OWN_ARTEFACTS = frozenset({MARKER_FILE, TRIPPED_FILE, EXEC_STATE_FILE, HANDOFF_FILE, BASE_FILE})
 
 
 def _git_dirty(worktree: Path) -> bool:
@@ -162,11 +162,11 @@ class Decision:
 
 _BLOCK_PROMPT_STACK = (
     "drain-cycle stop-guard: the issue is not finished — the worktree has "
-    "uncommitted changes or no submitted PRs in .drain-handoff.json yet. "
+    "uncommitted changes or no submitted PRs in exec-state.json yet. "
     "Complete the remaining steps now: commit any pending changes to the "
     "issue branch as reviewable slices (do not push by hand), run "
     "`/shape:pr-finishing` to submit the stacked PR(s) — it writes the "
-    "pr_urls into .drain-handoff.json and posts the review-summary comment "
+    "pr_urls into exec-state.json and posts the review-summary comment "
     "— then transition the issue to Done. If you are genuinely blocked, "
     "leave the issue In Progress and post a comment naming the blocker — "
     "do not stop silently."

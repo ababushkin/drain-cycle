@@ -831,7 +831,7 @@ def _drain_one_issue(
                     )
                     halt_reason = (
                         f"{_halt_message(identifier, effective_state, worktree_path)}"
-                        " — marked Done but .drain-handoff.json has no submitted "
+                        " — marked Done but exec-state.json has no submitted "
                         "pr_urls; stack chain halted"
                     )
                     if finishing_runs:

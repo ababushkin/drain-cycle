@@ -201,6 +201,8 @@ def test_build_finishing_contains_identifier_base_and_worktree(tmp_path: Path) -
     assert str(worktree) in rendered
     assert "main..HEAD" in rendered
     assert "/shape:pr-finishing" in rendered
+    assert "exec-state.json" in rendered
+    assert ".drain-handoff.json" not in rendered
     # Tail line last
     non_empty = [line for line in rendered.splitlines() if line.strip()]
     assert "Done" in non_empty[-1]

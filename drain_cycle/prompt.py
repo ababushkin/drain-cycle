@@ -108,14 +108,14 @@ def build_finishing(identifier: str, worktree: Path, base: str) -> str:
         "(if any). Do not push by hand.\n"
         f"  4. Run `/shape:pr-finishing`.{base_clause} It submits the slices as "
         "stacked PR(s) via Graphite, writes the submitted PR URLs into "
-        "`.drain-handoff.json` (`pr_urls`), and posts the review-summary comment "
+        "`exec-state.json` (`pr_urls`), and posts the review-summary comment "
         "on the Linear issue. Do not run `gt`/`gh` by hand or write "
-        "`.drain-handoff.json` yourself — the skill owns both.\n"
-        "  5. Confirm `.drain-handoff.json` now contains a non-empty `pr_urls` "
+        "`exec-state.json` yourself — the skill owns both.\n"
+        "  5. Confirm `exec-state.json` now contains a non-empty `pr_urls` "
         "list. If the skill could not submit, leave the issue In Progress and "
         "comment the blocker — do not mark Done.\n"
         "  6. Transition issue to Done via `mcp__claude_ai_Linear__save_issue` "
         '(state: "Done").\n\n'
-        "before marking Done: confirm the PR URLs are in `.drain-handoff.json` "
+        "before marking Done: confirm the PR URLs are in `exec-state.json` "
         "and transition to Done.\n"
     )
