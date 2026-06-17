@@ -38,7 +38,7 @@ The corrected boundary-chart rows read:
 
 ### Schema-v2 verdict fields were never built on the handoff
 
-The ADR records `outcome_verdict` and `prep_verdict` as writer-allocated to `exec:verify` and `shape:pr-prepare` respectively. The reader and dataclass support shipped (`drain_cycle/handoff.py`, `drain_cycle/orchestrator.py`, `drain_cycle/runlog.py`, `drain_cycle/kr2_check.py`), but **no pack-side producer was ever wired to call `handoff.write(...)` with those fields populated** — `handoff.read_partial` returns `(None, None)` on every live drain today. The rename to the pack-owned file is therefore not a migration of an in-use producer; the verdict-field producers will be authored against the new file's section contract in the build nodes that follow this amendment (ABA-399, ABA-400).
+The ADR records `outcome_verdict` and `prep_verdict` as writer-allocated to `exec:verify` and `shape:pr-prepare` respectively. The reader and dataclass support shipped (`drain_cycle/handoff.py`, `drain_cycle/orchestrator.py`, `drain_cycle/runlog.py`, `drain_cycle/kr2_check.py`), but **no pack-side producer was ever wired to call `handoff.write(...)` with those fields populated** — `handoff.read_partial` returns `(None, None)` on every live drain today. The rename to the pack-owned file is therefore not a migration of an in-use producer; the verdict-field producers will be authored against the new file's section contract in the build nodes that follow this amendment.
 
 ### Decoupled from §24 (prompt collapse)
 
@@ -46,7 +46,7 @@ The §26 rename is independent of §24 (the prompt-collapse work that thinned `p
 
 ### Observable success
 
-The §26 coupling is closed when no module under `drain_cycle/` and no skill under the pack's `skills/exec-*` tree names `.drain-handoff.json` (grep returns empty). Verified after ABA-399 (pack finishing dual-writes the pack-owned file) and ABA-400 (supervisor reads it with legacy fallback) both land.
+The §26 coupling is closed when no module under `drain_cycle/` and no skill under the pack's `skills/exec-*` tree names `.drain-handoff.json` (grep returns empty). This is reached once two build nodes land: the pack finishing skill dual-writes the pack-owned file, and the supervisor reads it with a legacy fallback.
 
 ## Original ADR (decision text retained for history)
 
