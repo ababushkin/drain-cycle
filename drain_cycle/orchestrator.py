@@ -179,12 +179,12 @@ def _set_verdict_span_attrs(
 ) -> None:
     """Record the verdict/responder span attributes shared by the worker-backed
     halt branches and the Done append, so the recorded shape can't drift."""
-    if outcome.outcome_verdict is not None:
-        issue_span.set_attribute(
-            "issue.outcome_verdict", outcome.outcome_verdict["result"]
-        )
-    if outcome.prep_verdict is not None:
-        issue_span.set_attribute("issue.prep_verdict", outcome.prep_verdict["result"])
+    outcome_result = (outcome.outcome_verdict or {}).get("result")
+    if outcome_result is not None:
+        issue_span.set_attribute("issue.outcome_verdict", outcome_result)
+    prep_result = (outcome.prep_verdict or {}).get("result")
+    if prep_result is not None:
+        issue_span.set_attribute("issue.prep_verdict", prep_result)
     if flow_name is not None:
         issue_span.set_attribute(
             "issue.responder_run_count", len(outcome.responder_runs)

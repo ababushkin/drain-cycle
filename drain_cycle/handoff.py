@@ -54,7 +54,16 @@ def write(worktree: Path, data: HandoffData) -> None:
 
 
 def _parse_dict(raw: object) -> dict[str, Any] | None:
-    return raw if isinstance(raw, dict) else None
+    """Return ``raw`` only if it is a verdict-shaped dict.
+
+    A verdict is a dict carrying a ``result`` key; downstream code reads
+    ``result`` to set span attributes and drive routing. A dict without it is
+    not a usable verdict, so it is dropped to ``None`` here rather than passed
+    on to crash a reader that assumes the key is present.
+    """
+    if not isinstance(raw, dict) or "result" not in raw:
+        return None
+    return raw
 
 
 def read(worktree: Path) -> HandoffData | None:
