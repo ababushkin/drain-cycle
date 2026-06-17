@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "198fbae5e3dc",
+  "strategy": "manual-commit",
+  "branch": "ABA-398",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/adrs/0002-thin-supervisor-contract.md",
+    "docs/adrs/references/drain-handoff-schema-v2.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/19/8fbae5e3dc/0/metadata.json",
+      "transcript": "/19/8fbae5e3dc/0/full.jsonl",
+      "content_hash": "/19/8fbae5e3dc/0/content_hash.txt",
+      "prompt": "/19/8fbae5e3dc/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 86581,
+    "cache_creation_tokens": 810383,
+    "cache_read_tokens": 20417102,
+    "output_tokens": 271757,
+    "api_call_count": 191
+  }
+}
