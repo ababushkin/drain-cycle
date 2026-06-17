@@ -666,6 +666,288 @@ def test_finishing_runs_recorded_with_model_and_timestamps(
 
 
 # ---------------------------------------------------------------------------
+# Hardening: git ancestry check times out → recovery skipped, clean halt
+# ---------------------------------------------------------------------------
+
+
+def test_git_timeout_skips_finishing_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A timed-out ``_commits_beyond_base`` git call returns False → no finishing
+    sub-agent is spawned and the run halts cleanly instead of crashing."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    issue = _issue("ABA-GTO")
+    issues_by_id = {issue["id"]: issue}
+
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "stub-cycle")
+    monkeypatch.setattr(linear, "pending_issues", lambda c: linear._plan([issue]))
+    monkeypatch.setattr(linear, "get_issue", lambda iid: issues_by_id[iid])
+    monkeypatch.setattr(linear, "set_state", lambda iid, s: None)
+
+    # Worker commits but never marks Done: recovery WOULD fire if the commits
+    # were detectable. The git ancestry check times out, so they are not.
+    script = _write_commit_but_stay_not_done_script(tmp_path)
+    monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(script)])
+
+    real_run = orchestrator.subprocess.run
+    timed_out: list = []
+
+    def fake_run(cmd, *args, **kwargs):
+        if cmd and cmd[0] == "git" and len(cmd) > 1 and cmd[1] in ("merge-base", "rev-list"):
+            timed_out.append(cmd)
+            raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout"))
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(orchestrator.subprocess, "run", fake_run)
+
+    exit_code = orchestrator.run(_stub_repos(repo), no_stack=True)
+
+    assert exit_code != 0
+    assert timed_out  # the ancestry check was actually exercised
+    payload = _read_run_log(tmp_path, "stub-cycle")
+    entry = payload["entries"][0]
+    assert entry["finishing_runs"] == []
+    assert "finishing sub-agent" not in (entry["halt_reason"] or "")
+
+
+# ---------------------------------------------------------------------------
+# Hardening: state refresh after finishing reports the demoted state
+# ---------------------------------------------------------------------------
+
+
+def test_state_refresh_after_finishing_reports_demoted_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Finishing agent moves the issue Done→In Progress; the stack-no-PRs halt
+    reports the refreshed state, not the stale "Done" from before the spawn."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    issue = _issue("ABA-RFR")
+    issues_by_id = {issue["id"]: issue}
+    done_marker = tmp_path / "done-identifiers.txt"
+    demote_marker = tmp_path / "demoted.txt"
+    counter_file = tmp_path / "invocation_count.txt"
+
+    def fake_get_issue(issue_id: str) -> dict:
+        base = issues_by_id[issue_id]
+        if demote_marker.exists():
+            return {**base, "state": {"type": "started", "name": "In Progress"}}
+        if base["identifier"] in _completed_identifiers(done_marker):
+            return {**base, "state": {"type": "completed", "name": "Done"}}
+        return base
+
+    def fake_set_state(iid: str, state: str) -> None:
+        # Fail only the revert (back to the original Todo); the pre-spawn
+        # Todo→In Progress transition still succeeds.
+        if state == "Todo":
+            raise RuntimeError("revert failed")
+
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "stub-cycle")
+    monkeypatch.setattr(linear, "pending_issues", lambda c: linear._plan([issue]))
+    monkeypatch.setattr(linear, "get_issue", fake_get_issue)
+    monkeypatch.setattr(linear, "set_state", fake_set_state)
+
+    # inv1 (main): commit + mark Done, no pr_urls.
+    # inv2 (finishing): demote the issue, still no pr_urls.
+    script = tmp_path / "fake-claude.sh"
+    script.write_text(
+        "#!/bin/sh\n"
+        f'count=$(cat "{counter_file}" 2>/dev/null || echo 0)\n'
+        'count=$((count + 1))\n'
+        f'printf "%s" "$count" > "{counter_file}"\n'
+        'if [ "$count" -ge 2 ]; then\n'
+        f'  touch "{demote_marker}"\n'
+        "  exit 0\n"
+        "else\n"
+        '  git config user.email "test@test.com" 2>/dev/null\n'
+        '  git config user.name "Test" 2>/dev/null\n'
+        '  touch work.txt\n'
+        "  git add work.txt 2>/dev/null\n"
+        '  git commit -m "work" 2>/dev/null\n'
+        f'  printf "%s\\n" "$(basename "$PWD")" >> "{done_marker}"\n'
+        "  exit 0\n"
+        "fi\n"
+    )
+    script.chmod(0o755)
+    monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(script)])
+
+    exit_code = orchestrator.run(_stub_repos(repo))
+
+    assert exit_code != 0
+    payload = _read_run_log(tmp_path, "stub-cycle")
+    entry = payload["entries"][0]
+    # The refreshed post-finishing state, not the stale "Done".
+    assert entry["final_linear_state"] == "In Progress"
+    assert "revert to 'Todo' failed" in entry["halt_reason"]
+    assert len(entry["finishing_runs"]) == 1
+    assert entry["finishing_runs"][0]["trigger"] == "err-stack-no-prs"
+
+
+# ---------------------------------------------------------------------------
+# Hardening: finishing agent's verdict propagates at the stack-no-PRs site
+# ---------------------------------------------------------------------------
+
+
+def test_verdict_propagation_at_stack_no_prs_site(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When finishing recovery succeeds, the run-log entry carries the finishing
+    agent's verdict, not the stale verdict the main worker left behind."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    issue = _issue("ABA-VPR")
+    issues_by_id = {issue["id"]: issue}
+    done_marker = tmp_path / "done-identifiers.txt"
+    counter_file = tmp_path / "invocation_count.txt"
+
+    def fake_get_issue(issue_id: str) -> dict:
+        base = issues_by_id[issue_id]
+        if base["identifier"] in _completed_identifiers(done_marker):
+            return {**base, "state": {"type": "completed", "name": "Done"}}
+        return base
+
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "stub-cycle")
+    monkeypatch.setattr(linear, "pending_issues", lambda c: linear._plan([issue]))
+    monkeypatch.setattr(linear, "get_issue", fake_get_issue)
+    monkeypatch.setattr(linear, "set_state", lambda iid, s: None)
+
+    main_verdict = {"result": "pass", "findings": ["from main worker"]}
+    finishing_verdict = {"result": "pass", "findings": ["from finishing agent"]}
+    main_handoff = json.dumps({"pr_urls": [], "outcome_verdict": main_verdict})
+    finishing_handoff = json.dumps(
+        {
+            "pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}],
+            "outcome_verdict": finishing_verdict,
+        }
+    )
+    # inv1 (main): commit + Done + verdict but empty pr_urls.
+    # inv2 (finishing): write pr_urls + a fresh verdict.
+    script = tmp_path / "fake-claude.sh"
+    script.write_text(
+        "#!/bin/sh\n"
+        f'count=$(cat "{counter_file}" 2>/dev/null || echo 0)\n'
+        'count=$((count + 1))\n'
+        f'printf "%s" "$count" > "{counter_file}"\n'
+        'if [ "$count" -ge 2 ]; then\n'
+        f"  cat > .drain-handoff.json << 'EOF'\n{finishing_handoff}\nEOF\n"
+        "  exit 0\n"
+        "else\n"
+        '  git config user.email "test@test.com" 2>/dev/null\n'
+        '  git config user.name "Test" 2>/dev/null\n'
+        '  touch work.txt\n'
+        "  git add work.txt 2>/dev/null\n"
+        '  git commit -m "work" 2>/dev/null\n'
+        f'  printf "%s\\n" "$(basename "$PWD")" >> "{done_marker}"\n'
+        f"  cat > .drain-handoff.json << 'EOF'\n{main_handoff}\nEOF\n"
+        "  exit 0\n"
+        "fi\n"
+    )
+    script.chmod(0o755)
+    monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(script)])
+
+    exit_code = orchestrator.run(_stub_repos(repo))
+
+    assert exit_code == 0
+    payload = _read_run_log(tmp_path, "stub-cycle")
+    entry = payload["entries"][0]
+    assert entry["final_linear_state"] == "Done"
+    assert entry["outcome_verdict"] == finishing_verdict
+    assert entry["outcome_verdict"]["findings"] == ["from finishing agent"]
+    assert len(entry["finishing_runs"]) == 1
+    assert entry["finishing_runs"][0]["trigger"] == "err-stack-no-prs"
+
+
+# ---------------------------------------------------------------------------
+# Hardening: finishing_runs recorded at the verifier-fail halt
+# ---------------------------------------------------------------------------
+
+
+def test_finishing_runs_recorded_at_verifier_fail_halt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A verifier-fail halt that occurs after a finishing attempt still records
+    the ``finishing_runs`` entry (the third halt site to carry it)."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    issue = _issue("ABA-VFH")
+    issues_by_id = {issue["id"]: issue}
+    done_marker = tmp_path / "done-identifiers.txt"
+    counter_file = tmp_path / "invocation_count.txt"
+
+    def fake_get_issue(issue_id: str) -> dict:
+        base = issues_by_id[issue_id]
+        if base["identifier"] in _completed_identifiers(done_marker):
+            return {**base, "state": {"type": "completed", "name": "Done"}}
+        return base
+
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "stub-cycle")
+    monkeypatch.setattr(linear, "pending_issues", lambda c: linear._plan([issue]))
+    monkeypatch.setattr(linear, "get_issue", fake_get_issue)
+    monkeypatch.setattr(linear, "set_state", lambda iid, s: None)
+
+    fail_verdict = {
+        "result": "fail",
+        "findings": ["regression introduced"],
+        "invoked_at": "2026-01-01T00:00:00Z",
+    }
+    finishing_handoff = json.dumps(
+        {
+            "pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}],
+            "outcome_verdict": fail_verdict,
+        }
+    )
+    # inv1 (main): commit, never Done, no verdict → not-Done recovery allowed.
+    # inv2 (finishing): mark Done + pr_urls + a FAIL verdict → verifier gate halts.
+    script = tmp_path / "fake-claude.sh"
+    script.write_text(
+        "#!/bin/sh\n"
+        f'count=$(cat "{counter_file}" 2>/dev/null || echo 0)\n'
+        'count=$((count + 1))\n'
+        f'printf "%s" "$count" > "{counter_file}"\n'
+        'if [ "$count" -ge 2 ]; then\n'
+        f'  printf "%s\\n" "$(basename "$PWD")" >> "{done_marker}"\n'
+        f"  cat > .drain-handoff.json << 'EOF'\n{finishing_handoff}\nEOF\n"
+        "  exit 0\n"
+        "else\n"
+        '  git config user.email "test@test.com" 2>/dev/null\n'
+        '  git config user.name "Test" 2>/dev/null\n'
+        '  touch work.txt\n'
+        "  git add work.txt 2>/dev/null\n"
+        '  git commit -m "work" 2>/dev/null\n'
+        "  exit 0\n"
+        "fi\n"
+    )
+    script.chmod(0o755)
+    monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(script)])
+
+    exit_code = orchestrator.run(_stub_repos(repo))
+
+    assert exit_code != 0
+    payload = _read_run_log(tmp_path, "stub-cycle")
+    entry = payload["entries"][0]
+    assert "outcome verifier fail" in entry["halt_reason"]
+    assert len(entry["finishing_runs"]) == 1
+    assert entry["finishing_runs"][0]["trigger"] == "err-issue-not-done"
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
