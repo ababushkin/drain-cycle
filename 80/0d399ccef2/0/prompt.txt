@@ -1,0 +1,5 @@
+ok now review all the PRs open, particularly the descriptions against /writing-refinement 
+
+finally tell me which ones i actually need to pay attention to vs. which ones i can merge - i only have 15-30 minutes of cognitive energy left
+
+plan-reviews should never be committed, they're transient artefacts
