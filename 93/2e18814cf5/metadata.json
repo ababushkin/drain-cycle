@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "932e18814cf5",
+  "strategy": "manual-commit",
+  "branch": "ABA-373-handoff-schema",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/handoff.py",
+    "drain_cycle/orchestrator.py",
+    "tests/test_handoff.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/93/2e18814cf5/0/metadata.json",
+      "transcript": "/93/2e18814cf5/0/full.jsonl",
+      "content_hash": "/93/2e18814cf5/0/content_hash.txt",
+      "prompt": "/93/2e18814cf5/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 27877,
+    "cache_creation_tokens": 99021,
+    "cache_read_tokens": 2030542,
+    "output_tokens": 30741,
+    "api_call_count": 37
+  }
+}

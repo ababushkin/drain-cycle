@@ -1,0 +1,48 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "932e18814cf5",
+  "session_id": "0567308d-82ec-40e4-871a-f12a9ac1109b",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-17T02:49:20.710237Z",
+  "branch": "ABA-373-handoff-schema",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/handoff.py",
+    "drain_cycle/orchestrator.py",
+    "tests/test_handoff.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "5a831a55519f",
+  "token_usage": {
+    "input_tokens": 27877,
+    "cache_creation_tokens": 99021,
+    "cache_read_tokens": 2030542,
+    "output_tokens": 30741,
+    "api_call_count": 37
+  },
+  "session_metrics": {
+    "turn_count": 6
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-17T02:49:20.699018Z",
+    "agent_lines": 225,
+    "agent_removed": 21,
+    "human_added": 295,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 520,
+    "total_lines_changed": 541,
+    "agent_percentage": 45.4713493530499,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}

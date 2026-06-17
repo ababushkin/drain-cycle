@@ -1,0 +1,30 @@
+i'm reviewing the prs open in this repo
+specifically the stacks from pr 22 up to 28
+
+lets review the handoff process and its verdicts as that's the focus
+
+explain to me the handoff API with an example of how to use it and give me human friendly version of the happy path and failure mode tests that have been written
+
+---
+
+before we do that, are there are any failure modes that should be added?
+
+---
+
+add that as a comment against the PR first, i want to walk through it all and then do one sweep
+
+---
+
+lets look at prs 27-28 now which contains the recovery modes and do the same read out to me
+
+---
+
+yes
+
+---
+
+yes
+
+---
+
+go ahead and address the feedback against those PRs
