@@ -1,12 +1,12 @@
 """Tests that orchestrator reads verdict fields from the handoff on every exit.
 
 Task 1 (skeleton): Done-path drain populates outcome_verdict and prep_verdict
-from .drain-handoff.json left by the worker.
+from exec-state.json left by the worker.
 
 Task 2 (halt path): a halt entry carries halt_reason plus any verdicts the
 worker managed to record in the partial handoff before exiting.
 
-The fake ``claude`` script writes a ``.drain-handoff.json`` with canned
+The fake ``claude`` script writes a ``exec-state.json`` with canned
 verdicts directly into the worktree directory (its ``$PWD``). In Done-path
 tests it also writes to the done-marker so the issue is seen as Done. In
 halt-path tests it omits that step, leaving the issue in Todo — which triggers
@@ -77,7 +77,7 @@ def _write_done_script(tmp_path: Path, done_marker: Path) -> Path:
         "#!/bin/sh\n"
         f'printf "%s\\n" "$(basename "$PWD")" >> "{done_marker}"\n'
         # Write the handoff into the current worktree directory.
-        f"printf '%s' '{handoff_json}' > .drain-handoff.json\n"
+        f"printf '%s' '{handoff_json}' > exec-state.json\n"
     )
     script.chmod(0o755)
     return script
@@ -90,7 +90,7 @@ def _write_done_fail_verdict_script(tmp_path: Path, done_marker: Path) -> Path:
     script.write_text(
         "#!/bin/sh\n"
         f'printf "%s\\n" "$(basename "$PWD")" >> "{done_marker}"\n'
-        f"printf '%s' '{handoff_json}' > .drain-handoff.json\n"
+        f"printf '%s' '{handoff_json}' > exec-state.json\n"
     )
     script.chmod(0o755)
     return script
@@ -102,7 +102,7 @@ def _write_halt_script(tmp_path: Path) -> Path:
     script = tmp_path / "fake-claude.sh"
     script.write_text(
         "#!/bin/sh\n"
-        f"printf '%s' '{handoff_json}' > .drain-handoff.json\n"
+        f"printf '%s' '{handoff_json}' > exec-state.json\n"
     )
     script.chmod(0o755)
     return script

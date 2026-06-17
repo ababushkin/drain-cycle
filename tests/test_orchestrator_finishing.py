@@ -80,7 +80,7 @@ def _write_two_invocation_script(
     if second_writes_handoff:
         handoff_clause = (
             'printf \'{"pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}]}\' '
-            "> .drain-handoff.json\n"
+            "> exec-state.json\n"
         )
     script = tmp_path / "fake-claude.sh"
     script.write_text(
@@ -162,7 +162,7 @@ def _write_commit_with_fail_verdict_script(tmp_path: Path) -> Path:
         'touch work.txt\n'
         "git add work.txt 2>/dev/null\n"
         'git commit -m "work" 2>/dev/null\n'
-        f"cat > .drain-handoff.json << 'EOFHANDOFF'\n{handoff}\nEOFHANDOFF\n"
+        f"cat > exec-state.json << 'EOFHANDOFF'\n{handoff}\nEOFHANDOFF\n"
         "exit 0\n"
     )
     script.chmod(0o755)
@@ -188,7 +188,7 @@ def _write_done_no_prs_then_finishing_script(
         'if [ "$count" -ge 2 ]; then\n'
         # Second invocation: write pr_urls (issue already Done)
         '  printf \'{"pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}]}\''
-        " > .drain-handoff.json\n"
+        " > exec-state.json\n"
         "  exit 0\n"
         "else\n"
         # First invocation: make a commit, mark Done, but omit pr_urls
@@ -842,7 +842,7 @@ def test_verdict_propagation_at_stack_no_prs_site(
         'count=$((count + 1))\n'
         f'printf "%s" "$count" > "{counter_file}"\n'
         'if [ "$count" -ge 2 ]; then\n'
-        f"  cat > .drain-handoff.json << 'EOF'\n{finishing_handoff}\nEOF\n"
+        f"  cat > exec-state.json << 'EOF'\n{finishing_handoff}\nEOF\n"
         "  exit 0\n"
         "else\n"
         '  git config user.email "test@test.com" 2>/dev/null\n'
@@ -851,7 +851,7 @@ def test_verdict_propagation_at_stack_no_prs_site(
         "  git add work.txt 2>/dev/null\n"
         '  git commit -m "work" 2>/dev/null\n'
         f'  printf "%s\\n" "$(basename "$PWD")" >> "{done_marker}"\n'
-        f"  cat > .drain-handoff.json << 'EOF'\n{main_handoff}\nEOF\n"
+        f"  cat > exec-state.json << 'EOF'\n{main_handoff}\nEOF\n"
         "  exit 0\n"
         "fi\n"
     )
@@ -923,7 +923,7 @@ def test_finishing_runs_recorded_at_verifier_fail_halt(
         f'printf "%s" "$count" > "{counter_file}"\n'
         'if [ "$count" -ge 2 ]; then\n'
         f'  printf "%s\\n" "$(basename "$PWD")" >> "{done_marker}"\n'
-        f"  cat > .drain-handoff.json << 'EOF'\n{finishing_handoff}\nEOF\n"
+        f"  cat > exec-state.json << 'EOF'\n{finishing_handoff}\nEOF\n"
         "  exit 0\n"
         "else\n"
         '  git config user.email "test@test.com" 2>/dev/null\n'

@@ -10,10 +10,10 @@ This module is the Stop hook the worker session runs at end-of-turn. It
 fires only when the orchestrator has planted ``.drain-guard.json`` in the
 worktree root, so interactive sessions and non-drain runs are a silent
 no-op. When the marker is present and the session is trying to stop with
-work still uncaptured (dirty tree or, in stack mode, no
-``.drain-handoff.json``), it returns ``decision: block`` to push the
-agent through the completion sequence. After ``max_blocks`` re-injections
-it gives up, writes ``.drain-guard-tripped`` with the observed state, and
+work still uncaptured (dirty tree or, in stack mode, no valid
+``exec-state.json``), it returns ``decision: block`` to push the agent
+through the completion sequence. After ``max_blocks`` re-injections it
+gives up, writes ``.drain-guard-tripped`` with the observed state, and
 lets the session exit — the orchestrator reads that marker and tags the
 halt as ``worker_stopped_incomplete`` rather than the generic not-Done
 line.
@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, TextIO
 
-from .handoff import EXEC_STATE_FILE, HANDOFF_FILE, read as _read_handoff
+from .handoff import EXEC_STATE_FILE, read as _read_handoff
 from .worktree import BASE_FILE
 
 MARKER_FILE = ".drain-guard.json"
@@ -110,7 +110,7 @@ def read_tripped(worktree: Path) -> str | None:
 # expected to be untracked. ``_git_dirty`` filters them out so the guard
 # doesn't see itself (or the handoff file written *after* the commit) as
 # uncaptured work.
-_OWN_ARTEFACTS = frozenset({MARKER_FILE, TRIPPED_FILE, EXEC_STATE_FILE, HANDOFF_FILE, BASE_FILE})
+_OWN_ARTEFACTS = frozenset({MARKER_FILE, TRIPPED_FILE, EXEC_STATE_FILE, BASE_FILE})
 
 
 def _git_dirty(worktree: Path) -> bool:
@@ -118,7 +118,7 @@ def _git_dirty(worktree: Path) -> bool:
 
     ``git status --porcelain`` lines are ``XY <path>`` (two status chars,
     a space, then the path). Untracked entries for our own artefacts —
-    ``.drain-guard.json``, ``.drain-guard-tripped``, ``.drain-handoff.json``
+    ``.drain-guard.json``, ``.drain-guard-tripped``, ``exec-state.json``
     — are skipped: the handoff is written after the commit by design, and
     the guard's own markers are not the agent's work.
     """
@@ -227,7 +227,7 @@ def _describe_incomplete(mode: str, *, dirty: bool, handoff_ok: bool) -> str:
     if dirty:
         parts.append("uncommitted changes in worktree")
     if mode == "stack" and not handoff_ok:
-        parts.append("no valid .drain-handoff.json")
+        parts.append("no valid exec-state.json")
     return ", ".join(parts) or "incomplete state"
 
 

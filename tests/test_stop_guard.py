@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from drain_cycle import stop_guard
-from drain_cycle.handoff import HandoffData, PullRequest, write as write_handoff
+from drain_cycle.handoff import EXEC_STATE_FILE
 
 
 def _git_init(path: Path) -> None:
@@ -34,9 +34,9 @@ def _commit(path: Path, name: str, contents: str = "x") -> None:
     subprocess.run(["git", "commit", "-qm", "c"], cwd=path, check=True)
 
 
-def _valid_handoff() -> HandoffData:
-    return HandoffData(
-        pr_urls=(PullRequest(title="feat: x", url="https://github.com/o/r/pull/1"),)
+def _write_exec_state(path: Path) -> None:
+    (path / EXEC_STATE_FILE).write_text(
+        json.dumps({"pr_urls": [{"title": "feat: x", "url": "https://github.com/o/r/pull/1"}]})
     )
 
 
@@ -52,12 +52,10 @@ def test_stack_mode_clean_tree_with_handoff_passes_through(tmp_path: Path) -> No
     _git_init(tmp_path)
     _commit(tmp_path, "a.txt")
     stop_guard.write_marker(tmp_path, mode="stack")
-    write_handoff(tmp_path, _valid_handoff())
-    # The marker and handoff are tracked-not, leave tree dirty by status —
-    # in practice both are gitignored, so simulate by committing them away
-    # or by adding to .gitignore. Add a .gitignore here.
+    _write_exec_state(tmp_path)
+    # The marker and exec-state are untracked; gitignore them so the tree stays clean.
     (tmp_path / ".gitignore").write_text(
-        f"{stop_guard.MARKER_FILE}\n.drain-handoff.json\n.drain-guard-tripped\n"
+        f"{stop_guard.MARKER_FILE}\n.drain-guard-tripped\n"
     )
     subprocess.run(["git", "add", ".gitignore"], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-qm", "ignore"], cwd=tmp_path, check=True)
@@ -202,8 +200,8 @@ def test_own_artefacts_do_not_count_as_dirty(tmp_path: Path) -> None:
     _git_init(tmp_path)
     _commit(tmp_path, "a.txt")
     stop_guard.write_marker(tmp_path, mode="stack")
-    write_handoff(tmp_path, _valid_handoff())
-    # Marker and handoff are both untracked; nothing else is dirty.
+    _write_exec_state(tmp_path)
+    # Marker and exec-state are both untracked; nothing else is dirty.
     decision = stop_guard.evaluate(tmp_path, stop_hook_active=False)
     assert decision.block_reason is None
     assert decision.tripped_reason is None

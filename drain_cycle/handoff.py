@@ -8,11 +8,6 @@ back as its confirmation signal — a present, non-empty ``pr_urls`` means the
 skill submitted at least one PR; its absence means submission never completed
 and the per-repo chain must halt rather than march on.
 
-``read`` prefers ``exec-state.json`` and falls back to the legacy
-``.drain-handoff.json`` so the orchestrator works whether or not the pack has
-cut over to the new file. Neither file present (or both structurally invalid)
-returns ``None``.
-
 Schema v2 adds ``outcome_verdict`` and ``prep_verdict`` fields so the worker
 can record its self-assessment. The orchestrator reads these on every exit
 path — Done, halted, or errored — and lands them in the run-log entry.
@@ -30,7 +25,6 @@ from pathlib import Path
 from typing import Any
 
 EXEC_STATE_FILE = "exec-state.json"
-HANDOFF_FILE = ".drain-handoff.json"
 
 
 @dataclass(frozen=True)
@@ -44,19 +38,6 @@ class HandoffData:
     pr_urls: tuple[PullRequest, ...]
     outcome_verdict: dict[str, Any] | None = None
     prep_verdict: dict[str, Any] | None = None
-
-
-def write(worktree: Path, data: HandoffData) -> None:
-    """Serialise ``data`` to ``<worktree>/.drain-handoff.json``."""
-    path = worktree / HANDOFF_FILE
-    payload: dict[str, Any] = {
-        "pr_urls": [{"title": pr.title, "url": pr.url} for pr in data.pr_urls],
-    }
-    if data.outcome_verdict is not None:
-        payload["outcome_verdict"] = data.outcome_verdict
-    if data.prep_verdict is not None:
-        payload["prep_verdict"] = data.prep_verdict
-    path.write_text(json.dumps(payload, indent=2))
 
 
 def _parse_dict(raw: object) -> dict[str, Any] | None:
@@ -108,17 +89,13 @@ def _read_file(path: Path) -> HandoffData | None:
 def read(worktree: Path) -> HandoffData | None:
     """Return the handoff data for ``worktree``, or ``None`` if absent or invalid.
 
-    Prefers ``exec-state.json`` (the pack-named file) and falls back to the
-    legacy ``.drain-handoff.json``. Returns ``None`` when neither file exists
-    or both are structurally invalid.
+    Reads ``exec-state.json`` (the pack-named file). Returns ``None`` when the
+    file is absent or structurally invalid.
 
     ``outcome_verdict`` and ``prep_verdict`` are optional: missing keys are
     read as ``None`` and do not affect validity.
     """
-    result = _read_file(worktree / EXEC_STATE_FILE)
-    if result is not None:
-        return result
-    return _read_file(worktree / HANDOFF_FILE)
+    return _read_file(worktree / EXEC_STATE_FILE)
 
 
 def read_partial(
@@ -130,7 +107,7 @@ def read_partial(
     even when ``pr_urls`` is absent or empty and ``read`` would return ``None``.
     Returns ``(None, None)`` when the file is absent or malformed.
     """
-    path = worktree / HANDOFF_FILE
+    path = worktree / EXEC_STATE_FILE
     try:
         payload = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError):
