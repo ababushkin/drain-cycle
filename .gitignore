@@ -8,6 +8,7 @@
 .drain-handoff.json
 .drain-base
 pickup-envelope.json
+exec-state.json
 
 # Operator secrets (LINEAR_API_KEY etc).
 .env
