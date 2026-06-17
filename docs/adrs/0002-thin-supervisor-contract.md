@@ -1,7 +1,50 @@
 # ADR 0002: Thin-supervisor contract — prompt-segment allocation, handoff schema v2, process/workflow boundary
 
 **Date:** 2026-06-16
-**Status:** Accepted (plan-review at `docs/adrs/references/0002-thin-supervisor-contract-plan-review.md`)
+**Status:** Accepted (plan-review at `docs/adrs/references/0002-thin-supervisor-contract-plan-review.md`); **superseded in part by [ADR 0030](0030-execution-state-file.md)** — see the Amendment below.
+
+## Amendment 2026-06-17 — single pack-owned execution-state file (supersedes the two-file model)
+
+[ADR 0030](0030-execution-state-file.md) replaces the two-file model this ADR established (`pickup-envelope.json` carrier + consumer-named `.drain-handoff.json` exit record) with **one pack-owned execution-state file per task** (illustratively `exec-state.json`, named in the pack's own terms). Each phase's skill writes its own section as the natural output of that phase; the supervisor authors none of the content and reads only the fields it gates on (the review verdict and `pr_urls`). The artefact's reason-to-exist is no longer "state the skill writes *for the supervisor*" — it is the workflow's own record, with the supervisor as one reader among possible others. See ADR 0030 for the rationale.
+
+Concretely, the parts of this ADR superseded by ADR 0030:
+
+- The **§ `.drain-handoff.json` schema v2** section, including the writer/reader allocation table, the lifecycle diagram, and the halt-reason taxonomy. The fields (`pr_urls`, `final_linear_state`, `exit_code`, `outcome_verdict`, `prep_verdict`, `halt_reason`) reappear as sections of the pack-owned file in ADR 0030; the file's name and owner change. The `docs/adrs/references/drain-handoff-schema-v2.md` reference is superseded with this amendment.
+- The **§ Constraints / Functional** bullets that name `.drain-handoff.json` as the contract carrier, and the **§ Schema-v2 fitness** NFR row keyed off that filename.
+- The **§ Process-vs-workflow boundary chart** rows that name `.drain-handoff.json` as the supervisor's read source — corrected below against code.
+
+The parts of this ADR **not** superseded:
+
+- The **15-line worker prompt template** and its segment allocation (§ Prompt-segment allocation).
+- The **procedure-verb grep** fitness function for the supervisor source.
+- The **vendor-agnostic prose constraints** for the prompt template.
+- The boundary-chart rows that do not turn on the handoff file's owner or path (worker spawn, worktree creation, halt-on-timeout, resume detection, stack-mode resolution, label resolution, the deleted `flow.py` gate).
+
+### Boundary-chart corrections (doc-vs-code divergences caught at reopen)
+
+The chart below mis-names the readers of `.drain-handoff.json`. Verified against `drain_cycle/`:
+
+- `drain_cycle/grade.py` reads `~/.drain-cycle/runs/*.json` (run-log files), **not** the handoff. It groups entries by `cycle_id` and emits the per-cycle / across-cycles / verdict report.
+- `drain_cycle/runlog.py` writes `~/.drain-cycle/runs/<cycle-id>-<run-timestamp>.json`. It does **not** read the handoff; the orchestrator reads the handoff and passes verdict fields into `runlog.append_entry(...)`.
+- `drain_cycle/orchestrator.py` is the sole reader of `.drain-handoff.json`. It calls `handoff.read(...)` for the `pr_urls` gating signal (was submission performed?) and `handoff.read_partial(...)` for best-effort verdict carryover into the run-log entry.
+
+The corrected boundary-chart rows read:
+
+| Concern | Today's location | After contract | Class |
+|---|---|---|---|
+| Grade the run (read run-log entries) | `grade.py` | unchanged; reads `~/.drain-cycle/runs/*.json` | process |
+| Run-log entry writing | `runlog.py` | unchanged; orchestrator reads the execution-state file and passes verdict fields into `runlog.append_entry(...)` | process |
+| Read the worker's execution state at exit | `orchestrator.py` (`handoff.read` for `pr_urls`; `handoff.read_partial` for verdict carryover) | unchanged in actor; the file becomes the pack-owned execution-state file per ADR 0030 | process |
+
+### Schema-v2 verdict fields were never built on the handoff
+
+The ADR records `outcome_verdict` and `prep_verdict` as writer-allocated to `exec:verify` and `shape:pr-prepare` respectively. The reader and dataclass support shipped (`drain_cycle/handoff.py`, `drain_cycle/orchestrator.py`, `drain_cycle/runlog.py`, `drain_cycle/kr2_check.py`), but **no pack-side producer was ever wired to call `handoff.write(...)` with those fields populated** — `handoff.read_partial` returns `(None, None)` on every live drain today. The rename to the pack-owned file is therefore not a migration of an in-use producer; the verdict-field producers will be authored against the new file's section contract in the build nodes that follow this amendment (ABA-399, ABA-400).
+
+### Decoupled from §24 (prompt collapse)
+
+The §26 rename is independent of §24 (the prompt-collapse work that thinned `prompt.py`'s tail into the pointer-only template). The file-rename build nodes do not edit the prompt template, the procedure-verb grep, or the 15-line fitness check; the §24 work does not touch the handoff file's name or owner. Either can land without the other.
+
+## Original ADR (decision text retained for history)
 
 The supervisor hands the worker process facts and one skill pointer — never the procedure itself; the pack owns every workflow step. Two mechanical checks keep it thin: the prompt template stays within 15 lines (`wc -l`) and a grep finds no procedure verbs in `drain_cycle/`.
 
