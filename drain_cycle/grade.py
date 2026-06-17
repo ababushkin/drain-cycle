@@ -1,208 +1,150 @@
-"""Self-grade a series of drain-cycle runs.
+"""``drain-cycle grade``: initiative health from confirmed grade files.
 
-Reads every ``~/.drain-cycle/runs/*.json`` produced by the orchestrator
-and emits a human-readable health read:
+Reads every grade file at ``~/.drain-cycle/grades/*.md``, separates
+confirmed from draft, and reports:
 
-1. Per-cycle section: cycle_id, attempted count, integer completion %,
-   and halted entries as
-   ``<identifier>: (<final_linear_state>, <exit_code>)``.
-2. Across-cycles section: trend label over the last ``_TREND_WINDOW``
-   cycles + recurrent ``(final_linear_state, exit_code)`` tuples
-   appearing in ≥2 of those cycles.
-3. Verdict section: one of ``HEALTHY`` / ``WATCH`` / ``CONCERNING``
-   against the most-recent cycle's completion %. Labels are general
-   health bands — the operator interprets them against whatever kill /
-   continuation rule they hold for the work being drained. No
-   project-specific reminders are baked into the tool.
+1. Total tickets graded (confirmed count).
+2. Pass-rate: confirmed entries without a silent-Done violation,
+   expressed as ``N/D (P%)``.
+3. Silent-Done violations: confirmed Done entries where the outcome
+   verifier never ran (``outcome_verdict == null`` in the run log).
+4. Draft files are warned about on stderr and excluded from the count.
 
-Run logs are grouped by ``cycle_id`` because one cycle can produce
-multiple files when ``drain-cycle`` is re-run against the same cycle
-after a halt. Chronological ordering uses the earliest filename per
-cycle.
+A *silent-Done violation* is the condition the halt-on-fail gate (ABA-328)
+is supposed to prevent: a ticket reaches Done in Linear without the outcome
+verifier running. Only ``outcome_verdict == null`` counts — a verdict of any
+kind (pass or fail) clears the violation.
+
+Exit code: 0 if no violations; 1 if any silent-Done violation is found.
 """
 from __future__ import annotations
 
 import json
 import sys
-from collections import Counter
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from . import runlog
+from . import grade_draft, runlog
 
-_TREND_WINDOW = 3
-"""Number of most-recent cycles considered by the trend + recurrent-tuple
-analysis. Pinned here; not configurable by the CLI."""
 
-_HEALTHY_THRESHOLD = 80
-_WATCH_THRESHOLD = 50
-"""Verdict bands. Boundaries are inclusive on the lower edge:
-≥80 → HEALTHY, 50–79 → WATCH, <50 → CONCERNING."""
+def default_grades_dir() -> Path:
+    return grade_draft.grades_dir()
 
 
 def default_runs_dir() -> Path:
     return runlog.runs_dir()
 
 
-@dataclass
-class _Cycle:
-    cycle_id: str
-    entries: list[dict[str, Any]] = field(default_factory=list)
-    earliest_filename: str = ""
+def _parse_frontmatter(text: str) -> dict[str, str]:
+    """Return key/value pairs from the opening ``---`` block.
 
-    @property
-    def attempted(self) -> int:
-        return len(self.entries)
-
-    @property
-    def completion_percent(self) -> int:
-        if not self.entries:
-            return 0
-        done = sum(1 for e in self.entries if e["final_linear_state"] == "Done")
-        return round(done * 100 / self.attempted)
-
-    @property
-    def halted(self) -> list[dict[str, Any]]:
-        return [e for e in self.entries if e["final_linear_state"] != "Done"]
-
-
-def _collect_cycles(runs_dir: Path) -> list[_Cycle]:
-    """Group run-log files by cycle_id, chronological by earliest filename.
-
-    A cycle can span multiple files (re-running drain-cycle on the same
-    cycle writes a new file). Ties are broken by filename; in practice
-    cycles never tie because each cycle has its own UUID, but the rule is
-    held for determinism if two cycles ever did share a min-filename
-    timestamp.
-
-    Malformed files — invalid JSON, missing ``cycle_id`` — are skipped
-    with a stderr warning. The grade tool is the kill-condition gauge;
-    one bad file should never block reading the rest.
+    Parses only simple ``key: value`` lines — no nested YAML, no lists.
+    Returns an empty dict if the file has no frontmatter block.
     """
-    files = sorted(runs_dir.glob("*.json"))
-    cycles: dict[str, _Cycle] = {}
-    for path in files:
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}
+    result: dict[str, str] = {}
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        if ":" in line:
+            key, _, value = line.partition(":")
+            result[key.strip()] = value.strip()
+    return result
+
+
+def _find_run_entry(issue_identifier: str, runs_dir: Path) -> dict[str, Any] | None:
+    """Return the most-recent run-log entry for *issue_identifier*, or None."""
+    if not runs_dir.is_dir():
+        return None
+    for path in sorted(runs_dir.glob("*.json"), reverse=True):
         try:
             payload = json.loads(path.read_text())
-            cycle_id = payload["cycle_id"]
-        except (json.JSONDecodeError, KeyError, OSError) as exc:
+        except (json.JSONDecodeError, OSError):
+            continue
+        for entry in reversed(payload.get("entries", [])):
+            if entry.get("issue_identifier") == issue_identifier:
+                return entry
+    return None
+
+
+def _is_silent_done(entry: dict[str, Any]) -> bool:
+    """True when the entry is Done in Linear but outcome_verdict was never set."""
+    return (
+        entry.get("final_linear_state") == "Done"
+        and entry.get("outcome_verdict") is None
+    )
+
+
+def run(grades_dir: Path, runs_dir: Path) -> int:
+    """Read grade files, report pass-rate and silent-Done violations.
+
+    Returns exit code: 0 (clean) or 1 (violations found).
+    """
+    confirmed: list[str] = []
+    drafts: list[str] = []
+
+    if grades_dir.is_dir():
+        for path in sorted(grades_dir.glob("*.md")):
+            try:
+                fm = _parse_frontmatter(path.read_text())
+            except OSError as exc:
+                print(
+                    f"drain-cycle grade: skipping unreadable grade file {path}: {exc}",
+                    file=sys.stderr,
+                )
+                continue
+            issue = fm.get("issue", path.stem)
+            status = fm.get("status", "draft")
+            if status == "confirmed":
+                confirmed.append(issue)
+            else:
+                drafts.append(issue)
+
+    if drafts:
+        for issue in drafts:
             print(
-                f"drain-cycle grade: skipping malformed run-log {path}: {exc}",
+                f"drain-cycle grade: warning: {issue} is a draft — excluded from rate",
                 file=sys.stderr,
             )
+
+    total = len(confirmed)
+
+    violations: list[str] = []
+    no_runlog: list[str] = []
+
+    for issue in confirmed:
+        entry = _find_run_entry(issue, runs_dir)
+        if entry is None:
+            no_runlog.append(issue)
             continue
-        cycle = cycles.setdefault(cycle_id, _Cycle(cycle_id=cycle_id))
-        cycle.entries.extend(payload.get("entries", []))
-        if not cycle.earliest_filename or path.name < cycle.earliest_filename:
-            cycle.earliest_filename = path.name
-    return sorted(cycles.values(), key=lambda c: (c.earliest_filename, c.cycle_id))
+        if _is_silent_done(entry):
+            violations.append(issue)
 
-
-def _trend_label(percents: list[int]) -> str:
-    """Strict-monotonic over the window → improving/regressing; else flat.
-
-    Single-cycle or empty windows are "flat" by definition (no direction
-    can be inferred from one or zero points). Two-cycle windows still
-    apply the strict-monotonic rule (50 → 60 is improving; 50 → 50 is
-    flat because the inequality is strict).
-    """
-    if len(percents) < 2:
-        return "flat"
-    if all(a < b for a, b in zip(percents, percents[1:])):
-        return "improving"
-    if all(a > b for a, b in zip(percents, percents[1:])):
-        return "regressing"
-    return "flat"
-
-
-def _recurrent_tuples(cycles: list[_Cycle]) -> list[tuple[tuple[str, int], int]]:
-    """Tuples appearing in ≥2 of the supplied cycles, with cycle-count.
-
-    Counted per cycle, not per entry: if a tuple appears three times
-    inside one cycle and once in another, it counts as 2 cycles (not 4).
-    Sorted by descending count then by the tuple itself for determinism.
-    """
-    counter: Counter[tuple[str, int]] = Counter()
-    for cycle in cycles:
-        seen_in_cycle: set[tuple[str, int]] = set()
-        for entry in cycle.entries:
-            key = (entry["final_linear_state"], entry["exit_code"])
-            seen_in_cycle.add(key)
-        counter.update(seen_in_cycle)
-    recurrent = [(tup, count) for tup, count in counter.items() if count >= 2]
-    recurrent.sort(key=lambda item: (-item[1], item[0]))
-    return recurrent
-
-
-def _render_across_cycles(cycles: list[_Cycle]) -> str:
-    window = cycles[-_TREND_WINDOW:]
-    percents = [c.completion_percent for c in window]
-    lines = [
-        f"window: last {len(window)} of {len(cycles)} cycle(s)"
-        f" (max {_TREND_WINDOW})",
-        f"trend: {_trend_label(percents)}",
-    ]
-    recurrent = _recurrent_tuples(window)
-    if not recurrent:
-        lines.append("recurrent tuples: none")
-    else:
-        lines.append("recurrent tuples:")
-        for (state, exit_code), count in recurrent:
-            lines.append(f"  ({state}, {exit_code}) x {count}")
-    return "\n".join(lines)
-
-
-def _render_verdict(cycles: list[_Cycle]) -> str:
-    most_recent = cycles[-1]
-    pct = most_recent.completion_percent
-    if pct >= _HEALTHY_THRESHOLD:
-        label = "HEALTHY"
-    elif pct >= _WATCH_THRESHOLD:
-        label = "WATCH"
-    else:
-        label = "CONCERNING"
-    return f"verdict: {label} (most-recent cycle completion: {pct}%)"
-
-
-def _render_per_cycle(cycle: _Cycle) -> str:
-    lines = [
-        f"cycle_id: {cycle.cycle_id}",
-        f"  attempted: {cycle.attempted}",
-        f"  completion: {cycle.completion_percent}%",
-    ]
-    if cycle.halted:
-        lines.append("  halted:")
-        for entry in cycle.halted:
-            lines.append(
-                f"    {entry['issue_identifier']}: "
-                f"({entry['final_linear_state']}, {entry['exit_code']})"
-            )
-    return "\n".join(lines)
-
-
-def run(runs_dir: Path) -> int:
-    cycles = _collect_cycles(runs_dir) if runs_dir.is_dir() else []
-    if not cycles:
+    for issue in no_runlog:
         print(
-            f"drain-cycle grade: no run logs found at {runs_dir}",
+            f"drain-cycle grade: warning: {issue} confirmed but no run-log entry found",
             file=sys.stderr,
         )
-        return 1
 
-    print("== Per-cycle ==")
-    print()
-    for cycle in cycles:
-        print(_render_per_cycle(cycle))
-        print()
+    passes = total - len(violations) - len(no_runlog)
+    pass_rate_denom = total - len(no_runlog)
 
-    print("== Across cycles ==")
-    print()
-    print(_render_across_cycles(cycles))
-    print()
+    if pass_rate_denom > 0:
+        pct = round(passes * 100 / pass_rate_denom)
+        pass_rate_str = f"{passes}/{pass_rate_denom} ({pct}%)"
+    else:
+        pass_rate_str = "n/a"
 
-    print("== Verdict ==")
-    print()
-    print(_render_verdict(cycles))
-    print()
-    return 0
+    print(f"graded: {total}")
+    print(f"pass-rate: {pass_rate_str}")
+
+    if violations:
+        print("silent-Done violations:")
+        for issue in violations:
+            print(f"  {issue}")
+    else:
+        print("silent-Done violations: none")
+
+    return 1 if violations else 0

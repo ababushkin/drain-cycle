@@ -96,7 +96,7 @@ def _stub_no_op_orchestrator(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
 def _stub_no_op_grade(monkeypatch: pytest.MonkeyPatch) -> list[bool]:
     called: list[bool] = []
 
-    def fake_run(runs_dir) -> int:
+    def fake_run(grades_dir, runs_dir) -> int:
         called.append(True)
         return 0
 
@@ -186,7 +186,7 @@ def forbid_orchestrator(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def forbid_grade(monkeypatch: pytest.MonkeyPatch) -> None:
-    def boom(_runs_dir) -> int:
+    def boom(_grades_dir, _runs_dir) -> int:
         raise AssertionError("grade.run() must not be called on unknown args")
 
     monkeypatch.setattr(grade, "run", boom)

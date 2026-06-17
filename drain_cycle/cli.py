@@ -92,7 +92,7 @@ def main() -> None:
         sys.exit(orchestrator.run(loaded_repos, loaded_limits, watch=watch, no_stack=no_stack))
 
     if remaining == ["grade"] and not watch:
-        sys.exit(grade.run(grade.default_runs_dir()))
+        sys.exit(grade.run(grade.default_grades_dir(), grade.default_runs_dir()))
     if (
         len(remaining) == 2
         and remaining[0] == "grade-draft"
