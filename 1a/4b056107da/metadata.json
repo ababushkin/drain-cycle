@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "1a4b056107da",
+  "strategy": "manual-commit",
+  "branch": "ABA-393",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "tests/test_orchestrator_finishing.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/1a/4b056107da/0/metadata.json",
+      "transcript": "/1a/4b056107da/0/full.jsonl",
+      "content_hash": "/1a/4b056107da/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 3856,
+    "cache_creation_tokens": 51737,
+    "cache_read_tokens": 1218141,
+    "output_tokens": 25429,
+    "api_call_count": 17
+  }
+}
