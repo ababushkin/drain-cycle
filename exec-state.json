@@ -1,4 +1,20 @@
 {
+  "pr_urls": [
+    {
+      "title": "feat(ABA-334): drain-cycle grade reads confirmed grade files, exits nonzero on silent-Done violations",
+      "url": "https://github.com/ababushkin/drain-cycle/pull/33"
+    }
+  ],
+  "outcome_verdict": {
+    "result": "pass",
+    "invoked_at": "2026-06-17T07:15:00+00:00",
+    "findings": []
+  },
+  "prep_verdict": {
+    "result": "structured",
+    "route": "human-review",
+    "reasoning": "diff exceeds 200 lines and permanently removes old cycle-stats grade functionality — one-way-door warrants human review"
+  },
   "pickup": {
     "issue_id": "ABA-334",
     "branch": "ABA-334",
