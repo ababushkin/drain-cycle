@@ -44,6 +44,10 @@ The ADR records `outcome_verdict` and `prep_verdict` as writer-allocated to `exe
 
 The §26 rename is independent of §24 (the prompt-collapse work that thinned `prompt.py`'s tail into the pointer-only template). The file-rename build nodes do not edit the prompt template, the procedure-verb grep, or the 15-line fitness check; the §24 work does not touch the handoff file's name or owner. Either can land without the other.
 
+### Observable success
+
+The §26 coupling is closed when no module under `drain_cycle/` and no skill under the pack's `skills/exec-*` tree names `.drain-handoff.json` (grep returns empty). Verified after ABA-399 (pack finishing dual-writes the pack-owned file) and ABA-400 (supervisor reads it with legacy fallback) both land.
+
 ## Original ADR (decision text retained for history)
 
 The supervisor hands the worker process facts and one skill pointer — never the procedure itself; the pack owns every workflow step. Two mechanical checks keep it thin: the prompt template stays within 15 lines (`wc -l`) and a grep finds no procedure verbs in `drain_cycle/`.
