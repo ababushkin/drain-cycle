@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from drain_cycle.prompt import _TAIL, build
+from drain_cycle.prompt import _TAIL, build, build_finishing
 
 
 def _fixture_issue() -> dict:
@@ -190,3 +190,44 @@ def test_emitted_template_fits_within_line_budget(tmp_path: Path) -> None:
     sep = rendered.index("---\n")
     template_section = rendered[sep:]
     assert len(template_section.splitlines()) <= 15
+
+
+def test_build_finishing_contains_identifier_base_and_worktree(tmp_path: Path) -> None:
+    """build_finishing names the identifier, worktree, and base in the output."""
+    worktree = tmp_path / ".worktrees" / "ABA-383"
+    rendered = build_finishing("ABA-383", worktree, "main")
+
+    assert "ABA-383" in rendered
+    assert str(worktree) in rendered
+    assert "main..HEAD" in rendered
+    assert "/shape:pr-finishing" in rendered
+    # Tail line last
+    non_empty = [line for line in rendered.splitlines() if line.strip()]
+    assert "Done" in non_empty[-1]
+
+
+def test_build_finishing_chained_base_adds_stack_clause(tmp_path: Path) -> None:
+    """A non-main base in build_finishing adds the stack-clause for pr-finishing."""
+    worktree = tmp_path / ".worktrees" / "ABA-383"
+    rendered = build_finishing("ABA-383", worktree, "ABA-380")
+
+    assert "stacked on `ABA-380`" in rendered
+    assert "ABA-380..HEAD" in rendered
+    assert "- Base branch: ABA-380" in rendered
+
+
+def test_build_finishing_main_base_omits_stack_clause(tmp_path: Path) -> None:
+    """build_finishing with base='main' does not add the stacked-on clause."""
+    worktree = tmp_path / ".worktrees" / "ABA-383"
+    rendered = build_finishing("ABA-383", worktree, "main")
+
+    assert "stacked on" not in rendered
+
+
+def test_build_finishing_mentions_opus_for_fixes(tmp_path: Path) -> None:
+    """build_finishing instructs the agent to delegate fixes to opus."""
+    from drain_cycle.prompt import _FINISHING_OPUS_MODEL
+    worktree = tmp_path / ".worktrees" / "ABA-383"
+    rendered = build_finishing("ABA-383", worktree, "main")
+
+    assert _FINISHING_OPUS_MODEL in rendered

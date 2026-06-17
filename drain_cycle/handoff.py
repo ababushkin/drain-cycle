@@ -8,6 +8,12 @@ list back as its confirmation signal — a present, non-empty ``pr_urls`` means
 the skill submitted at least one PR; its absence means submission never
 completed and the per-repo chain must halt rather than march on.
 
+Schema v2 adds ``outcome_verdict`` and ``prep_verdict`` fields so the worker
+can record its self-assessment. The orchestrator reads these on every exit
+path — Done, halted, or errored — and lands them in the run-log entry.
+``read_partial`` extracts those fields without the ``pr_urls`` validity gate,
+so halt paths can carry whatever verdicts the worker managed to write.
+
 ``read`` never raises: a missing or malformed file returns ``None`` so callers
 can treat it as "not submitted yet."
 """
@@ -16,6 +22,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 HANDOFF_FILE = ".drain-handoff.json"
 
@@ -29,21 +36,34 @@ class PullRequest:
 @dataclass(frozen=True)
 class HandoffData:
     pr_urls: tuple[PullRequest, ...]
+    outcome_verdict: dict[str, Any] | None = None
+    prep_verdict: dict[str, Any] | None = None
 
 
 def write(worktree: Path, data: HandoffData) -> None:
     """Serialise ``data`` to ``<worktree>/.drain-handoff.json``."""
     path = worktree / HANDOFF_FILE
-    path.write_text(
-        json.dumps(
-            {
-                "pr_urls": [
-                    {"title": pr.title, "url": pr.url} for pr in data.pr_urls
-                ],
-            },
-            indent=2,
-        )
-    )
+    payload: dict[str, Any] = {
+        "pr_urls": [{"title": pr.title, "url": pr.url} for pr in data.pr_urls],
+    }
+    if data.outcome_verdict is not None:
+        payload["outcome_verdict"] = data.outcome_verdict
+    if data.prep_verdict is not None:
+        payload["prep_verdict"] = data.prep_verdict
+    path.write_text(json.dumps(payload, indent=2))
+
+
+def _parse_dict(raw: object) -> dict[str, Any] | None:
+    """Return ``raw`` only if it is a verdict-shaped dict.
+
+    A verdict is a dict carrying a ``result`` key; downstream code reads
+    ``result`` to set span attributes and drive routing. A dict without it is
+    not a usable verdict, so it is dropped to ``None`` here rather than passed
+    on to crash a reader that assumes the key is present.
+    """
+    if not isinstance(raw, dict) or "result" not in raw:
+        return None
+    return raw
 
 
 def read(worktree: Path) -> HandoffData | None:
@@ -53,6 +73,9 @@ def read(worktree: Path) -> HandoffData | None:
     a dict carrying string ``title`` and ``url``. An empty list is treated as
     invalid: the skill writes ``pr_urls`` only after a PR is actually created,
     so "present but empty" means no submission happened.
+
+    ``outcome_verdict`` and ``prep_verdict`` are optional: missing keys are
+    read as ``None`` and do not affect validity.
     """
     path = worktree / HANDOFF_FILE
     try:
@@ -73,4 +96,27 @@ def read(worktree: Path) -> HandoffData | None:
         if not isinstance(title, str) or not isinstance(url, str) or not url:
             return None
         prs.append(PullRequest(title=title, url=url))
-    return HandoffData(pr_urls=tuple(prs))
+    return HandoffData(
+        pr_urls=tuple(prs),
+        outcome_verdict=_parse_dict(payload.get("outcome_verdict")),
+        prep_verdict=_parse_dict(payload.get("prep_verdict")),
+    )
+
+
+def read_partial(
+    worktree: Path,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Return ``(outcome_verdict, prep_verdict)`` without the ``pr_urls`` gate.
+
+    Used by halt and breach paths to carry any verdicts the worker recorded
+    even when ``pr_urls`` is absent or empty and ``read`` would return ``None``.
+    Returns ``(None, None)`` when the file is absent or malformed.
+    """
+    path = worktree / HANDOFF_FILE
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None, None
+    if not isinstance(payload, dict):
+        return None, None
+    return _parse_dict(payload.get("outcome_verdict")), _parse_dict(payload.get("prep_verdict"))

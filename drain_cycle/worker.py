@@ -78,6 +78,20 @@ _STREAM_FLAGS = ["--verbose", "--output-format", "stream-json"]
 terminal ``result`` event, dropping the per-turn ``assistant`` usage we
 accumulate."""
 
+_STOP_GUARD_HOOK_COMMAND = (
+    "sh -c 'test -f .drain-guard.json || exit 0; "
+    "command -v drain-cycle >/dev/null 2>&1 || exit 0; "
+    "exec drain-cycle _stop-guard 2>/dev/null'"
+)
+"""Shell command the injected Stop hook runs at end of each worker turn.
+
+It is a no-op unless the orchestrator has planted ``.drain-guard.json`` in
+the worktree (so interactive and non-drain sessions are untouched) and the
+``drain-cycle`` console script is on PATH, then hands the Stop payload to the
+``_stop-guard`` entrypoint (``cli.py``). Same guard the drain-cycle repo's own
+``.claude/settings.json`` carries — injected here so the hook fires in *every*
+target repo, not only ones whose tracked settings happen to register it."""
+
 _READER_JOIN_TIMEOUT_SECONDS = 5.0
 """Bound on waiting for the stdout-reader thread to drain to EOF after the
 process exits. The group SIGKILL closes every inherited write-end of the
@@ -125,6 +139,32 @@ class WorkerResult:
     is_error: bool | None
 
 
+def _stop_guard_settings_json() -> str:
+    """Return the ``--settings`` JSON payload that wires in the stop-guard hook.
+
+    Claude Code concatenates each settings source's ``hooks`` arrays rather
+    than replacing them, so this Stop entry runs *alongside* any user/project
+    Stop hook (e.g. ``entire``) the session already loads — it does not shadow
+    them. Passed inline via ``--settings`` so no file under the worktree's
+    ``.claude/`` is mutated (which, when ``.claude`` is symlinked back to the
+    source repo, would write through to the source — and a tracked-file edit
+    would read as uncaptured work to the guard's own dirty-tree check)."""
+    return json.dumps(
+        {
+            "hooks": {
+                "Stop": [
+                    {
+                        "matcher": "",
+                        "hooks": [
+                            {"type": "command", "command": _STOP_GUARD_HOOK_COMMAND}
+                        ],
+                    }
+                ]
+            }
+        }
+    )
+
+
 def build_argv(
     claude_cmd: list[str],
     *,
@@ -137,17 +177,19 @@ def build_argv(
 
     ``claude_cmd`` is the base argv (``["claude", "-p",
     "--dangerously-skip-permissions"]``); the streaming flags, ``--model``,
-    ``--max-budget-usd`` (when ``cost_limit_usd`` is set), ``--debug-file``
-    (when set), and the prompt are appended. The prompt is the trailing
-    positional, so it must follow the value-taking ``--model`` /
-    ``--max-budget-usd`` / ``--debug-file`` options, not sit between an option
-    and its value.
+    ``--settings`` (the stop-guard Stop hook, always injected — see
+    :func:`_stop_guard_settings_json`), ``--max-budget-usd`` (when
+    ``cost_limit_usd`` is set), ``--debug-file`` (when set), and the prompt are
+    appended. The prompt is the trailing positional, so it must follow the
+    value-taking ``--model`` / ``--settings`` / ``--max-budget-usd`` /
+    ``--debug-file`` options, not sit between an option and its value.
 
     Both spawn paths share this: the worker's own ``subprocess.Popen`` and the
     orchestrator's watch pane (which runs this argv under ``tee`` so the same
     bytes reach the operator's terminal and drain-cycle's reader).
     """
     argv = [*claude_cmd, *_STREAM_FLAGS, "--model", model]
+    argv += ["--settings", _stop_guard_settings_json()]
     if cost_limit_usd is not None:
         argv += ["--max-budget-usd", f"{cost_limit_usd:g}"]
     if debug_file is not None:
@@ -200,8 +242,9 @@ def run_issue(
     ``debug_file``, when set, is passed to ``claude`` as ``--debug-file`` so
     the session writes its startup diagnostics — which settings sources,
     plugins, MCP servers, and hooks initialised — to that path. Opt-in only;
-    ``None`` (the default) passes no flag. See ``docs/design-decisions.md``
-    §10. (Ignored on the external path, where the orchestrator already baked
+    ``None`` (the default) passes no flag. See
+    ``docs/adrs/0014-worktree-config-symlink.md``. (Ignored on the external
+    path, where the orchestrator already baked
     it into the pane's argv.)
 
     ``on_progress``, when set, is called from the reader thread after each

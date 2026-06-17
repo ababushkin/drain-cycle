@@ -136,6 +136,7 @@ def test_orchestrator_writes_runlog_with_one_entry_per_successful_issue(
         "outcome_verdict",
         "prep_verdict",
         "responder_runs",
+        "finishing_runs",
     }
     for entry in payload["entries"]:
         assert set(entry.keys()) == required_keys

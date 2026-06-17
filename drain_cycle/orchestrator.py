@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field
+import subprocess
+from dataclasses import dataclass, field, replace as dataclass_replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, TextIO
@@ -31,16 +32,51 @@ _DEBUG_ENV_VAR = "DRAIN_CYCLE_DEBUG"
 turns it on; the worker then writes each session's startup diagnostics
 (settings sources, plugins, MCP servers, hooks) beside the run log. Off by
 default — the diagnostic exists for one-shot investigation, not steady state.
-See ``docs/design-decisions.md`` §10."""
+See ``docs/adrs/0014-worktree-config-symlink.md``."""
 _UNRESOLVED_WORKTREE_DISPLAY = "<unresolved>"
 """Worktree-path placeholder for the pre-spawn resolution-halt path.
 No path has been chosen yet — the issue couldn't be mapped to a target
 repo — so the run-log entry and stderr halt line carry this marker
 rather than a misleading fake path."""
 
+_FINISHING_MODEL = "claude-sonnet-4-6"
+"""Model for the finishing sub-agent spawned to recover a committed-but-unfinished
+issue. Fixed at sonnet regardless of the original issue's model: label so the
+mechanical protocol (review → fix → pr-finishing → Done) runs reliably."""
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _commits_beyond_base(worktree_path: Path, base: str) -> bool:
+    """Return True if ``base..HEAD`` contains at least one commit.
+
+    Verifies that ``base`` is an ancestor of HEAD before counting —
+    an ambiguous base (not an ancestor) returns False so the caller
+    skips recovery rather than making a wrong decision.
+    Returns False on any subprocess error so failure-to-check is
+    treated as "no commits to work from", which is the safe direction.
+    """
+    try:
+        ancestor_check = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", base, "HEAD"],
+            cwd=str(worktree_path),
+            capture_output=True,
+            timeout=10,
+        )
+        if ancestor_check.returncode != 0:
+            return False
+        count_result = subprocess.run(
+            ["git", "rev-list", "--count", f"{base}..HEAD"],
+            cwd=str(worktree_path),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return count_result.returncode == 0 and int(count_result.stdout.strip()) > 0
+    except (ValueError, OSError, subprocess.TimeoutExpired):
+        return False
 
 
 def _emit_summary(log: runlog.RunLog, *, total: int, halted_on: str | None) -> None:
@@ -177,12 +213,12 @@ def _set_verdict_span_attrs(
 ) -> None:
     """Record the verdict/responder span attributes shared by the worker-backed
     halt branches and the Done append, so the recorded shape can't drift."""
-    if outcome.outcome_verdict is not None:
-        issue_span.set_attribute(
-            "issue.outcome_verdict", outcome.outcome_verdict["result"]
-        )
-    if outcome.prep_verdict is not None:
-        issue_span.set_attribute("issue.prep_verdict", outcome.prep_verdict["result"])
+    outcome_result = (outcome.outcome_verdict or {}).get("result")
+    if outcome_result is not None:
+        issue_span.set_attribute("issue.outcome_verdict", outcome_result)
+    prep_result = (outcome.prep_verdict or {}).get("result")
+    if prep_result is not None:
+        issue_span.set_attribute("issue.prep_verdict", prep_result)
 
 
 @dataclass(frozen=True)
@@ -212,6 +248,7 @@ class _HaltContext:
         finished_at: str,
         exit_code: int,
         outcome: _WorkerOutcome | None = None,
+        finishing_runs: list[dict] | None = None,
     ) -> None:
         entry_fields: dict[str, object] = {}
         if outcome is not None:
@@ -229,6 +266,7 @@ class _HaltContext:
             final_linear_state=final_linear_state,
             worktree_path=worktree_path,
             halt_reason=halt_reason,
+            finishing_runs=finishing_runs,
             **entry_fields,
         )
         self.issue_span.set_attribute("issue.final_linear_state", final_linear_state)
@@ -628,10 +666,13 @@ def _drain_one_issue(
             if session is not None:
                 session.cleanup()
         finished_at = _now_iso()
+        # Read any verdicts the worker recorded in the handoff. M2+-populated
+        # locals take precedence; handoff fills the gap when they are None.
+        _hov, _hpv = handoff.read_partial(worktree_path)
         outcome = _WorkerOutcome(
             result=result,
-            outcome_verdict=outcome_verdict,
-            prep_verdict=prep_verdict,
+            outcome_verdict=outcome_verdict if outcome_verdict is not None else _hov,
+            prep_verdict=prep_verdict if prep_verdict is not None else _hpv,
             responder_runs=responder_runs,
         )
 
@@ -673,6 +714,59 @@ def _drain_one_issue(
         issue_span.set_attribute("issue.exit_code", result.exit_code)
         issue_span.set_attribute("issue.is_done", is_done)
 
+        finishing_runs: list[dict] = []
+        finishing_attempted = False
+
+        # Recovery: committed-but-unfinished → spawn a sonnet finishing sub-agent
+        # before halting. Fires only when the branch has commits beyond base (an
+        # empty or uncommitted-only branch is a genuine failure), the verifier did
+        # not explicitly reject the work (a FAIL verdict must stay halted to
+        # satisfy KR2), and a cap breach did not already stop the session (that
+        # path returned above). At most one finishing attempt per issue per run.
+        if not is_done and _commits_beyond_base(worktree_path, base):
+            _prior_verifier_failed = (
+                outcome.outcome_verdict is not None
+                and outcome.outcome_verdict.get("result") == "fail"
+            )
+            if not _prior_verifier_failed:
+                finishing_attempted = True
+                console.worker_event(
+                    identifier, "not-Done with commits: spawning finishing sub-agent"
+                )
+                _finishing_started = _now_iso()
+                _finishing_result = worker.run_issue(
+                    claude_cmd=_CLAUDE_CMD,
+                    model=_FINISHING_MODEL,
+                    prompt=prompt.build_finishing(identifier, worktree_path, base),
+                    cwd=worktree_path,
+                    token_limit=limits.per_issue_tokens,
+                    time_limit_seconds=limits.per_issue_seconds,
+                    cost_limit_usd=limits.per_issue_cost_usd,
+                    passthrough=console.AgentSink(),
+                )
+                _finishing_finished = _now_iso()
+                finishing_runs.append({
+                    "trigger": "err-issue-not-done",
+                    "started_at": _finishing_started,
+                    "finished_at": _finishing_finished,
+                    **_worker_log_fields(_finishing_result),
+                })
+                finished_at = _finishing_finished
+                # Re-read to see whether finishing succeeded
+                refreshed = linear.get_issue(issue["id"])
+                post_spawn_state = refreshed["state"]["name"]
+                is_done = refreshed["state"]["type"] == _DONE_STATE_TYPE
+                issue_span.set_attribute("issue.is_done", is_done)
+                # Pull any verdicts the finishing agent wrote to the handoff so
+                # the verifier gate below uses the freshest available signal.
+                _fhov, _fhpv = handoff.read_partial(worktree_path)
+                if _fhov is not None or _fhpv is not None:
+                    outcome = dataclass_replace(
+                        outcome,
+                        outcome_verdict=_fhov if _fhov is not None else outcome.outcome_verdict,
+                        prep_verdict=_fhpv if _fhpv is not None else outcome.prep_verdict,
+                    )
+
         if is_done:
             # Stack-mode confirmation gate, read before teardown removes the
             # worktree. A Done issue in stack mode must have left a non-empty
@@ -684,30 +778,123 @@ def _drain_one_issue(
             # extend and no handoff, so they bypass the gate entirely.
             submitted = handoff.read(worktree_path) if stack else None
             if stack and submitted is None:
+                # Recovery: Done but no pr_urls → spawn finishing sub-agent once
+                # (guard skips a second attempt if not-Done recovery already ran).
+                if not finishing_attempted and _commits_beyond_base(worktree_path, base):
+                    finishing_attempted = True
+                    console.worker_event(
+                        identifier, "Done but no pr_urls: spawning finishing sub-agent"
+                    )
+                    _finishing_started = _now_iso()
+                    _finishing_result = worker.run_issue(
+                        claude_cmd=_CLAUDE_CMD,
+                        model=_FINISHING_MODEL,
+                        prompt=prompt.build_finishing(identifier, worktree_path, base),
+                        cwd=worktree_path,
+                        token_limit=limits.per_issue_tokens,
+                        time_limit_seconds=limits.per_issue_seconds,
+                        cost_limit_usd=limits.per_issue_cost_usd,
+                        passthrough=console.AgentSink(),
+                    )
+                    _finishing_finished = _now_iso()
+                    finishing_runs.append({
+                        "trigger": "err-stack-no-prs",
+                        "started_at": _finishing_started,
+                        "finished_at": _finishing_finished,
+                        **_worker_log_fields(_finishing_result),
+                    })
+                    finished_at = _finishing_finished
+                    submitted = handoff.read(worktree_path)
+                    # Refresh state name: the finishing agent may have moved the
+                    # issue away from Done (e.g. back to In Progress on partial
+                    # failure). Without this, _revert_to_pre_halt_state reports
+                    # the wrong pre-revert state on revert failure.
+                    _refreshed_post = linear.get_issue(issue["id"])
+                    post_spawn_state = _refreshed_post["state"]["name"]
+                    # Propagate any verdicts the finishing agent wrote so the
+                    # verifier gate below reads the freshest signal.
+                    if submitted is not None:
+                        _fhov, _fhpv = handoff.read_partial(worktree_path)
+                        if _fhov is not None or _fhpv is not None:
+                            outcome = dataclass_replace(
+                                outcome,
+                                outcome_verdict=_fhov if _fhov is not None else outcome.outcome_verdict,
+                                prep_verdict=_fhpv if _fhpv is not None else outcome.prep_verdict,
+                            )
+
+                if stack and submitted is None:
+                    original_state_name = issue["state"]["name"]
+                    effective_state, revert_error = _revert_to_pre_halt_state(
+                        issue["id"],
+                        target_state_name=original_state_name,
+                        pre_revert_state_name=post_spawn_state,
+                    )
+                    halt_reason = (
+                        f"{_halt_message(identifier, effective_state, worktree_path)}"
+                        " — marked Done but .drain-handoff.json has no submitted "
+                        "pr_urls; stack chain halted"
+                    )
+                    if finishing_runs:
+                        halt_reason += (
+                            " — finishing sub-agent attempted but did not produce pr_urls"
+                        )
+                    if revert_error is not None:
+                        halt_reason += (
+                            f" — revert to {original_state_name!r} failed: {revert_error}"
+                        )
+                    halt_ctx.record(
+                        slug="err-stack-no-prs",
+                        halt_reason=halt_reason,
+                        final_linear_state=effective_state,
+                        worktree_path=str(worktree_path),
+                        finished_at=finished_at,
+                        exit_code=result.exit_code,
+                        outcome=outcome,
+                        finishing_runs=finishing_runs,
+                    )
+                    return 1, pane_id
+
+            # Outcome-verifier gate: a fail verdict stops the cycle and leaves
+            # the worktree intact for operator inspection — default-to-halt,
+            # not default-to-continue. Any other result value (including "pass")
+            # is treated as a pass and lets the drain continue.
+            verifier_fail = (
+                outcome.outcome_verdict is not None
+                and outcome.outcome_verdict.get("result") == "fail"
+            )
+            if verifier_fail:
                 original_state_name = issue["state"]["name"]
                 effective_state, revert_error = _revert_to_pre_halt_state(
                     issue["id"],
                     target_state_name=original_state_name,
                     pre_revert_state_name=post_spawn_state,
                 )
+                findings = outcome.outcome_verdict.get("findings") or []
+                detail = f"outcome verifier fail ({len(findings)} finding(s))"
                 halt_reason = (
                     f"{_halt_message(identifier, effective_state, worktree_path)}"
-                    " — marked Done but .drain-handoff.json has no submitted "
-                    "pr_urls; stack chain halted"
+                    f" — {detail}"
                 )
                 if revert_error is not None:
                     halt_reason += (
-                        f" — revert to {original_state_name!r} failed: {revert_error}"
+                        f"; revert to {original_state_name!r} failed: {revert_error}"
                     )
+                _set_verdict_span_attrs(issue_span, outcome)
                 halt_ctx.record(
-                    slug="err-stack-no-prs",
+                    slug="err-outcome-verifier-fail",
                     halt_reason=halt_reason,
                     final_linear_state=effective_state,
                     worktree_path=str(worktree_path),
                     finished_at=finished_at,
                     exit_code=result.exit_code,
                     outcome=outcome,
+                    finishing_runs=finishing_runs,
                 )
+                # set_cycle_halt is called here (not via the _run() cycle-cap
+                # path) because the spec requires cycle_halt_reason to name the
+                # verifier findings so downstream tooling can distinguish this
+                # halt type from a cap breach or a worker not-Done.
+                halt_ctx.log.set_cycle_halt(halt_reason)
                 return 1, pane_id
 
             if submitted is not None:
@@ -740,6 +927,7 @@ def _drain_one_issue(
                 outcome_verdict=outcome.outcome_verdict,
                 prep_verdict=outcome.prep_verdict,
                 responder_runs=outcome.responder_runs,
+                finishing_runs=finishing_runs,
                 **_worker_log_fields(outcome.result),
             )
             _set_verdict_span_attrs(issue_span, outcome)
@@ -768,6 +956,8 @@ def _drain_one_issue(
         tripped = stop_guard.read_tripped(worktree_path)
         if tripped is not None:
             halt_reason += f" — {stop_guard.TRIPPED_HALT_REASON}: {tripped}"
+        if finishing_runs:
+            halt_reason += " — finishing sub-agent attempted but did not mark Done"
         if revert_error is not None:
             halt_reason += (
                 f" — revert to {original_state_name!r} failed: {revert_error}"
@@ -783,5 +973,6 @@ def _drain_one_issue(
             finished_at=finished_at,
             exit_code=result.exit_code,
             outcome=outcome,
+            finishing_runs=finishing_runs,
         )
         return 1, pane_id

@@ -1,0 +1,15 @@
+# ADR 0019: `--watch` runs claude *in* the tmux pane, not a formatter tailing a log
+
+**Date:** 2026-06-01
+**Status:** Accepted
+**Migrated from:** docs/design-decisions.md §15
+
+In `--watch` mode the operator wants to see the agent working in real time. The pane therefore **is** the `claude` session: the orchestrator runs `claude … | tee <fifo>` in a `tmux split-window`, and the same stream-json bytes that scroll in the pane flow through a named pipe (FIFO) to drain-cycle's reader thread. The reader opens the FIFO instead of a `subprocess.PIPE`; usage accounting, cost, and breach detection are byte-for-byte identical to the spawned path — there is exactly one `claude` process, and both consumers (the operator's terminal and the parser) see its raw output.
+
+**What this replaces.** The first cut tailed a *secondhand* view: the worker spawned `claude` normally, an internal `_WatchWriter` formatted each event into a human-readable activity log, and the pane ran `tail -f` on that file. The operator saw a filtered summary produced by drain-cycle, not the live session — and the formatter was a second place for stream-json knowledge to rot. `tee`-into-a-FIFO deletes the formatter and the intermediate file entirely (`runlog.watch_path` and `_WatchWriter` are gone): the pane shows precisely what `claude` emits.
+
+**FIFO startup is non-blocking with a timeout.** drain-cycle opens the read end `O_RDONLY | O_NONBLOCK` and `select`s up to ten seconds for the pane's `tee` to produce its first bytes, then clears `O_NONBLOCK` so the reader thread blocks normally until EOF. A reader-only FIFO with no writer is *not* readable in `select` until a writer connects (verified on macOS/BSD and Linux), so a pane that never started can't wedge the drain — the `select` simply times out. On timeout (or any pane/FIFO setup failure, or no `$TMUX`), the pane is torn down and the issue runs through the **normal subprocess path** unchanged. Watch is a convenience overlay; it never gates whether the cycle drains.
+
+**Breach kills the pane, not a process group.** On the spawned path a per-issue breach SIGKILLs the worker's process group (ADR 0013). On the watch path there is no child process to signal — `claude` belongs to the pane — so the worker calls a `kill_fn` the orchestrator wires to `tmux kill-pane`. Killing the pane terminates `claude` and its `tee`, which closes the FIFO write end and lets the reader reach EOF. The pane command ends in `; exec ${SHELL}` so the pane survives `claude`'s *normal* exit (the final issue's scrollback is preserved, AC of the pane-lifecycle: prior pane killed when the next issue starts, last one left open); `tee` still closes the FIFO on claude's exit, so EOF fires regardless of the trailing shell.
+
+**`exit_code` is `0` on the watch path.** The pane owns `claude`, so its real return code isn't observable from drain-cycle. The run-log entry records `exit_code=0`; the breach field and the result event's `is_error` carry the real outcome, and KR1 grading keys on `final_linear_state`, not the exit code. This is the one fidelity gap versus the spawned path, and it is cosmetic.

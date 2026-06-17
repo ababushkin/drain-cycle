@@ -118,6 +118,11 @@
   main pre { background: var(--rule-soft); padding: 16px 18px; border-radius: 8px; overflow-x: auto; font-size: 13.5px; line-height: 1.6; border: 1px solid var(--rule); color: var(--fg-soft); }
   main code { font-size: 0.92em; padding: 2px 6px; background: var(--rule-soft); border-radius: 4px; color: var(--fg); }
   main pre code { padding: 0; background: transparent; font-size: 1em; }
+  /* lightweight, theme-aware syntax highlight for Python blocks */
+  .code-py .tok-kw  { color: var(--accent); font-weight: 600; }
+  .code-py .tok-fn  { color: var(--info); }
+  .code-py .tok-str { color: var(--ok); }
+  .code-py .tok-com { color: var(--muted); font-style: italic; }
   main em { color: var(--fg); font-style: italic; }
   main table { border-collapse: collapse; margin: 18px 0; width: 100%; font-size: 14px; }
   main th, main td { border-bottom: 1px solid var(--rule); padding: 10px 14px; text-align: left; vertical-align: top; }
@@ -258,8 +263,10 @@
     <p class="kicker">Interface<span class="sub">How the layers meet</span></p>
     <nav><ul>
       <li><a href="#s5"><span class="navnum">§5</span>Writes signals; reads them</a></li>
+      <li><a href="#sguard"><span class="navnum">▸</span>The stop-guard enforces Done</a></li>
       <li><a href="#s4"><span class="navnum">§4</span>A worker per phase</a></li>
       <li><a href="#s6"><span class="navnum">§6</span>Dual-mode</a></li>
+      <li><a href="#sspine"><span class="navnum">▸</span>The supervisor in one loop</a></li>
     </ul></nav>
 
     <p class="kicker">Scale<span class="sub">How far it runs</span></p>
@@ -287,7 +294,7 @@
       </div>
       <dl class="meta-grid">
         <dt>Pre-read</dt><dd><a href="vision.md">docs/vision.md</a> — the north-star</dd>
-        <dt>Decisions</dt><dd>docs/design-decisions.md</dd>
+        <dt>Decisions</dt><dd><a href="adrs/README.md">docs/adrs/</a></dd>
       </dl>
     </div>
 
@@ -437,18 +444,18 @@
         <span class="pl-step">exec:finish</span>
       </div>
       <p><code>exec:pickup</code> is the front door; <code>exec:review</code> fans out reviewer personas; <code>exec:finish</code> is Graphite-first with a plain-git fallback and produces the trail artefacts (What/Why/Focus PR body, review-summary comment, Linear status move).</p>
-      <p>Every step is also a standalone skill, so a human can run any one by hand. A <strong>handoff envelope</strong> carries the issue's acceptance criteria from pickup through to review, so the spec-compliance persona can grade <em>built-the-wrong-thing</em>, not just <em>built-it-badly</em>.</p>
+      <p>Every step is also a standalone skill, so a human can run any one by hand. The <strong>execution-state file</strong> carries the issue's acceptance criteria from pickup through to review, so the spec-compliance persona can grade <em>built-the-wrong-thing</em>, not just <em>built-it-badly</em>.</p>
     </section>
 
     <section class="s" id="s3">
       <header><span class="ix">§3</span><h2>Layer 1 owns process, not procedure</h2></header>
       <p><code>drain-cycle</code> owns process concerns only: spawn, guardrails, halt, revert, resume, recover, record, grade. It reads Linear state and the worker's artifacts to decide whether to advance to the next issue or stop. It does not contain workflow prose — the worker's prompt points at the entry skill and the procedure lives in Layer 2.</p>
-      <p>The supervisor mechanics are documented in <code>docs/design-decisions.md</code>.</p>
+      <p>The supervisor mechanics are documented in the ADRs under <code>docs/adrs/</code>.</p>
     </section>
 
     <section class="s" id="s7">
       <header><span class="ix">§7</span><h2>All state lives in one record — the state plane</h2></header>
-      <p>Everything works off one organized record of where the work stands. <strong>Linear is authoritative</strong> for issue status (design decision §1, §12). Beneath it sit the durable supervisor records: per-run logs (§4, §8), the atomic active-run marker (§11), and opt-in OpenTelemetry traces (§13).</p>
+      <p>Everything works off one organized record of where the work stands. <strong>Linear is authoritative</strong> for issue status (ADR 0005, ADR 0016). Beneath it sit the durable supervisor records: per-run logs (ADR 0008, ADR 0012), the atomic active-run marker (ADR 0015), and opt-in OpenTelemetry traces (ADR 0017).</p>
       <p>These records are the <strong>delayed feedback loop</strong> that replaces live watching. Automating supervision deliberately gives up the operator's real-time view of each worker; observability is how that trade is paid back. Better observability widens the set of work that is safe to hand off (§9).</p>
     </section>
 
@@ -461,9 +468,9 @@
 
     <section class="s" id="s5">
       <header><span class="ix">§5</span><h2>Layer 2 writes signals; Layer 1 reads them</h2></header>
-      <p>The two layers meet at an artifact, not at a function call. <strong>Layer 2 writes signals; Layer 1 reads them.</strong> The supervisor never reads the workflow's steps — only the artifacts the workflow leaves behind: Linear issue state, run-log fields, and <code>.drain-handoff.json</code> (e.g. <code>pr_urls</code>).</p>
+      <p>The two layers meet at an artifact, not at a function call. <strong>Layer 2 writes signals; Layer 1 reads them.</strong> The supervisor never reads the workflow's steps — only the artifacts the workflow leaves behind: Linear issue state, run-log fields, and the <strong>execution-state file</strong> the workflow writes in the worktree (today <code>.drain-handoff.json</code>). That file is the workflow's own: it holds one section per phase and has two readers. The next phase's skill reads the handoff sections it needs — the acceptance criteria, the diff — and the supervisor reads only the fields it gates on (<code>verdict</code>, <code>pr_urls</code>). The supervisor is a reader of that file, never its author: the skill that ran a phase writes that phase's section. See ADR 0030.</p>
 
-      <div class="diagram diagram-boundary" role="img" aria-label="The artifact boundary: Layer 2, the workflow pack, writes down into the boundary; the boundary carries Linear issue state, run-log fields, and .drain-handoff.json (pr_urls); Layer 1, the supervisor, reads up from it.">
+      <div class="diagram diagram-boundary" role="img" aria-label="The artifact boundary: Layer 2, the workflow pack, writes down into the boundary; the boundary carries Linear issue state, run-log fields, and the execution-state file (AC, verdict, pr_urls); Layer 1, the supervisor, reads up from it.">
         <div class="dg-card dg-l2 dg-wide">
           <span class="dg-tag">Layer 2</span>
           <div class="dg-title">Layer 2 — the workflow pack (skills)</div>
@@ -475,7 +482,7 @@
           <div class="dg-chips">
             <span class="dg-chip">Linear issue state</span>
             <span class="dg-chip">run-log fields</span>
-            <span class="dg-chip">.drain-handoff.json (pr_urls)</span>
+            <span class="dg-chip">execution-state file (AC · verdict · pr_urls)</span>
           </div>
         </div>
         <div class="dg-card dg-l1 dg-wide">
@@ -487,8 +494,32 @@
         <p class="dg-caption">Layer 1 never reads the workflow's steps — only the artifacts it leaves behind. That content-blindness is what lets the same Layer 2 run under any worker.</p>
       </div>
 
-      <p>The placement test for any new behaviour: does <code>drain-cycle</code> need to know <em>what a role does</em> (Layer 2), or only <em>whether an artifact exists</em> (Layer 1)? Submitting a PR is "what a role does" — it belongs in a skill. Reading back the submitted PR URLs to decide whether to advance is "whether an artifact exists" — it belongs in the supervisor (see design decision §19).</p>
+      <p>The placement test for any new behaviour: does <code>drain-cycle</code> need to know <em>what a role does</em> (Layer 2), or only <em>whether an artifact exists</em> (Layer 1)? Submitting a PR is "what a role does" — it belongs in a skill. Reading back the submitted PR URLs to decide whether to advance is "whether an artifact exists" — it belongs in the supervisor (see ADR 0023). The same test governs state in the execution-state file: a field only the supervisor needs is requested through the worker's prompt, never written into a skill (ADR 0030).</p>
       <p>Keeping the boundary at the artifact is what makes Layer 1 content-blind, and content-blindness is what lets the same Layer 2 run under any worker.</p>
+    </section>
+
+    <section class="s" id="sguard">
+      <header><span class="ix">guard</span><h2>Done has to mean done — the stop-guard enforces it</h2></header>
+      <p>Content-blindness has one precondition: a worker must not be able to <em>stop</em> with the work uncaptured. A <code>claude -p</code> session that loads a "report findings and await input" skill can end its turn with the code green but uncommitted and no PR submitted — the boundary would then read "not Done" for work that was actually finished, or worse, let the run march on past a half-done issue. The <strong>stop-guard</strong> closes that gap. Before each spawn the orchestrator plants <code>.drain-guard.json</code> in the worktree; the worker runs <code>stop_guard</code> as its Stop hook, so at end-of-turn Layer 1 gets one last check on the artifacts before the session is allowed to exit:</p>
+
+      <pre class="code-py"><code><span class="tok-kw">def</span> <span class="tok-fn">evaluate</span>(worktree, *, stop_hook_active):
+    config = <span class="tok-fn">read_marker</span>(worktree)             <span class="tok-com"># planted before the spawn; absent ⇒ not a drain worker</span>
+    <span class="tok-kw">if</span> config <span class="tok-kw">is</span> <span class="tok-kw">None</span>:
+        <span class="tok-kw">return</span> <span class="tok-fn">Decision</span>(block_reason=<span class="tok-kw">None</span>, tripped_reason=<span class="tok-kw">None</span>)   <span class="tok-com"># silent no-op for interactive sessions</span>
+
+    dirty      = <span class="tok-fn">_git_dirty</span>(worktree)          <span class="tok-com"># uncommitted work in the tree?</span>
+    handoff_ok = <span class="tok-fn">_has_handoff</span>(worktree) <span class="tok-kw">if</span> config.mode == <span class="tok-str">"stack"</span> <span class="tok-kw">else</span> <span class="tok-kw">True</span>
+    <span class="tok-kw">if</span> <span class="tok-kw">not</span> dirty <span class="tok-kw">and</span> handoff_ok:                <span class="tok-com"># commit + handoff present ⇒ the sequence ran</span>
+        <span class="tok-kw">return</span> <span class="tok-fn">Decision</span>(block_reason=<span class="tok-kw">None</span>, tripped_reason=<span class="tok-kw">None</span>)
+
+    <span class="tok-kw">if</span> config.count &gt;= config.max_blocks:    <span class="tok-com"># out of retries ⇒ give up and tag it</span>
+        (worktree / TRIPPED_FILE).<span class="tok-fn">write_text</span>(reason)   <span class="tok-com"># orchestrator reads → worker_stopped_incomplete</span>
+        <span class="tok-kw">return</span> <span class="tok-fn">Decision</span>(block_reason=<span class="tok-kw">None</span>, tripped_reason=reason)
+
+    <span class="tok-fn">_write_marker_count</span>(worktree, config, count=config.count + 1)
+    <span class="tok-kw">return</span> <span class="tok-fn">Decision</span>(block_reason=_BLOCK_PROMPT, tripped_reason=<span class="tok-kw">None</span>)   <span class="tok-com"># re-inject: finish the sequence, then stop</span></code></pre>
+
+      <p>The shape generalises: Layer 1 watches what a worker leaves behind, and when it falls short, re-injects a corrective prompt and retries before giving up and recording the shortfall. The same loop — observe, push back, retry, then escalate — is how the supervisor will later answer review comments on an open PR: revise, resubmit, and record the pass, escalating to the operator when a fix keeps missing.</p>
     </section>
 
     <section class="s" id="s4">
@@ -499,7 +530,7 @@
         <li><strong>Per-phase model economics.</strong> Review anchors to a stronger (more expensive) model regardless of what coded the change. That asymmetry is only expressible if each phase is its own spawn with its own <code>--model</code> pin — a cheap model can build while an expensive one reviews.</li>
       </ul>
       <p>The three phase agents map onto the existing pack: code = <code>exec:build</code> (+<code>exec:debug</code>, <code>exec:simplify</code>), review = <code>exec:review</code>, finish = <code>exec:finish</code>. Each is a goal-shaped worker prompt, not a resident process — the goal ("produce sliced artifacts", "apply every quality lens", "land human-readable PRs") drives a sequence of skill delegations inside one spawn.</p>
-      <p>The cost accepted in return: every phase boundary pays a spawn plus artifact rehydration, so the handoff envelope (§5) must carry everything the next phase needs — a single worker kept that context in memory for free. This is the deliberate price of independence; see design decision §20.</p>
+      <p>The cost accepted in return: every phase boundary pays a spawn plus artifact rehydration, so the execution-state file (§5) must carry everything the next phase needs — a single worker kept that context in memory for free. This is the deliberate price of independence; see ADR 0024.</p>
     </section>
 
     <section class="s" id="s6">
@@ -532,20 +563,65 @@ me         → review the finished work; step in only where it halted</code></pr
         </figure>
       </div>
 
-      <p>Design decision §10 (config symlinked into each worktree) is what makes the headless worker's environment match an interactive session, so a skill behaves the same in both modes.</p>
+      <p>ADR 0014 (config symlinked into each worktree) is what makes the headless worker's environment match an interactive session, so a skill behaves the same in both modes.</p>
+    </section>
+
+    <section class="s" id="sspine">
+      <header><span class="ix">spine</span><h2>The whole supervisor is one loop</h2></header>
+      <p>§6 showed the operator's view; this is the supervisor's. Layer 1 is a handful of single-purpose modules — <code>linear</code> moves issue state, <code>worktree</code> isolates the branch, <code>prompt</code> points the worker at the entry skill, <code>worker</code> spawns the metered <code>claude -p</code>, and <code>handoff</code> and <code>runlog</code> are the artifacts read back. The run is just the loop that threads them together:</p>
+
+      <pre class="code-py"><code><span class="tok-kw">from</span> drain_cycle <span class="tok-kw">import</span> linear, repos, model, worktree, prompt, worker, handoff, runlog
+
+<span class="tok-kw">def</span> <span class="tok-fn">run</span>(repos, limits):
+    cycle_id = linear.<span class="tok-fn">current_cycle_id</span>()              <span class="tok-com"># the state plane (§7)</span>
+    plan = linear.<span class="tok-fn">pending_issues</span>(cycle_id)            <span class="tok-com"># runnable issues, topo-sorted</span>
+    log = runlog.<span class="tok-fn">RunLog</span>(cycle_id=cycle_id)
+
+    <span class="tok-kw">for</span> issue <span class="tok-kw">in</span> plan.order:
+        repo   = repos.<span class="tok-fn">resolve</span>(issue)                 <span class="tok-com"># isolate on its own branch (§10)</span>
+        handle = worktree.<span class="tok-fn">ensure</span>(repo, issue[<span class="tok-str">"identifier"</span>], base=<span class="tok-str">"main"</span>)
+        linear.<span class="tok-fn">set_state</span>(issue[<span class="tok-str">"id"</span>], <span class="tok-str">"In Progress"</span>)
+
+        prompt_text = prompt.<span class="tok-fn">build</span>(issue, handle.path)   <span class="tok-com"># entry skill, no procedure (§3)</span>
+        result = worker.<span class="tok-fn">run_issue</span>(                    <span class="tok-com"># one metered `claude -p` (§4)</span>
+            claude_cmd=[<span class="tok-str">"claude"</span>, <span class="tok-str">"-p"</span>, <span class="tok-str">"--dangerously-skip-permissions"</span>],
+            model=model.<span class="tok-fn">resolve</span>(issue), prompt=prompt_text, cwd=handle.path,
+            token_limit=limits.per_issue_tokens,
+            time_limit_seconds=limits.per_issue_seconds,
+            cost_limit_usd=limits.per_issue_cost_usd,
+        )
+
+        <span class="tok-com"># advance on the artifacts the worker left — never on what it did (§5)</span>
+        done = linear.<span class="tok-fn">get_issue</span>(issue[<span class="tok-str">"id"</span>])[<span class="tok-str">"state"</span>][<span class="tok-str">"type"</span>] == <span class="tok-str">"completed"</span>
+        prs  = handoff.<span class="tok-fn">read</span>(handle.path)              <span class="tok-com"># .drain-handoff.json → pr_urls</span>
+        log.<span class="tok-fn">append_entry</span>(issue_identifier=issue[<span class="tok-str">"identifier"</span>],
+                         final_linear_state=<span class="tok-str">"Done"</span> <span class="tok-kw">if</span> done <span class="tok-kw">else</span> <span class="tok-str">"In Progress"</span>)</code></pre>
+
+      <p>That loop is <code>orchestrator.run</code>, near enough. Notice what is absent: no line reads what the worker <em>did</em>. The supervisor advances on three artifacts and nothing else — the Linear state from <code>linear.get_issue</code>, the <code>pr_urls</code> from <code>handoff.read</code>, and the entry it appends to the <code>runlog</code>. Swap <code>claude -p</code> for any other worker and the loop is unchanged.</p>
     </section>
 
     <!-- ACT III -->
     <div class="act-head" id="act3">
       <div class="act-kicker">Scale</div>
       <h2 class="act-title">How far it runs</h2>
-      <p class="act-tldr">The supervisor reaches further as observability earns trust: from one-shot CLI to resident daemon, from one issue to a whole planned unit, with review rolling up the same tree the work was broken down along.</p>
+      <p class="act-tldr">The supervisor runs wider as its records earn trust: from one-shot CLI to resident daemon, from a single issue to a whole planned unit, with review rolling back up the decomposition tree.</p>
     </div>
 
     <section class="s" id="s9">
-      <header><span class="ix">§9</span><h2>Extend the autonomy horizon as observability earns trust</h2></header>
-      <p>How far the supervisor runs without the operator. Today it drains a cycle transactionally — one issue, one worker, one diff — and halts when it runs out of runnable work or hits a result it cannot get past. The horizon extends outward as observability earns more trust: building on unmerged work, auto-merging trusted classes, and eventually a resident process that watches its own PRs through the review-and-merge loop. That extension is shaped in <a href="ideas/drain-past-the-merge-gate.md"><code>ideas/drain-past-the-merge-gate.md</code></a>.</p>
-      <p>The horizon is a deliberate trade, not a default: autonomy is applied selectively where the delayed feedback loop (§7) makes the loss of live intervention acceptable.</p>
+      <header><span class="ix">§9</span><h2>Extend the autonomy horizon as the run-logs earn trust</h2></header>
+      <p>The autonomy horizon is how far the supervisor runs without the operator. Today it drains a cycle transactionally — one issue, one worker, one diff — and halts when it runs out of runnable work or hits a result it cannot get past. It widens as the records earn more trust: building on unmerged work, auto-merging trusted classes, and eventually a resident process that watches its own PRs through the review-and-merge loop. That work is shaped in <a href="ideas/drain-past-the-merge-gate.md"><code>ideas/drain-past-the-merge-gate.md</code></a>.</p>
+      <p>Widening is a deliberate trade, not a default: the supervisor runs unattended only where the delayed feedback loop (§7) makes it safe to stop watching live.</p>
+      <p><code>grade</code> is how that trust is measured. It reads every run-log under <code>~/.drain-cycle/runs/</code> and scores the series — a Done-rate per cycle, a trend across the last three, the <code>(final_linear_state, exit_code)</code> failures that recur, and a verdict band the operator reads against their own kill rule:</p>
+
+      <pre class="code-py"><code><span class="tok-kw">def</span> <span class="tok-fn">verdict</span>(cycles):                              <span class="tok-com"># cycles built from ~/.drain-cycle/runs/*.json</span>
+    recent = [c.completion_percent <span class="tok-kw">for</span> c <span class="tok-kw">in</span> cycles[-3:]]   <span class="tok-com"># Done-rate per cycle</span>
+    trend  = <span class="tok-fn">_trend_label</span>(recent)                 <span class="tok-com"># improving / flat / regressing</span>
+    pct    = recent[-1]
+    <span class="tok-kw">if</span> pct &gt;= 80:  <span class="tok-kw">return</span> <span class="tok-str">"HEALTHY"</span>               <span class="tok-com"># the horizon may widen</span>
+    <span class="tok-kw">if</span> pct &gt;= 50:  <span class="tok-kw">return</span> <span class="tok-str">"WATCH"</span>
+    <span class="tok-kw">return</span> <span class="tok-str">"CONCERNING"</span>                          <span class="tok-com"># pull it back</span></code></pre>
+
+      <p>Records (§7) feed grades, and grades decide whether the supervisor takes on more: it drains, records, grades, then decides how far to go next.</p>
     </section>
 
     <section class="s" id="s10">
@@ -555,12 +631,12 @@ me         → review the finished work; step in only where it halted</code></pr
         <li><strong>Control plane (one per machine).</strong> The long-lived daemon. Owns process lifecycle, the queue of planned units to execute, and an API the operator queries and steers: what is running, halt this issue, resume, and (the horizon behaviour) watch open PRs through the review-and-merge loop and respond to review comments.</li>
         <li><strong>Execution-coordinator (one per unit in flight).</strong> Spawned by the control plane to drive a single cycle or project. It advances work by reading artifacts (§5) — never by reading inside a phase — and halts on a missing or failed artifact.</li>
       </ul>
-      <p>The control plane stays a <strong>process, not a Claude skill</strong> (design decision §22). A <code>/execute-cycle</code> skill would run inside a Claude session and collapse the artifact boundary that makes the worker vendor-agnostic; the one-command ergonomics come instead from a thin CLI front-door (<code>drain-cycle run &lt;unit&gt;</code>). "Respond to PR comments" is a control-plane behaviour, not a pack skill, because it requires watching a PR after it is open — which only a resident process does.</p>
+      <p>The control plane stays a <strong>process, not a Claude skill</strong> (ADR 0026). A <code>/execute-cycle</code> skill would run inside a Claude session and collapse the artifact boundary that makes the worker vendor-agnostic; the one-command ergonomics come instead from a thin CLI front-door (<code>drain-cycle run &lt;unit&gt;</code>). "Respond to PR comments" is a control-plane behaviour, not a pack skill, because it requires watching a PR after it is open — which only a resident process does.</p>
     </section>
 
     <section class="s" id="s11">
       <header><span class="ix">§11</span><h2>Execute a planned unit — a cycle or a project</h2></header>
-      <p>The supervisor executes a <em>planned unit</em>. The atom is unchanged — one issue, with a worker per phase (§4) — and a cycle and a project differ only as containers with a hierarchy over them. "Drain a cycle" is one entry point, not the definition; project execution is out of scope today but is a later container, not a redesign (design decision §22). The tool keeps the name <code>drain-cycle</code>; the concept it serves is wider.</p>
+      <p>The supervisor executes a <em>planned unit</em>. The atom is unchanged — one issue, with a worker per phase (§4) — and a cycle and a project differ only as containers with a hierarchy over them. "Drain a cycle" is one entry point, not the definition; project execution is out of scope today but is a later container, not a redesign (ADR 0026). The tool keeps the name <code>drain-cycle</code>; the concept it serves is wider.</p>
     </section>
 
     <section class="s" id="s12">

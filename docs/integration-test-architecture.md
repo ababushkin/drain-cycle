@@ -18,7 +18,7 @@ We need **scenario-level integration tests** that drive the orchestrator end-to-
 - **Resume semantics** — halt mid-cycle, re-run, observe pickup of in-flight issues reverted to Todo
 - **Session/usage tracking** — `_UsageAccumulator` totals, cycle aggregates in runlog, per-issue caps triggering breaches
 
-The drain has no native retry (deliberate, per `docs/design-decisions.md`); "retry" here means **resume** — a re-invocation against the same cycle.
+The drain has no native retry (deliberate, per `docs/adrs/0018-resume-on-rerun.md`); "retry" here means **resume** — a re-invocation against the same cycle.
 
 ## System context
 

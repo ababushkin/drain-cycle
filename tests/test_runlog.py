@@ -111,6 +111,7 @@ def test_append_entry_persists_two_entries_in_order_with_required_fields(
         "outcome_verdict",
         "prep_verdict",
         "responder_runs",
+        "finishing_runs",
     }
     assert set(first.keys()) == required_keys
     assert set(second.keys()) == required_keys

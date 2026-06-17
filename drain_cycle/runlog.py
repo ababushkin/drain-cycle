@@ -49,6 +49,7 @@ Schema:
           "outcome_verdict":    null | {"result": "pass"|"fail", "findings": [...], "invoked_at": "<iso-8601>"},
           "prep_verdict":       null | {"result": "<str>", "route": "human-review"|"auto-merge", "reasoning": "<str>"},
           "responder_runs":     [],
+          "finishing_runs":     [],
         },
         ...
       ],
@@ -167,6 +168,7 @@ class RunLog:
         outcome_verdict: dict[str, Any] | None = None,
         prep_verdict: dict[str, Any] | None = None,
         responder_runs: list[dict[str, Any]] | None = None,
+        finishing_runs: list[dict[str, Any]] | None = None,
     ) -> None:
         if duration_seconds is None:
             duration_seconds = (
@@ -192,6 +194,7 @@ class RunLog:
                 "outcome_verdict": outcome_verdict,
                 "prep_verdict": prep_verdict,
                 "responder_runs": responder_runs if responder_runs is not None else [],
+                "finishing_runs": finishing_runs if finishing_runs is not None else [],
             }
         )
         self._persist()
@@ -203,7 +206,7 @@ class RunLog:
         startup diagnostics sit next to the run log they belong to and the
         run-start timestamp keeps re-runs from clobbering a prior capture.
         Only written when debug capture is enabled — see ``orchestrator.run``
-        and ``docs/design-decisions.md`` §10.
+        and ``docs/adrs/0014-worktree-config-symlink.md``.
         """
         return self.path.with_name(f"{self.path.stem}-{issue_identifier}.debug.log")
 

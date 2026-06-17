@@ -12,6 +12,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+_FINISHING_OPUS_MODEL = "claude-opus-4-7"
+
 
 def _resume_directive(identifier: str, base: str) -> str:
     """Resume preamble for a worktree carrying prior committed work.
@@ -68,4 +70,52 @@ def build(
         f"{description}\n\n"
         f"{preamble}\n"
         f"{_TAIL}\n"
+    )
+
+
+def build_finishing(identifier: str, worktree: Path, base: str) -> str:
+    """Build a finishing-only prompt for a committed-but-unfinished issue.
+
+    The implementation is already committed. The agent runs review → fix →
+    pr-finishing → Done. It must not re-implement or add commits beyond those
+    needed to fix Critical/Required review findings.
+    Critical/Required fixes are delegated to ``_FINISHING_OPUS_MODEL`` sub-agents.
+    """
+    if base == "main":
+        base_clause = ""
+    else:
+        base_clause = (
+            f" These commits are stacked on `{base}`, not `main`, so pass "
+            f"`{base}` to the skill as its base branch (it slices `{base}..HEAD`)."
+        )
+    return (
+        f"# Finishing incomplete issue {identifier}\n\n"
+        f"The implementation for this issue is already committed on this branch. "
+        f"Run `git log --oneline {base}..HEAD` to see the committed work.\n\n"
+        "Your only task is to run the finishing protocol below. Do not "
+        "re-implement, redesign, or add commits beyond those needed to fix "
+        "Critical/Required review findings.\n\n"
+        "---\n\n"
+        f"Finishing instructions for issue {identifier}:\n"
+        f"- Working directory: {worktree}\n"
+        f"- Base branch: {base}\n"
+        "- Steps (run in order, before marking Done):\n"
+        "  1. Review the committed changes for correctness and quality.\n"
+        "  2. Fix any Critical or Required findings. For each fix that needs "
+        f"significant code changes, spawn a sub-agent on `{_FINISHING_OPUS_MODEL}` "
+        "with the specific fix task — do not switch models for the overall session.\n"
+        "  3. Commit any review-fix changes to the branch as reviewable slices "
+        "(if any). Do not push by hand.\n"
+        f"  4. Run `/shape:pr-finishing`.{base_clause} It submits the slices as "
+        "stacked PR(s) via Graphite, writes the submitted PR URLs into "
+        "`.drain-handoff.json` (`pr_urls`), and posts the review-summary comment "
+        "on the Linear issue. Do not run `gt`/`gh` by hand or write "
+        "`.drain-handoff.json` yourself — the skill owns both.\n"
+        "  5. Confirm `.drain-handoff.json` now contains a non-empty `pr_urls` "
+        "list. If the skill could not submit, leave the issue In Progress and "
+        "comment the blocker — do not mark Done.\n"
+        "  6. Transition issue to Done via `mcp__claude_ai_Linear__save_issue` "
+        '(state: "Done").\n\n'
+        "before marking Done: confirm the PR URLs are in `.drain-handoff.json` "
+        "and transition to Done.\n"
     )
