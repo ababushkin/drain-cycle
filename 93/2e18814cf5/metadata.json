@@ -3,8 +3,14 @@
   "checkpoint_id": "932e18814cf5",
   "strategy": "manual-commit",
   "branch": "ABA-373-handoff-schema",
-  "checkpoints_count": 0,
+  "checkpoints_count": 2,
   "files_touched": [
+    "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/N01-amend-thin-supervisor-contract.md",
+    "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/N02-pack-dual-writes-exec-state.md",
+    "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/N03-supervisor-reads-exec-state.md",
+    "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/N04-drop-legacy-handoff.md",
+    "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/_deliverable.md",
+    "docs/delivery-plans/exec-state-file-rename/README.md",
     "drain_cycle/handoff.py",
     "drain_cycle/orchestrator.py",
     "tests/test_handoff.py"
@@ -15,13 +21,19 @@
       "transcript": "/93/2e18814cf5/0/full.jsonl",
       "content_hash": "/93/2e18814cf5/0/content_hash.txt",
       "prompt": "/93/2e18814cf5/0/prompt.txt"
+    },
+    {
+      "metadata": "/93/2e18814cf5/1/metadata.json",
+      "transcript": "/93/2e18814cf5/1/full.jsonl",
+      "content_hash": "/93/2e18814cf5/1/content_hash.txt",
+      "prompt": "/93/2e18814cf5/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 27877,
-    "cache_creation_tokens": 99021,
-    "cache_read_tokens": 2030542,
-    "output_tokens": 30741,
-    "api_call_count": 37
+    "input_tokens": 29228,
+    "cache_creation_tokens": 326594,
+    "cache_read_tokens": 14340500,
+    "output_tokens": 62134,
+    "api_call_count": 94
   }
 }

@@ -1,0 +1,113 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "932e18814cf5",
+  "session_id": "0ea14c36-4388-4f5f-9e9c-7327e3607066",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-17T02:49:21.749779Z",
+  "branch": "ABA-373-handoff-schema",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/N01-amend-thin-supervisor-contract.md",
+    "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/N02-pack-dual-writes-exec-state.md",
+    "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/N03-supervisor-reads-exec-state.md",
+    "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/N04-drop-legacy-handoff.md",
+    "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/_deliverable.md",
+    "docs/delivery-plans/exec-state-file-rename/README.md",
+    "drain_cycle/handoff.py",
+    "drain_cycle/orchestrator.py",
+    "tests/test_handoff.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "a140560364ba",
+  "checkpoint_transcript_start": 844,
+  "transcript_lines_at_start": 844,
+  "token_usage": {
+    "input_tokens": 1351,
+    "cache_creation_tokens": 227573,
+    "cache_read_tokens": 12309958,
+    "output_tokens": 31393,
+    "api_call_count": 57
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01VfX2qkWKfrgwSwg8wNuWdC",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "delivery"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "a140560364ba",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 611,
+        "end": 612,
+        "entry_ids": [
+          "bf9cc454-cfd0-48c1-b64d-71b593e30431"
+        ],
+        "tool_use_id": "toolu_01VfX2qkWKfrgwSwg8wNuWdC"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01VfX2qkWKfrgwSwg8wNuWdC"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: delivery",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 14
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-17T02:49:21.710895Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 944,
+    "human_modified": 21,
+    "human_removed": 0,
+    "total_committed": 944,
+    "total_lines_changed": 965,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 595,
+      "user_lines_removed": 21,
+      "agent_lines_added": 15,
+      "agent_lines_removed": 131,
+      "user_added_per_file": {
+        "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/N01-amend-thin-supervisor-contract.md": 75,
+        "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/N02-pack-dual-writes-exec-state.md": 67,
+        "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/N03-supervisor-reads-exec-state.md": 69,
+        "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/N04-drop-legacy-handoff.md": 57,
+        "docs/delivery-plans/exec-state-file-rename/D1-one-pack-owned-execution-state-file/_deliverable.md": 41,
+        "docs/delivery-plans/exec-state-file-rename/README.md": 61,
+        "drain_cycle/handoff.py": 57,
+        "drain_cycle/orchestrator.py": 12,
+        "tests/test_handoff.py": 156
+      },
+      "user_removed_per_file": {
+        "drain_cycle/handoff.py": 11,
+        "drain_cycle/orchestrator.py": 9,
+        "tests/test_handoff.py": 1
+      }
+    }
+  ]
+}
