@@ -2,7 +2,7 @@
 
 **Status:** **Superseded by [ADR 0030](../0030-execution-state-file.md) (2026-06-17).** The two-file model (`pickup-envelope.json` carrier + consumer-named `.drain-handoff.json` exit record) is replaced by one pack-owned execution-state file per task (illustratively `exec-state.json`), with each phase's skill writing its own section as the natural output of that phase. The fields below reappear as sections of the pack-owned file under the new contract; the file's name and owner change. The verdict producers (`outcome_verdict`, `prep_verdict`) **were never built on this handoff** — the dataclass and reader shipped, but no pack-side writer was wired — so the rename is not a migration of an in-use producer. See [ADR 0002 § Amendment 2026-06-17](../0002-thin-supervisor-contract.md#amendment-2026-06-17--single-pack-owned-execution-state-file-supersedes-the-two-file-model) for the supersession record and the boundary-chart corrections caught at the reopen.
 
-The schema below is retained for history: the build nodes that follow the amendment (ABA-399, ABA-400) will land the section contract on the pack-owned file, not on `.drain-handoff.json`.
+The schema below is retained for history: the build nodes that follow the amendment will land the section contract on the pack-owned file, not on `.drain-handoff.json`.
 
 ---
 
