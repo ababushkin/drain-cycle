@@ -2,11 +2,16 @@
 
 In stack mode the worker drives PR submission itself via the ``pr-finishing``
 skill, which runs ``gt``/``gh`` inside the worktree, posts the Linear
-review-summary comment, and records the submitted PRs in
-``.drain-handoff.json`` as a ``pr_urls`` list. The orchestrator reads that
-list back as its confirmation signal — a present, non-empty ``pr_urls`` means
-the skill submitted at least one PR; its absence means submission never
-completed and the per-repo chain must halt rather than march on.
+review-summary comment, and records the submitted PRs in ``exec-state.json``
+(the pack-named file) as a ``pr_urls`` list. The orchestrator reads that list
+back as its confirmation signal — a present, non-empty ``pr_urls`` means the
+skill submitted at least one PR; its absence means submission never completed
+and the per-repo chain must halt rather than march on.
+
+``read`` prefers ``exec-state.json`` and falls back to the legacy
+``.drain-handoff.json`` so the orchestrator works whether or not the pack has
+cut over to the new file. Neither file present (or both structurally invalid)
+returns ``None``.
 
 Schema v2 adds ``outcome_verdict`` and ``prep_verdict`` fields so the worker
 can record its self-assessment. The orchestrator reads these on every exit
@@ -24,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+EXEC_STATE_FILE = "exec-state.json"
 HANDOFF_FILE = ".drain-handoff.json"
 
 
@@ -66,18 +72,14 @@ def _parse_dict(raw: object) -> dict[str, Any] | None:
     return raw
 
 
-def read(worktree: Path) -> HandoffData | None:
-    """Return the handoff data for ``worktree``, or ``None`` if absent or invalid.
+def _read_file(path: Path) -> HandoffData | None:
+    """Parse a single state file path, returning HandoffData or None.
 
-    A valid handoff has a ``pr_urls`` list with at least one entry, each entry
-    a dict carrying string ``title`` and ``url``. An empty list is treated as
+    A valid file has a ``pr_urls`` list with at least one entry, each entry a
+    dict carrying string ``title`` and ``url``. An empty list is treated as
     invalid: the skill writes ``pr_urls`` only after a PR is actually created,
     so "present but empty" means no submission happened.
-
-    ``outcome_verdict`` and ``prep_verdict`` are optional: missing keys are
-    read as ``None`` and do not affect validity.
     """
-    path = worktree / HANDOFF_FILE
     try:
         payload = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError):
@@ -101,6 +103,22 @@ def read(worktree: Path) -> HandoffData | None:
         outcome_verdict=_parse_dict(payload.get("outcome_verdict")),
         prep_verdict=_parse_dict(payload.get("prep_verdict")),
     )
+
+
+def read(worktree: Path) -> HandoffData | None:
+    """Return the handoff data for ``worktree``, or ``None`` if absent or invalid.
+
+    Prefers ``exec-state.json`` (the pack-named file) and falls back to the
+    legacy ``.drain-handoff.json``. Returns ``None`` when neither file exists
+    or both are structurally invalid.
+
+    ``outcome_verdict`` and ``prep_verdict`` are optional: missing keys are
+    read as ``None`` and do not affect validity.
+    """
+    result = _read_file(worktree / EXEC_STATE_FILE)
+    if result is not None:
+        return result
+    return _read_file(worktree / HANDOFF_FILE)
 
 
 def read_partial(

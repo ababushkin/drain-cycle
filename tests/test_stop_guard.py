@@ -76,7 +76,7 @@ def test_stack_mode_dirty_tree_blocks(tmp_path: Path) -> None:
     decision = stop_guard.evaluate(tmp_path, stop_hook_active=False)
     assert decision.block_reason is not None
     assert "commit" in decision.block_reason.lower()
-    assert ".drain-handoff.json" in decision.block_reason
+    assert "exec-state.json" in decision.block_reason
     # count incremented
     cfg = stop_guard.read_marker(tmp_path)
     assert cfg is not None and cfg.count == 1
@@ -95,7 +95,7 @@ def test_stack_mode_missing_handoff_blocks(tmp_path: Path) -> None:
     decision = stop_guard.evaluate(tmp_path, stop_hook_active=False)
     # Tree is clean but handoff missing → block in stack mode.
     assert decision.block_reason is not None
-    assert "handoff" in decision.block_reason.lower()
+    assert "exec-state.json" in decision.block_reason
 
 
 def test_push_mode_clean_tree_passes_through(tmp_path: Path) -> None:
@@ -204,6 +204,22 @@ def test_own_artefacts_do_not_count_as_dirty(tmp_path: Path) -> None:
     stop_guard.write_marker(tmp_path, mode="stack")
     write_handoff(tmp_path, _valid_handoff())
     # Marker and handoff are both untracked; nothing else is dirty.
+    decision = stop_guard.evaluate(tmp_path, stop_hook_active=False)
+    assert decision.block_reason is None
+    assert decision.tripped_reason is None
+
+
+def test_exec_state_file_does_not_count_as_dirty(tmp_path: Path) -> None:
+    """exec-state.json is a drain-cycle artefact — untracked, must not trip guard."""
+    import json as _json
+    from drain_cycle.handoff import EXEC_STATE_FILE
+    _git_init(tmp_path)
+    _commit(tmp_path, "a.txt")
+    stop_guard.write_marker(tmp_path, mode="stack")
+    # Write exec-state.json as the handoff (the new primary file).
+    (tmp_path / EXEC_STATE_FILE).write_text(
+        _json.dumps({"pr_urls": [{"title": "feat", "url": "https://github.com/o/r/pull/1"}]})
+    )
     decision = stop_guard.evaluate(tmp_path, stop_hook_active=False)
     assert decision.block_reason is None
     assert decision.tripped_reason is None
