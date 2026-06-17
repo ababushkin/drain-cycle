@@ -1,0 +1,3 @@
+the ADR written as part of aba-398 makes references to linear tickets
+this is incorrect, linear tickets are "in progress" ephermal tracking items, they don't encapsulate knowledge that's durable
+all durable information should be captured in the ADR directly without lingering links back to linear
