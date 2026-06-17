@@ -12,48 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-_VERIFY_FLOW_LABEL = "verify"
-
-_FINISHING_MODEL = "claude-sonnet-4-6"
 _FINISHING_OPUS_MODEL = "claude-opus-4-7"
-
-
-def is_verify_flow(issue: dict[str, Any]) -> bool:
-    """Return True when the issue carries the ``verify`` label."""
-    return _VERIFY_FLOW_LABEL in issue.get("labels", [])
-
-
-def _shape_task_directive(identifier: str) -> str:
-    """Shape-task preamble for verify-flow worker sessions.
-
-    Instructs the worker to check for an existing Task Shaper output
-    block in the Linear issue body before invoking ``/shape:task``. The
-    check-first approach handles both fresh sessions (block absent →
-    invoke) and §14 resumes (block present → reuse).
-    """
-    return (
-        f"Shaping step (run before implementing): fetch the Linear issue body "
-        f"for {identifier} and check for a Task Shaper output block "
-        "(delimited by `<!-- TASK-SHAPER-START -->` and `<!-- TASK-SHAPER-END -->`). "
-        "If the block is present, use it as your implementation guide and skip "
-        "re-running `/shape:task`. If the block is absent, run "
-        f"`/shape:task {identifier}` first and use its output as your "
-        "implementation guide.\n\n"
-    )
-
-
-_TAIL = (
-    "before marking Done: review the working-tree changes for correctness "
-    "and quality, fix Critical/Required findings, commit + push, then post a "
-    "review-summary comment on the issue and transition to Done."
-)
-
-_STACK_TAIL = (
-    "before marking Done: review the changes, fix Critical/Required findings, "
-    "commit them as reviewable slices on the issue branch, then run "
-    "`/shape:pr-finishing` to submit the stacked PR(s) and post the "
-    "review-summary comment, and only then transition to Done."
-)
 
 
 def _resume_directive(identifier: str, base: str) -> str:
@@ -61,7 +20,7 @@ def _resume_directive(identifier: str, base: str) -> str:
 
     Inserted as the first line inside the preamble (after the ``---``
     separator, before "Execution instructions:") so the agent reads it
-    ahead of the procedure but the tail still holds the last-line
+    ahead of the pointer but the tail still holds the last-line
     position the four-segment ordering reserves for it.
 
     The ``git log`` range is anchored at ``base`` so a chained worktree
@@ -77,70 +36,19 @@ def _resume_directive(identifier: str, base: str) -> str:
     )
 
 
-def _normal_preamble(
-    identifier: str, worktree: Path, base: str, resume_segment: str, shape_task_segment: str
-) -> str:
+def _preamble(identifier: str, worktree: Path, base: str, resume_segment: str) -> str:
     return (
         "---\n\n"
         f"{resume_segment}"
-        f"{shape_task_segment}"
         "Execution instructions:\n"
         f"- Working directory: {worktree}\n"
         f"- Base branch: {base}\n"
-        f"- Completion sequence for issue {identifier} (run in this order, "
-        "before marking Done):\n"
-        "  1. Review the working-tree changes for correctness and quality.\n"
-        "  2. Fix any Critical or Required findings. Lower-severity findings "
-        "are at your discretion.\n"
-        "  3. Commit and push to main.\n"
-        "  4. Post a short review-summary comment on the Linear issue via "
-        "`mcp__claude_ai_Linear__save_comment` (count of findings by severity, "
-        "fixed vs deferred).\n"
-        "  5. Transition issue to Done via `mcp__claude_ai_Linear__save_issue` "
-        '(state: "Done").\n'
+        "\n"
+        "Run `/shape:exec:pickup` to execute this issue end-to-end.\n"
     )
 
 
-def _stack_preamble(
-    identifier: str, worktree: Path, base: str, resume_segment: str, shape_task_segment: str
-) -> str:
-    # When the worktree is chained off a prior issue's branch rather than
-    # ``main``, the slices stack on that branch — tell pr-finishing so it
-    # slices ``<base>..HEAD`` instead of its ``main..HEAD`` default and
-    # opens the PR against the right base. Omitted for the ``main`` base so
-    # the unchained prompt stays unchanged.
-    if base == "main":
-        base_clause = ""
-    else:
-        base_clause = (
-            f" These commits are stacked on `{base}`, not `main`, so pass "
-            f"`{base}` to the skill as its base branch (it slices `{base}..HEAD`)."
-        )
-    return (
-        "---\n\n"
-        f"{resume_segment}"
-        f"{shape_task_segment}"
-        "Execution instructions:\n"
-        f"- Working directory: {worktree}\n"
-        f"- Base branch: {base}\n"
-        f"- Completion sequence for issue {identifier} (run in this order, "
-        "before marking Done):\n"
-        "  1. Review the working-tree changes for correctness and quality.\n"
-        "  2. Fix any Critical or Required findings. Lower-severity findings "
-        "are at your discretion.\n"
-        "  3. Commit the changes to the issue branch as reviewable slices — "
-        "one logical change per commit. Do not push by hand.\n"
-        "  4. Run `/shape:pr-finishing`. It submits the slices as stacked "
-        "PR(s) via Graphite, writes the submitted PR URLs into "
-        "`.drain-handoff.json` (`pr_urls`), and posts the review-summary "
-        "comment on the Linear issue. Do not run `gt`/`gh` by hand or write "
-        f"`.drain-handoff.json` yourself — the skill owns both.{base_clause}\n"
-        "  5. Confirm `.drain-handoff.json` now contains a non-empty `pr_urls` "
-        "list. If the skill could not submit, leave the issue In Progress and "
-        "comment the blocker — do not mark Done.\n"
-        "  6. Transition issue to Done via `mcp__claude_ai_Linear__save_issue` "
-        '(state: "Done").\n'
-    )
+_TAIL = "before marking Done: run `/shape:exec:pickup`."
 
 
 def build(
@@ -148,7 +56,6 @@ def build(
     worktree: Path,
     *,
     resumed: bool = False,
-    stack: bool = False,
     base: str = "main",
 ) -> str:
     title = issue.get("title", "")
@@ -156,24 +63,13 @@ def build(
     identifier = issue.get("identifier", "")
 
     resume_segment = _resume_directive(identifier, base) if resumed else ""
-    shape_task_segment = _shape_task_directive(identifier) if is_verify_flow(issue) else ""
-
-    if stack:
-        preamble = _stack_preamble(
-            identifier, worktree, base, resume_segment, shape_task_segment
-        )
-        tail = _STACK_TAIL
-    else:
-        preamble = _normal_preamble(
-            identifier, worktree, base, resume_segment, shape_task_segment
-        )
-        tail = _TAIL
+    preamble = _preamble(identifier, worktree, base, resume_segment)
 
     return (
         f"# {title}\n\n"
         f"{description}\n\n"
         f"{preamble}\n"
-        f"{tail}\n"
+        f"{_TAIL}\n"
     )
 
 

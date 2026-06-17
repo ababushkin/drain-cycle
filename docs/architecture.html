@@ -582,7 +582,7 @@ me         → review the finished work; step in only where it halted</code></pr
         handle = worktree.<span class="tok-fn">ensure</span>(repo, issue[<span class="tok-str">"identifier"</span>], base=<span class="tok-str">"main"</span>)
         linear.<span class="tok-fn">set_state</span>(issue[<span class="tok-str">"id"</span>], <span class="tok-str">"In Progress"</span>)
 
-        prompt_text = prompt.<span class="tok-fn">build</span>(issue, handle.path, stack=<span class="tok-kw">True</span>)   <span class="tok-com"># entry skill, no procedure (§3)</span>
+        prompt_text = prompt.<span class="tok-fn">build</span>(issue, handle.path)   <span class="tok-com"># entry skill, no procedure (§3)</span>
         result = worker.<span class="tok-fn">run_issue</span>(                    <span class="tok-com"># one metered `claude -p` (§4)</span>
             claude_cmd=[<span class="tok-str">"claude"</span>, <span class="tok-str">"-p"</span>, <span class="tok-str">"--dangerously-skip-permissions"</span>],
             model=model.<span class="tok-fn">resolve</span>(issue), prompt=prompt_text, cwd=handle.path,

@@ -204,13 +204,11 @@ def test_resume_reuses_preserved_worktree_and_signals_resumed_prompt(
     build_calls: list[dict] = []
     real_build = prompt.build
 
-    def recording_build(issue_arg, worktree_arg, *, resumed=False, stack=False, base="main"):
+    def recording_build(issue_arg, worktree_arg, *, resumed=False, base="main"):
         build_calls.append(
             {"identifier": issue_arg["identifier"], "resumed": resumed}
         )
-        return real_build(
-            issue_arg, worktree_arg, resumed=resumed, stack=stack, base=base
-        )
+        return real_build(issue_arg, worktree_arg, resumed=resumed, base=base)
 
     monkeypatch.setattr(prompt, "build", recording_build)
 
@@ -276,11 +274,9 @@ def test_resume_of_chained_worktree_recovers_base_from_worktree(
     build_calls: list[dict] = []
     real_build = prompt.build
 
-    def recording_build(issue_arg, worktree_arg, *, resumed=False, stack=False, base="main"):
+    def recording_build(issue_arg, worktree_arg, *, resumed=False, base="main"):
         build_calls.append({"identifier": issue_arg["identifier"], "base": base})
-        return real_build(
-            issue_arg, worktree_arg, resumed=resumed, stack=stack, base=base
-        )
+        return real_build(issue_arg, worktree_arg, resumed=resumed, base=base)
 
     monkeypatch.setattr(prompt, "build", recording_build)
     _patch_linear(monkeypatch, [issue], set_state_calls=[])
