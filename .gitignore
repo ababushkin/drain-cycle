@@ -12,6 +12,9 @@ pickup-envelope.json
 # Operator secrets (LINEAR_API_KEY etc).
 .env
 
+# Plan-review records are transient review artefacts, never committed.
+docs/adrs/references/*-plan-review.md
+
 # Python
 __pycache__/
 *.py[cod]

@@ -1,7 +1,7 @@
 # ADR 0002: Thin-supervisor contract — prompt-segment allocation, handoff schema v2, process/workflow boundary
 
 **Date:** 2026-06-16
-**Status:** Accepted (plan-review at `docs/adrs/references/0002-thin-supervisor-contract-plan-review.md`); **superseded in part by [ADR 0030](0030-execution-state-file.md)** — see the Amendment below.
+**Status:** Accepted; **superseded in part by [ADR 0030](0030-execution-state-file.md)** — see the Amendment below.
 
 ## Amendment 2026-06-17 — single pack-owned execution-state file (supersedes the two-file model)
 
