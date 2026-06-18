@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "42d27c20991c",
+  "strategy": "manual-commit",
+  "branch": "ABA-409-live-execution-swimlanes",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "docs/design-docs/live-execution-swimlanes/design-doc.md",
+    "docs/ideas/live-execution-swimlanes.md",
+    "docs/prototypes/live-execution-swimlanes/demo.py",
+    "docs/prototypes/live-execution-swimlanes/finding.md",
+    "docs/spikes/live-execution-swimlanes-observability/recommendation.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/42/d27c20991c/0/metadata.json",
+      "transcript": "/42/d27c20991c/0/full.jsonl",
+      "content_hash": "/42/d27c20991c/0/content_hash.txt",
+      "prompt": "/42/d27c20991c/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 20744,
+    "cache_creation_tokens": 39302,
+    "cache_read_tokens": 527476,
+    "output_tokens": 10298,
+    "api_call_count": 13
+  }
+}

@@ -1,0 +1,6 @@
+why do i see this error when i try to grade my drain-cycle runs? drain-cycle grade: warning: ABA-406 is a draft — excluded from rate
+
+---
+
+i need to make the grading automated - also grading is a bad choice of words
+i'm trying to figure out a way to automate how to measure the quality of each run - duration,cost,correctness
