@@ -110,6 +110,7 @@ def test_append_entry_persists_two_entries_in_order_with_required_fields(
         "is_error",
         "outcome_verdict",
         "prep_verdict",
+        "review_verdict",
         "responder_runs",
         "finishing_runs",
     }
