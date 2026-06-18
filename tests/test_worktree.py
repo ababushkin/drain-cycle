@@ -72,6 +72,82 @@ def test_remove_failure_raises_with_git_stderr_in_message(tmp_path: Path) -> Non
     assert str(bogus) in msg or "working tree" in msg.lower()
 
 
+def _spy_subprocess_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[tuple[list[str], object]]:
+    """Record ``(argv, cwd)`` of every ``subprocess.run`` worktree makes.
+
+    The ``mise trust`` call is faked (never exec'd) so the test passes whether or
+    not mise is installed; all other commands (git) delegate to the real runner.
+    """
+    real_run = subprocess.run
+    calls: list[tuple[list[str], object]] = []
+
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+        calls.append((list(args), kwargs.get("cwd")))
+        if args and args[0] == "mise":
+            return subprocess.CompletedProcess(args, 0, "", "")
+        return real_run(args, **kwargs)
+
+    monkeypatch.setattr(worktree.subprocess, "run", fake_run)
+    return calls
+
+
+def test_ensure_trusts_mise_in_new_worktree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When mise is on PATH, ``ensure`` runs ``mise trust`` *with the new worktree
+    as cwd* — trust is path-keyed, so it must run inside the worktree to mark the
+    checked-out ``mise.toml``; running it at the repo root would be a no-op."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.setattr(worktree.shutil, "which", lambda _: "/usr/bin/mise")
+    calls = _spy_subprocess_run(monkeypatch)
+
+    handle = worktree.ensure(repo, "ABA-X")
+
+    trust_cwds = [cwd for argv, cwd in calls if argv[:2] == ["mise", "trust"]]
+    assert trust_cwds == [handle.path]
+
+
+def test_ensure_trusts_mise_on_resume(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A resumed (already-registered) worktree gets trusted too — a worktree left
+    by a pre-fix run never had its ``mise.toml`` trusted."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    worktree.add(repo, "ABA-X")  # pre-existing, registered worktree
+
+    monkeypatch.setattr(worktree.shutil, "which", lambda _: "/usr/bin/mise")
+    calls = _spy_subprocess_run(monkeypatch)
+
+    handle = worktree.ensure(repo, "ABA-X")
+
+    assert handle.resumed is True
+    trust_cwds = [cwd for argv, cwd in calls if argv[:2] == ["mise", "trust"]]
+    assert trust_cwds == [handle.path]
+
+
+def test_ensure_skips_mise_trust_when_not_installed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No mise on PATH → no ``mise`` subprocess; ``ensure`` still returns the
+    handle. This is the no-op guarantee for repos that don't use mise."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    # conftest _default_mise_absent autouse fixture already stubs which -> None.
+    calls = _spy_subprocess_run(monkeypatch)
+
+    handle = worktree.ensure(repo, "ABA-X")
+
+    assert not any(argv and argv[0] == "mise" for argv, _ in calls)
+    assert handle.path == repo / worktree.WORKTREE_DIR / "ABA-X"
+
+
 def test_link_project_config_symlinks_gitignored_claude(tmp_path: Path) -> None:
     """A gitignored ``.claude/`` (absent from the worktree checkout) is
     symlinked back to the repo's real dir, so the worker reads through it."""

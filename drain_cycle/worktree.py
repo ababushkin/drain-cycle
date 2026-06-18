@@ -82,9 +82,15 @@ def ensure(repo: Path, identifier: str, base: str = BASE_BRANCH) -> WorktreeHand
         span.set_attribute("worktree.path", str(worktree_path))
         if _is_registered_worktree(repo, worktree_path):
             span.set_attribute("worktree.resumed", True)
-            return WorktreeHandle(path=worktree_path, resumed=True)
-        span.set_attribute("worktree.resumed", False)
-    return WorktreeHandle(path=add(repo, identifier, base), resumed=False)
+            handle = WorktreeHandle(path=worktree_path, resumed=True)
+        else:
+            span.set_attribute("worktree.resumed", False)
+            handle = WorktreeHandle(path=add(repo, identifier, base), resumed=False)
+    # Trust the worktree's mise config on both paths: a fresh checkout's tracked
+    # mise.toml is untrusted (path-keyed), and a resumed worktree from a pre-fix
+    # run never got trusted either.
+    _trust_mise(worktree_path)
+    return handle
 
 
 def read_base(worktree_path: Path) -> str:
@@ -178,6 +184,27 @@ def remove(repo: Path, worktree_path: Path) -> None:
         span.set_attribute("worktree.repo", repo.name)
         span.set_attribute("worktree.path", str(worktree_path))
         _run_git(["worktree", "remove", "--force", str(worktree_path)], cwd=repo)
+
+
+def _trust_mise(worktree_path: Path) -> None:
+    """Best-effort ``mise trust`` run with ``worktree_path`` as the working dir.
+
+    A git worktree checks out the repo's tracked ``mise.toml`` to a new path, but
+    mise trust is path-keyed, so the copy is untrusted even when the repo root is
+    trusted — every mise invocation in the worktree (e.g. a SessionEnd hook running
+    git there) then errors. Running trust *in* the worktree marks its own config.
+
+    No-op when mise is not installed, so repos that don't use mise are unaffected.
+    Failures are swallowed: trust is a convenience, never a reason to fail setup.
+    """
+    if shutil.which("mise") is None:
+        return
+    subprocess.run(
+        ["mise", "trust"],
+        cwd=worktree_path,
+        check=False,
+        capture_output=True,
+    )
 
 
 def _is_gitignored(repo: Path, name: str) -> bool:
