@@ -3,21 +3,27 @@
 In stack mode the worker drives PR submission itself via the ``pr-finishing``
 skill, which runs ``gt``/``gh`` inside the worktree, posts the Linear
 review-summary comment, and records the submitted PRs in ``exec-state.json``
-(the pack-named file) as a ``pr_urls`` list. The orchestrator reads that list
-back as its confirmation signal — a present, non-empty ``pr_urls`` means the
-skill submitted at least one PR; its absence means submission never completed
-and the per-repo chain must halt rather than march on.
+(the pack-named file). The pack writes that file as a set of phase-keyed
+sections — ``pickup``, ``breakdown``, ``build``, ``review``, ``verify``,
+``finish`` — each skill owning its own section (ADR 0030). The orchestrator
+reads two of those sections back: ``finish.pr_urls`` as its submission-confirmation
+signal — a present, non-empty list means the skill submitted at least one PR;
+its absence means submission never completed and the per-repo chain must halt —
+and the ``verify`` section, which it maps to its ``outcome_verdict`` for the
+run-log and the verifier-fail gate.
 
-``read`` prefers ``exec-state.json`` and falls back to the legacy
-``.drain-handoff.json`` so the orchestrator works whether or not the pack has
-cut over to the new file. Neither file present (or both structurally invalid)
-returns ``None``.
+``read`` prefers ``exec-state.json`` (sectioned) and falls back to the legacy
+``.drain-handoff.json`` (a flat top-level ``pr_urls``) so the orchestrator works
+whether or not the pack has cut over. Neither file present (or both structurally
+invalid) returns ``None``.
 
-Schema v2 adds ``outcome_verdict`` and ``prep_verdict`` fields so the worker
-can record its self-assessment. The orchestrator reads these on every exit
-path — Done, halted, or errored — and lands them in the run-log entry.
-``read_partial`` extracts those fields without the ``pr_urls`` validity gate,
-so halt paths can carry whatever verdicts the worker managed to write.
+``outcome_verdict`` is derived from the pack's ``verify`` section: a ``FAIL``
+verdict maps to ``result == "fail"`` with the failed AC items as ``findings``.
+``read_partial`` extracts that verdict without the ``pr_urls`` validity gate, so
+halt paths can carry whatever the worker managed to write. ``prep_verdict`` has
+no producer in the ``exec:*`` workflow today, so it is ``None`` from the
+sectioned file; the legacy reader still surfaces a top-level ``prep_verdict`` if
+one is present.
 
 ``read`` never raises: a missing or malformed file returns ``None`` so callers
 can treat it as "not submitted yet."
@@ -47,7 +53,11 @@ class HandoffData:
 
 
 def write(worktree: Path, data: HandoffData) -> None:
-    """Serialise ``data`` to ``<worktree>/.drain-handoff.json``."""
+    """Serialise ``data`` to ``<worktree>/.drain-handoff.json``.
+
+    Writes the legacy flat shape. Used only by tests and any remaining
+    legacy writer; the pack writes the sectioned ``exec-state.json`` directly.
+    """
     path = worktree / HANDOFF_FILE
     payload: dict[str, Any] = {
         "pr_urls": [{"title": pr.title, "url": pr.url} for pr in data.pr_urls],
@@ -57,6 +67,15 @@ def write(worktree: Path, data: HandoffData) -> None:
     if data.prep_verdict is not None:
         payload["prep_verdict"] = data.prep_verdict
     path.write_text(json.dumps(payload, indent=2))
+
+
+def _load(path: Path) -> dict[str, Any] | None:
+    """Parse ``path`` as a JSON object, or ``None`` if absent/malformed."""
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def _parse_dict(raw: object) -> dict[str, Any] | None:
@@ -72,21 +91,14 @@ def _parse_dict(raw: object) -> dict[str, Any] | None:
     return raw
 
 
-def _read_file(path: Path) -> HandoffData | None:
-    """Parse a single state file path, returning HandoffData or None.
+def _parse_pr_urls(raw: object) -> tuple[PullRequest, ...] | None:
+    """Validate a ``pr_urls`` list, returning the parsed PRs or ``None``.
 
-    A valid file has a ``pr_urls`` list with at least one entry, each entry a
-    dict carrying string ``title`` and ``url``. An empty list is treated as
-    invalid: the skill writes ``pr_urls`` only after a PR is actually created,
-    so "present but empty" means no submission happened.
+    A valid list has at least one entry, each a dict carrying a string
+    ``title`` and a non-empty string ``url``. An empty list is invalid: the
+    skill writes ``pr_urls`` only after a PR is actually created, so "present
+    but empty" means no submission happened.
     """
-    try:
-        payload = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(payload, dict):
-        return None
-    raw = payload.get("pr_urls")
     if not isinstance(raw, list) or not raw:
         return None
     prs: list[PullRequest] = []
@@ -98,8 +110,73 @@ def _read_file(path: Path) -> HandoffData | None:
         if not isinstance(title, str) or not isinstance(url, str) or not url:
             return None
         prs.append(PullRequest(title=title, url=url))
+    return tuple(prs)
+
+
+def _verify_to_outcome(raw: object) -> dict[str, Any] | None:
+    """Map the pack's ``verify`` section to the supervisor's outcome verdict.
+
+    The pack records ``{"verdict": "PASS"|"FAIL", "ac_results": [{"item",
+    "result"}]}``. Downstream the supervisor reads ``result`` ("pass"/"fail")
+    and ``findings``, so a ``FAIL`` verdict becomes ``result == "fail"`` with
+    the failing AC items as ``findings``. A section without a recognised
+    verdict is dropped to ``None``.
+    """
+    if not isinstance(raw, dict):
+        return None
+    verdict = raw.get("verdict")
+    if verdict not in ("PASS", "FAIL"):
+        return None
+    ac_results = raw.get("ac_results")
+    findings: list[str] = []
+    if isinstance(ac_results, list):
+        for ac in ac_results:
+            if isinstance(ac, dict) and ac.get("result") == "FAIL":
+                item = ac.get("item")
+                if isinstance(item, str):
+                    findings.append(item)
+    return {
+        "result": "fail" if verdict == "FAIL" else "pass",
+        "findings": findings,
+    }
+
+
+def _read_exec_state(path: Path) -> HandoffData | None:
+    """Parse the sectioned ``exec-state.json``, returning HandoffData or None.
+
+    ``pr_urls`` comes from the ``finish`` section; ``outcome_verdict`` from the
+    ``verify`` section. Returns ``None`` unless a valid, non-empty
+    ``finish.pr_urls`` is present — that list is the submission signal.
+    """
+    payload = _load(path)
+    if payload is None:
+        return None
+    finish = payload.get("finish")
+    raw_urls = finish.get("pr_urls") if isinstance(finish, dict) else None
+    prs = _parse_pr_urls(raw_urls)
+    if prs is None:
+        return None
     return HandoffData(
-        pr_urls=tuple(prs),
+        pr_urls=prs,
+        outcome_verdict=_verify_to_outcome(payload.get("verify")),
+        prep_verdict=None,
+    )
+
+
+def _read_legacy(path: Path) -> HandoffData | None:
+    """Parse the legacy flat ``.drain-handoff.json``, returning HandoffData or None.
+
+    A valid file has a top-level ``pr_urls`` list with at least one entry.
+    Verdicts are read from top-level ``outcome_verdict``/``prep_verdict``.
+    """
+    payload = _load(path)
+    if payload is None:
+        return None
+    prs = _parse_pr_urls(payload.get("pr_urls"))
+    if prs is None:
+        return None
+    return HandoffData(
+        pr_urls=prs,
         outcome_verdict=_parse_dict(payload.get("outcome_verdict")),
         prep_verdict=_parse_dict(payload.get("prep_verdict")),
     )
@@ -108,17 +185,17 @@ def _read_file(path: Path) -> HandoffData | None:
 def read(worktree: Path) -> HandoffData | None:
     """Return the handoff data for ``worktree``, or ``None`` if absent or invalid.
 
-    Prefers ``exec-state.json`` (the pack-named file) and falls back to the
-    legacy ``.drain-handoff.json``. Returns ``None`` when neither file exists
-    or both are structurally invalid.
+    Prefers the sectioned ``exec-state.json`` (the pack-named file) and falls
+    back to the legacy flat ``.drain-handoff.json``. Returns ``None`` when
+    neither file exists or both are structurally invalid.
 
-    ``outcome_verdict`` and ``prep_verdict`` are optional: missing keys are
-    read as ``None`` and do not affect validity.
+    ``outcome_verdict`` and ``prep_verdict`` are optional: missing sections/keys
+    are read as ``None`` and do not affect validity.
     """
-    result = _read_file(worktree / EXEC_STATE_FILE)
+    result = _read_exec_state(worktree / EXEC_STATE_FILE)
     if result is not None:
         return result
-    return _read_file(worktree / HANDOFF_FILE)
+    return _read_legacy(worktree / HANDOFF_FILE)
 
 
 def read_partial(
@@ -128,13 +205,19 @@ def read_partial(
 
     Used by halt and breach paths to carry any verdicts the worker recorded
     even when ``pr_urls`` is absent or empty and ``read`` would return ``None``.
-    Returns ``(None, None)`` when the file is absent or malformed.
+    Prefers the sectioned ``exec-state.json`` (``verify`` section → outcome
+    verdict; no prep producer there yet), then falls back to the legacy flat
+    file's top-level verdicts. Returns ``(None, None)`` when neither is present.
     """
-    path = worktree / HANDOFF_FILE
-    try:
-        payload = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        return None, None
-    if not isinstance(payload, dict):
-        return None, None
-    return _parse_dict(payload.get("outcome_verdict")), _parse_dict(payload.get("prep_verdict"))
+    exec_state = _load(worktree / EXEC_STATE_FILE)
+    if exec_state is not None:
+        outcome = _verify_to_outcome(exec_state.get("verify"))
+        if outcome is not None:
+            return outcome, None
+    legacy = _load(worktree / HANDOFF_FILE)
+    if legacy is not None:
+        return (
+            _parse_dict(legacy.get("outcome_verdict")),
+            _parse_dict(legacy.get("prep_verdict")),
+        )
+    return None, None
