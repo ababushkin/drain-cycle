@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "42d27c20991c",
+  "session_id": "75418cc5-ca2f-42e9-9cbf-74ba261dd2d7",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-18T12:07:13.069477Z",
+  "branch": "ABA-409-live-execution-swimlanes",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/ideas/live-execution-swimlanes.md",
+    "docs/prototypes/live-execution-swimlanes/finding.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "93840e0b2027",
+  "token_usage": {
+    "input_tokens": 36149,
+    "cache_creation_tokens": 190343,
+    "cache_read_tokens": 6194465,
+    "output_tokens": 76024,
+    "api_call_count": 66
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-18T12:07:13.048044Z",
+    "agent_lines": 123,
+    "agent_removed": 0,
+    "human_added": 811,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 934,
+    "total_lines_changed": 934,
+    "agent_percentage": 13.16916488222698,
+    "metric_version": 2
+  }
+}

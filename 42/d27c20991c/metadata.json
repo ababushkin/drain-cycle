@@ -3,7 +3,7 @@
   "checkpoint_id": "42d27c20991c",
   "strategy": "manual-commit",
   "branch": "ABA-409-live-execution-swimlanes",
-  "checkpoints_count": 0,
+  "checkpoints_count": 1,
   "files_touched": [
     "docs/design-docs/live-execution-swimlanes/design-doc.md",
     "docs/ideas/live-execution-swimlanes.md",
@@ -17,13 +17,19 @@
       "transcript": "/42/d27c20991c/0/full.jsonl",
       "content_hash": "/42/d27c20991c/0/content_hash.txt",
       "prompt": "/42/d27c20991c/0/prompt.txt"
+    },
+    {
+      "metadata": "/42/d27c20991c/1/metadata.json",
+      "transcript": "/42/d27c20991c/1/full.jsonl",
+      "content_hash": "/42/d27c20991c/1/content_hash.txt",
+      "prompt": "/42/d27c20991c/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 20744,
-    "cache_creation_tokens": 39302,
-    "cache_read_tokens": 527476,
-    "output_tokens": 10298,
-    "api_call_count": 13
+    "input_tokens": 56893,
+    "cache_creation_tokens": 229645,
+    "cache_read_tokens": 6721941,
+    "output_tokens": 86322,
+    "api_call_count": 79
   }
 }
