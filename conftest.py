@@ -15,3 +15,13 @@ def _default_linear_noop(monkeypatch: pytest.MonkeyPatch) -> None:
     import drain_cycle.linear as _linear
 
     monkeypatch.setattr(_linear, "add_comment", lambda issue_id, body: None)
+
+
+@pytest.fixture(autouse=True)
+def _default_mise_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Default ``mise`` to "not installed" so worktree setup never forks a real
+    ``mise trust`` on a dev machine that has mise — keeping tests deterministic
+    across machines. Tests covering the trust path re-stub ``shutil.which``."""
+    import drain_cycle.worktree as _worktree
+
+    monkeypatch.setattr(_worktree.shutil, "which", lambda _: None)
