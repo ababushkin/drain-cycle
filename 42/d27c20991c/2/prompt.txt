@@ -1,0 +1,53 @@
+/shape-idea swim lanes to show me which "agents" are doing what during the execution run
+
+for example i want to be able to see something like:
+
+ABA-313: Issue Picked Up
+--| Starting supervising agent
+--| [Code is written]
+----| Starting code-review sub-agent
+----| Starting code-simplification sub-agent
+
+etc
+
+Basically it should follow the architecture and personas I have but I want to be able to see what's going on while drain-cycle is running
+
+This is equivalent to a kanban board, but in a vertical UI rather than a horizontal Kanban
+
+---
+
+/shape-design
+
+---
+
+i want to construct an interactive demo now that shows me how this would work end to end
+it should be a prototype that runs in python and takes an issue (that requires coding) and runs through all of the steps that drain-cycle would along side the `agent-skills-shaper` pack that's bundled with this project
+
+---
+
+i'd like to also see all the tasks in the queue and be able to toggle between them for viewing
+the tasks should show in their execution order, which takes into account any dependencies
+
+---
+
+yes
+
+---
+
+a few minor things since this will go into the build:
+
+- we should not use the word "drained": completed/done or something similar is sufficient
+
+make this small change then lets go ahead and run a backend spike to validate the riskiest parts of the implementation
+
+---
+
+yes
+
+---
+
+how do i capture a real stream??
+
+---
+
+i did Path A
