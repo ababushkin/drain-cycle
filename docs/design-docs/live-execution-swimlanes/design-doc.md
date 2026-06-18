@@ -1,7 +1,7 @@
 # Design doc: live-execution-swimlanes
 
 **Date:** 2026-06-18
-**Status:** Draft — not accepted; no implementation until accepted.
+**Status:** Accepted (2026-06-18) — writing-editor pass + human crit review both clean; no implementation until the delivery nodes are planned.
 **Track:** A — design document (`shape:design`)
 **Trigger:** Shared-interface surface — the feature reads across the artifact boundary (architecture §5) and touches the supervisor↔pack contract (ADR 0002, 0030), so it cannot be a purely additive local change.
 
