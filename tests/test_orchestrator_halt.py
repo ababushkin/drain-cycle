@@ -283,6 +283,7 @@ def test_orchestrator_runlog_records_halted_issue_with_non_done_state(
         "is_error",
         "outcome_verdict",
         "prep_verdict",
+        "review_verdict",
         "responder_runs",
         "finishing_runs",
     }

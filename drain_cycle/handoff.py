@@ -180,17 +180,21 @@ def read(worktree: Path) -> HandoffData | None:
 
 def read_partial(
     worktree: Path,
-) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    """Return ``(outcome_verdict, prep_verdict)`` without the ``pr_urls`` gate.
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None]:
+    """Return ``(outcome_verdict, prep_verdict, review_verdict)`` without the ``pr_urls`` gate.
 
     Used by halt and breach paths to carry any verdicts the worker recorded
     even when ``pr_urls`` is absent or empty and ``read`` would return ``None``.
-    Reads the ``verify`` section of ``exec-state.json`` for the outcome verdict;
-    there is no ``prep_verdict`` producer in the ``exec:*`` workflow today, so it
-    is always ``None``. Returns ``(None, None)`` when the file is absent or
-    malformed.
+    Reads the ``verify`` section for ``outcome_verdict`` and the ``review``
+    section for ``review_verdict``; there is no ``prep_verdict`` producer in
+    the ``exec:*`` workflow today, so it is always ``None``. Returns
+    ``(None, None, None)`` when the file is absent or malformed.
     """
     exec_state = _load(worktree / EXEC_STATE_FILE)
     if exec_state is not None:
-        return _verify_to_outcome(exec_state.get("verify")), None
-    return None, None
+        return (
+            _verify_to_outcome(exec_state.get("verify")),
+            None,
+            _review_to_verdict(exec_state.get("review")),
+        )
+    return None, None, None
