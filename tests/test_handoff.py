@@ -293,3 +293,70 @@ def test_pack_fixture_read_partial_surfaces_verify_verdict(tmp_path: Path) -> No
     got_ov, got_pv = read_partial(tmp_path)
     assert got_ov == {"result": "pass", "findings": []}
     assert got_pv is None
+
+
+# --- review section → review_verdict ---
+
+
+def test_read_maps_review_go_to_review_verdict(tmp_path: Path) -> None:
+    _write_exec_state(tmp_path, {
+        "finish": {"pr_urls": [{"title": "t", "url": "https://x/pull/1"}]},
+        "review": {"verdict": "GO", "findings": []},
+    })
+    result = read(tmp_path)
+    assert result is not None
+    assert result.review_verdict == {"result": "go", "findings": []}
+
+
+def test_read_maps_review_no_go_to_review_verdict(tmp_path: Path) -> None:
+    _write_exec_state(tmp_path, {
+        "finish": {"pr_urls": [{"title": "t", "url": "https://x/pull/1"}]},
+        "review": {"verdict": "NO-GO", "findings": ["missing test", "style issue"]},
+    })
+    result = read(tmp_path)
+    assert result is not None
+    assert result.review_verdict == {"result": "no-go", "findings": ["missing test", "style issue"]}
+
+
+def test_read_no_review_section_leaves_review_verdict_none(tmp_path: Path) -> None:
+    _write_exec_state(tmp_path, _finish([{"title": "t", "url": "https://x/pull/1"}]))
+    result = read(tmp_path)
+    assert result is not None
+    assert result.review_verdict is None
+
+
+def test_review_to_verdict_drops_unrecognised_verdict(tmp_path: Path) -> None:
+    _write_exec_state(tmp_path, {
+        "finish": {"pr_urls": [{"title": "t", "url": "https://x/pull/1"}]},
+        "review": {"verdict": "MAYBE", "findings": []},
+    })
+    result = read(tmp_path)
+    assert result is not None
+    assert result.review_verdict is None
+
+
+def test_review_to_verdict_tolerates_missing_findings(tmp_path: Path) -> None:
+    _write_exec_state(tmp_path, {
+        "finish": {"pr_urls": [{"title": "t", "url": "https://x/pull/1"}]},
+        "review": {"verdict": "GO"},
+    })
+    result = read(tmp_path)
+    assert result is not None
+    assert result.review_verdict == {"result": "go", "findings": []}
+
+
+def test_review_to_verdict_tolerates_non_dict_section(tmp_path: Path) -> None:
+    _write_exec_state(tmp_path, {
+        "finish": {"pr_urls": [{"title": "t", "url": "https://x/pull/1"}]},
+        "review": "not-a-dict",
+    })
+    result = read(tmp_path)
+    assert result is not None
+    assert result.review_verdict is None
+
+
+def test_pack_fixture_carries_review_verdict(tmp_path: Path) -> None:
+    (tmp_path / EXEC_STATE_FILE).write_text(_PACK_FIXTURE.read_text())
+    result = read(tmp_path)
+    assert result is not None
+    assert result.review_verdict == {"result": "go", "findings": []}
