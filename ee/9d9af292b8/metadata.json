@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "ee9d9af292b8",
+  "strategy": "manual-commit",
+  "branch": "trust-mise-in-worktrees",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/worktree.py",
+    "tests/test_worktree.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ee/9d9af292b8/0/metadata.json",
+      "transcript": "/ee/9d9af292b8/0/full.jsonl",
+      "content_hash": "/ee/9d9af292b8/0/content_hash.txt",
+      "prompt": "/ee/9d9af292b8/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 57946,
+    "cache_creation_tokens": 406221,
+    "cache_read_tokens": 7011541,
+    "output_tokens": 88965,
+    "api_call_count": 83
+  }
+}

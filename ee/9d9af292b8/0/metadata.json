@@ -1,0 +1,82 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "ee9d9af292b8",
+  "session_id": "9995327e-05ce-48e0-9fc5-535511800b3c",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-18T02:43:10.11089Z",
+  "branch": "trust-mise-in-worktrees",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/worktree.py",
+    "tests/test_worktree.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "e5c4fbb68f5d",
+  "token_usage": {
+    "input_tokens": 57946,
+    "cache_creation_tokens": 406221,
+    "cache_read_tokens": 7011541,
+    "output_tokens": 88965,
+    "api_call_count": 83
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_013UYP8Fnistg6uNztLW78AM",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-writing-refinement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "e5c4fbb68f5d",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 224,
+        "end": 225,
+        "entry_ids": [
+          "1c28dd62-c2be-43a1-888d-82df17636653"
+        ],
+        "tool_use_id": "toolu_013UYP8Fnistg6uNztLW78AM"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_013UYP8Fnistg6uNztLW78AM"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-writing-refinement",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "initial_attribution": {
+    "calculated_at": "2026-06-18T02:43:10.088838Z",
+    "agent_lines": 28,
+    "agent_removed": 3,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 28,
+    "total_lines_changed": 31,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 78,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "drain_cycle/worktree.py": 23,
+        "tests/test_worktree.py": 55
+      }
+    }
+  ]
+}
