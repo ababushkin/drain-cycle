@@ -79,7 +79,7 @@ def _write_two_invocation_script(
     handoff_clause = ""
     if second_writes_handoff:
         handoff_clause = (
-            'printf \'{"pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}]}\' '
+            'printf \'{"finish": {"pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}]}}\' '
             "> exec-state.json\n"
         )
     script = tmp_path / "fake-claude.sh"
@@ -143,12 +143,12 @@ def _write_commit_with_fail_verdict_script(tmp_path: Path) -> Path:
     the finishing sub-agent regardless of commits present.
     """
     counter_file = tmp_path / "invocation_count.txt"
+    # Sectioned exec-state: the FAIL verify section derives to
+    # {"result": "fail", "findings": ["test coverage missing"]}.
     handoff = json.dumps({
-        "pr_urls": [],
-        "outcome_verdict": {
-            "result": "fail",
-            "findings": ["test coverage missing"],
-            "invoked_at": "2026-01-01T00:00:00Z",
+        "verify": {
+            "verdict": "FAIL",
+            "ac_results": [{"item": "test coverage missing", "result": "FAIL"}],
         },
     })
     script = tmp_path / "fake-claude.sh"
@@ -186,8 +186,8 @@ def _write_done_no_prs_then_finishing_script(
         'count=$((count + 1))\n'
         f'printf "%s" "$count" > "{counter_file}"\n'
         'if [ "$count" -ge 2 ]; then\n'
-        # Second invocation: write pr_urls (issue already Done)
-        '  printf \'{"pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}]}\''
+        # Second invocation: write finish.pr_urls (issue already Done)
+        '  printf \'{"finish": {"pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}]}}\''
         " > exec-state.json\n"
         "  exit 0\n"
         "else\n"
@@ -824,13 +824,23 @@ def test_verdict_propagation_at_stack_no_prs_site(
     monkeypatch.setattr(linear, "get_issue", fake_get_issue)
     monkeypatch.setattr(linear, "set_state", lambda iid, s: None)
 
-    main_verdict = {"result": "pass", "findings": ["from main worker"]}
-    finishing_verdict = {"result": "pass", "findings": ["from finishing agent"]}
-    main_handoff = json.dumps({"pr_urls": [], "outcome_verdict": main_verdict})
+    # The main worker leaves a FAIL verify section (no pr_urls); the finishing
+    # agent overwrites exec-state.json with finish.pr_urls and a PASS verify
+    # section. If the finishing verdict did not propagate, the stale FAIL would
+    # trip the verifier gate and halt — so a clean PASS exit proves propagation.
+    finishing_verdict = {"result": "pass", "findings": []}
+    main_handoff = json.dumps(
+        {
+            "verify": {
+                "verdict": "FAIL",
+                "ac_results": [{"item": "from main worker", "result": "FAIL"}],
+            }
+        }
+    )
     finishing_handoff = json.dumps(
         {
-            "pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}],
-            "outcome_verdict": finishing_verdict,
+            "finish": {"pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}]},
+            "verify": {"verdict": "PASS", "ac_results": []},
         }
     )
     # inv1 (main): commit + Done + verdict but empty pr_urls.
@@ -864,8 +874,9 @@ def test_verdict_propagation_at_stack_no_prs_site(
     payload = _read_run_log(tmp_path, "stub-cycle")
     entry = payload["entries"][0]
     assert entry["final_linear_state"] == "Done"
+    # The finishing agent's PASS verdict replaced the main worker's stale FAIL.
     assert entry["outcome_verdict"] == finishing_verdict
-    assert entry["outcome_verdict"]["findings"] == ["from finishing agent"]
+    assert entry["outcome_verdict"]["result"] == "pass"
     assert len(entry["finishing_runs"]) == 1
     assert entry["finishing_runs"][0]["trigger"] == "err-stack-no-prs"
 
@@ -902,15 +913,15 @@ def test_finishing_runs_recorded_at_verifier_fail_halt(
     monkeypatch.setattr(linear, "get_issue", fake_get_issue)
     monkeypatch.setattr(linear, "set_state", lambda iid, s: None)
 
-    fail_verdict = {
-        "result": "fail",
-        "findings": ["regression introduced"],
-        "invoked_at": "2026-01-01T00:00:00Z",
-    }
+    # Sectioned exec-state: finish.pr_urls present (submission ran) but a FAIL
+    # verify section trips the verifier gate after the finishing attempt.
     finishing_handoff = json.dumps(
         {
-            "pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}],
-            "outcome_verdict": fail_verdict,
+            "finish": {"pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}]},
+            "verify": {
+                "verdict": "FAIL",
+                "ac_results": [{"item": "regression introduced", "result": "FAIL"}],
+            },
         }
     )
     # inv1 (main): commit, never Done, no verdict → not-Done recovery allowed.

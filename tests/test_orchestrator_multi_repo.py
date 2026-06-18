@@ -28,9 +28,12 @@ from drain_cycle import linear, orchestrator, repos
 # Shell fragment a fake stack-mode worker appends to emit the handoff a real
 # `/shape:pr-finishing` run would write — the orchestrator reads its non-empty
 # ``pr_urls`` as proof the issue's PRs were submitted before tearing down.
-_HANDOFF_PAYLOAD = '{\"pr_urls\":[{\"title\":\"feat\",\"url\":\"https://x/pull/1\"}]}'
+# exec-state.json is the only state file. It keys pr_urls under the ``finish``
+# section (ADR 0030); a non-empty ``finish.pr_urls`` is the orchestrator's
+# proof the issue's PRs were submitted before tearing down.
+_EXEC_STATE_PAYLOAD = '{\"finish\":{\"pr_urls\":[{\"title\":\"feat\",\"url\":\"https://x/pull/1\"}]}}'
 _HANDOFF_LINE = (
-    f"printf '%s' '{_HANDOFF_PAYLOAD}' > exec-state.json\n"
+    f"printf '%s' '{_EXEC_STATE_PAYLOAD}' > exec-state.json\n"
 )
 
 

@@ -6,11 +6,13 @@ from exec-state.json left by the worker.
 Task 2 (halt path): a halt entry carries halt_reason plus any verdicts the
 worker managed to record in the partial handoff before exiting.
 
-The fake ``claude`` script writes a ``exec-state.json`` with canned
-verdicts directly into the worktree directory (its ``$PWD``). In Done-path
-tests it also writes to the done-marker so the issue is seen as Done. In
-halt-path tests it omits that step, leaving the issue in Todo — which triggers
-the not-Done halt.
+The fake ``claude`` script writes a sectioned ``exec-state.json`` with a canned
+``verify`` section directly into the worktree directory (its ``$PWD``). The
+orchestrator derives ``outcome_verdict`` from that section; there is no
+``prep_verdict`` producer in the ``exec:*`` workflow, so it stays ``None``. In
+Done-path tests it also writes to the done-marker so the issue is seen as Done.
+In halt-path tests it omits that step, leaving the issue in Todo — which
+triggers the not-Done halt.
 """
 from __future__ import annotations
 
@@ -23,30 +25,31 @@ import pytest
 from drain_cycle import linear, orchestrator, repos
 
 
+# Outcome verdicts are derived from the exec-state ``verify`` section: a PASS
+# with no failing AC items maps to result "pass" / no findings; a FAIL maps to
+# result "fail" with the failing items as findings.
 _OUTCOME_VERDICT = {
     "result": "pass",
     "findings": [],
-    "invoked_at": "2026-01-01T00:00:00Z",
 }
 _FAIL_VERDICT = {
     "result": "fail",
     "findings": ["tests still failing", "missing edge-case coverage"],
-    "invoked_at": "2026-01-01T00:00:00Z",
 }
-_PREP_VERDICT = {
-    "result": "ok",
-    "route": "auto-merge",
-    "reasoning": "all checks passed",
-}
+# Sectioned exec-state.json the worker leaves behind. ``pr_urls`` is omitted —
+# tests run with no_stack=True, so the submission gate is bypassed and verdicts
+# are read from the ``verify`` section via read_partial.
 _HANDOFF = {
-    "pr_urls": [],  # empty — tests run with no_stack=True, gate is bypassed
-    "outcome_verdict": _OUTCOME_VERDICT,
-    "prep_verdict": _PREP_VERDICT,
+    "verify": {"verdict": "PASS", "ac_results": []},
 }
 _FAIL_HANDOFF = {
-    "pr_urls": [],
-    "outcome_verdict": _FAIL_VERDICT,
-    "prep_verdict": _PREP_VERDICT,
+    "verify": {
+        "verdict": "FAIL",
+        "ac_results": [
+            {"item": "tests still failing", "result": "FAIL"},
+            {"item": "missing edge-case coverage", "result": "FAIL"},
+        ],
+    },
 }
 def _issue(identifier: str, sort_order: float) -> dict:
     return {
@@ -154,7 +157,7 @@ def test_done_path_entry_carries_verdicts_from_handoff(
     payload = _run_log(tmp_path)
     (entry,) = payload["entries"]
     assert entry["outcome_verdict"] == _OUTCOME_VERDICT
-    assert entry["prep_verdict"] == _PREP_VERDICT
+    assert entry["prep_verdict"] is None
     assert entry["halt_reason"] is None
 
 
@@ -189,7 +192,7 @@ def test_halt_path_entry_carries_halt_reason_and_partial_verdicts(
     assert entry["final_linear_state"] != "Done"
     # Verdicts from the partial handoff are carried despite the halt.
     assert entry["outcome_verdict"] == _OUTCOME_VERDICT
-    assert entry["prep_verdict"] == _PREP_VERDICT
+    assert entry["prep_verdict"] is None
 
 
 def _make_stateful_fakes(

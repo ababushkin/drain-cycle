@@ -35,8 +35,10 @@ def _commit(path: Path, name: str, contents: str = "x") -> None:
 
 
 def _write_exec_state(path: Path) -> None:
+    # pr_urls live under the finish section (ADR 0030) — the sectioned shape the
+    # pack writes and the only shape read() accepts.
     (path / EXEC_STATE_FILE).write_text(
-        json.dumps({"pr_urls": [{"title": "feat: x", "url": "https://github.com/o/r/pull/1"}]})
+        json.dumps({"finish": {"pr_urls": [{"title": "feat: x", "url": "https://github.com/o/r/pull/1"}]}})
     )
 
 
@@ -214,9 +216,10 @@ def test_exec_state_file_does_not_count_as_dirty(tmp_path: Path) -> None:
     _git_init(tmp_path)
     _commit(tmp_path, "a.txt")
     stop_guard.write_marker(tmp_path, mode="stack")
-    # Write exec-state.json as the handoff (the new primary file).
+    # Write exec-state.json as the handoff (the new primary file), in the
+    # sectioned shape the pack writes: pr_urls live under the finish section.
     (tmp_path / EXEC_STATE_FILE).write_text(
-        _json.dumps({"pr_urls": [{"title": "feat", "url": "https://github.com/o/r/pull/1"}]})
+        _json.dumps({"finish": {"pr_urls": [{"title": "feat", "url": "https://github.com/o/r/pull/1"}]}})
     )
     decision = stop_guard.evaluate(tmp_path, stop_hook_active=False)
     assert decision.block_reason is None

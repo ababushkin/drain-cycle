@@ -1,0 +1,46 @@
+{
+  "pickup": {
+    "issue_id": "ABA-000",
+    "branch": "ABA-000",
+    "parent_branch": "main",
+    "worktree_path": "/tmp/worktrees/ABA-000",
+    "ac_checklist": [
+      "The feature does X when Y.",
+      "The skill writes exec-state.json with a finish.pr_urls section."
+    ],
+    "body_md": "Example issue body for fixture use.",
+    "labels": ["sonnet", "agent-skills-shaper"],
+    "blocked_by": []
+  },
+  "breakdown": {
+    "tasks": [
+      {
+        "id": "t1",
+        "title": "Update pr-finishing skill",
+        "done_when": "SKILL.md step 7 writes exec-state.json finish section with pr_urls.",
+        "model_tier": "sonnet",
+        "axes": { "RC": 1, "SC": 0, "HS": 0, "SR": 1, "OR": 0 }
+      }
+    ]
+  },
+  "build": {
+    "completed_tasks": ["t1"],
+    "commits": ["abc1234"]
+  },
+  "review": {
+    "verdict": "GO",
+    "findings": []
+  },
+  "verify": {
+    "verdict": "PASS",
+    "ac_results": [
+      { "item": "The feature does X when Y.", "result": "PASS" },
+      { "item": "The skill writes exec-state.json with a finish.pr_urls section.", "result": "PASS" }
+    ]
+  },
+  "finish": {
+    "pr_urls": [
+      { "title": "feat: update pr-finishing to dual-write exec-state.json", "url": "https://github.com/example/repo/pull/1" }
+    ]
+  }
+}
