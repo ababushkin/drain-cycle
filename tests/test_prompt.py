@@ -203,9 +203,30 @@ def test_build_finishing_contains_identifier_base_and_worktree(tmp_path: Path) -
     assert "/shape:pr-finishing" in rendered
     assert "exec-state.json" in rendered
     assert ".drain-handoff.json" not in rendered
-    # Tail line last
+
+
+def test_build_finishing_stack_leaves_in_progress(tmp_path: Path) -> None:
+    """Stack mode (the default): the submitted PR is the completion signal, so
+    the agent leaves the issue In Progress and must not transition to Done."""
+    worktree = tmp_path / ".worktrees" / "ABA-383"
+    rendered = build_finishing("ABA-383", worktree, "main", stack=True)
+
+    non_empty = [line for line in rendered.splitlines() if line.strip()]
+    assert "In Progress" in non_empty[-1]
+    assert "do not transition it to Done" in rendered
+    # No instruction to flip the issue to Done in stack mode.
+    assert 'state: "Done"' not in rendered
+
+
+def test_build_finishing_push_marks_done(tmp_path: Path) -> None:
+    """Push mode: there is no PR to merge, so the push to main is the
+    completion proof and the agent transitions the issue to Done."""
+    worktree = tmp_path / ".worktrees" / "ABA-383"
+    rendered = build_finishing("ABA-383", worktree, "main", stack=False)
+
     non_empty = [line for line in rendered.splitlines() if line.strip()]
     assert "Done" in non_empty[-1]
+    assert 'state: "Done"' in rendered
 
 
 def test_build_finishing_chained_base_adds_stack_clause(tmp_path: Path) -> None:

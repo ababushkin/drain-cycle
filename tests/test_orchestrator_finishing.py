@@ -218,7 +218,7 @@ def _read_run_log(tmp_path: Path, cycle_id: str) -> dict:
 
 
 def test_finishing_sub_agent_recovers_not_done_with_commits(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Not-Done + commits → finishing sub-agent runs and marks Done → run continues."""
     repo = tmp_path / "repo"
@@ -256,6 +256,10 @@ def test_finishing_sub_agent_recovers_not_done_with_commits(
     # finishing_runs records the sub-agent spawn
     assert len(entry["finishing_runs"]) == 1
     assert entry["finishing_runs"][0]["trigger"] == "err-issue-not-done"
+    # The finishing run emits a completion line so its exit is visible off the
+    # watch pane (the blind spot that makes an in-flight finishing run look hung).
+    stderr = capsys.readouterr().err
+    assert "finishing sub-agent done" in stderr
 
 
 def test_finishing_sub_agent_not_done_recovery_run_continues_to_next_issue(
@@ -307,6 +311,70 @@ def test_finishing_sub_agent_not_done_recovery_run_continues_to_next_issue(
     assert exit_code == 0
     assert "ABA-FIRST" in _completed_identifiers(done_marker)
     assert "ABA-SECOND" in _completed_identifiers(done_marker)
+
+
+# ---------------------------------------------------------------------------
+# not-Done but submitted: pr_urls present + In Progress → complete, no finishing
+# ---------------------------------------------------------------------------
+
+
+def test_stack_worker_in_progress_with_pr_urls_is_complete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Stack worker that submits its PR(s) and leaves the issue In Progress is
+    complete: no finishing sub-agent spawns, the run continues, and the
+    submission — not a Done transition — is the completion signal."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    issue = _issue("ABA-INPROG")
+    issues_by_id = {issue["id"]: issue}
+    counter_file = tmp_path / "invocation_count.txt"
+
+    def fake_get_issue(issue_id: str) -> dict:
+        # The worker leaves the issue In Progress (started) — never Done.
+        base = issues_by_id[issue_id]
+        return {**base, "state": {"type": "started", "name": "In Progress"}}
+
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "stub-cycle")
+    monkeypatch.setattr(linear, "pending_issues", lambda c: linear._plan([issue]))
+    monkeypatch.setattr(linear, "get_issue", fake_get_issue)
+    monkeypatch.setattr(linear, "set_state", lambda iid, s: None)
+
+    # Single invocation: commit, write finish.pr_urls, leave In Progress (no Done).
+    script = tmp_path / "fake-claude.sh"
+    script.write_text(
+        "#!/bin/sh\n"
+        f'count=$(cat "{counter_file}" 2>/dev/null || echo 0)\n'
+        'count=$((count + 1))\n'
+        f'printf "%s" "$count" > "{counter_file}"\n'
+        'git config user.email "test@test.com" 2>/dev/null\n'
+        'git config user.name "Test" 2>/dev/null\n'
+        'touch work.txt\n'
+        "git add work.txt 2>/dev/null\n"
+        'git commit -m "work" 2>/dev/null\n'
+        '  printf \'{"finish": {"pr_urls": [{"title": "PR #1", "url": "https://github.com/r/p/1"}]}}\''
+        " > exec-state.json\n"
+        "exit 0\n"
+    )
+    script.chmod(0o755)
+    monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(script)])
+
+    # Stack mode (default): pr_urls is the submission signal.
+    exit_code = orchestrator.run(_stub_repos(repo))
+
+    assert exit_code == 0
+    # Exactly one invocation — no finishing sub-agent spawned.
+    assert int(counter_file.read_text()) == 1
+    payload = _read_run_log(tmp_path, "stub-cycle")
+    entry = payload["entries"][0]
+    assert entry["finishing_runs"] == []
+    assert entry["halt_reason"] is None
+    # The issue is recorded In Progress, not forced to Done.
+    assert entry["final_linear_state"] == "In Progress"
 
 
 # ---------------------------------------------------------------------------

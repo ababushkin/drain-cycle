@@ -166,10 +166,11 @@ _BLOCK_PROMPT_STACK = (
     "Complete the remaining steps now: commit any pending changes to the "
     "issue branch as reviewable slices (do not push by hand), run "
     "`/shape:pr-finishing` to submit the stacked PR(s) — it writes the "
-    "pr_urls into exec-state.json and posts the review-summary comment "
-    "— then transition the issue to Done. If you are genuinely blocked, "
-    "leave the issue In Progress and post a comment naming the blocker — "
-    "do not stop silently."
+    "pr_urls into exec-state.json and posts the review-summary comment. "
+    "Leave the issue In Progress: the submitted PR is the completion signal "
+    "and the issue stays In Progress until the PR merges — do not transition "
+    "it to Done. If you are genuinely blocked, leave the issue In Progress "
+    "and post a comment naming the blocker — do not stop silently."
 )
 
 _BLOCK_PROMPT_PUSH = (

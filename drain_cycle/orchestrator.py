@@ -194,6 +194,23 @@ def _worker_log_fields(result: worker.WorkerResult) -> dict[str, object]:
     }
 
 
+def _log_finishing_done(identifier: str, result: worker.WorkerResult) -> None:
+    """Emit a completion line for a finishing sub-agent.
+
+    The finishing agent runs off the watch pane, so without an explicit
+    end-of-run line the orchestrator pane would fall silent when it exits —
+    the same blind spot that makes an in-flight finishing run look hung. The
+    line mirrors the worker's ``=== done ===`` frame: turns and cost, flagged
+    if the session errored.
+    """
+    cost = "n/a" if result.cost_usd is None else f"${result.cost_usd:.2f}"
+    suffix = " (error)" if result.is_error else ""
+    console.worker_event(
+        identifier,
+        f"finishing sub-agent done: {result.num_turns} turns, {cost}{suffix}",
+    )
+
+
 @dataclass(frozen=True)
 class _WorkerOutcome:
     """The post-spawn verdict/responder trio plus the worker result, gathered
@@ -717,13 +734,23 @@ def _drain_one_issue(
         finishing_runs: list[dict] = []
         finishing_attempted = False
 
-        # Recovery: committed-but-unfinished → spawn a sonnet finishing sub-agent
-        # before halting. Fires only when the branch has commits beyond base (an
+        # The submission signal is ``pr_urls`` in exec-state.json, not the Linear
+        # Done state. A stack worker that submitted its PR(s) and deliberately
+        # left the issue In Progress (governance: stay In Progress until the PR
+        # merges) is complete — read that signal up front so both the recovery
+        # condition and the success gate below key on submission rather than on
+        # Done. Push mode has no handoff, so this is always ``None`` there.
+        submitted = handoff.read(worktree_path) if stack else None
+
+        # Recovery: committed-but-unsubmitted → spawn a sonnet finishing sub-agent
+        # before halting. Fires only when the work was not already submitted (a
+        # present ``pr_urls`` means the worker finished and left the issue In
+        # Progress — no recovery needed), the branch has commits beyond base (an
         # empty or uncommitted-only branch is a genuine failure), the verifier did
         # not explicitly reject the work (a FAIL verdict must stay halted to
         # satisfy KR2), and a cap breach did not already stop the session (that
         # path returned above). At most one finishing attempt per issue per run.
-        if not is_done and _commits_beyond_base(worktree_path, base):
+        if not is_done and submitted is None and _commits_beyond_base(worktree_path, base):
             _prior_verifier_failed = (
                 outcome.outcome_verdict is not None
                 and outcome.outcome_verdict.get("result") == "fail"
@@ -734,17 +761,25 @@ def _drain_one_issue(
                     identifier, "not-Done with commits: spawning finishing sub-agent"
                 )
                 _finishing_started = _now_iso()
+                # The finishing agent runs on the spawned (non-pane) path, so the
+                # watch split-pane can't mirror it. Route its per-turn progress
+                # through ``on_progress`` so the orchestrator pane keeps ticking —
+                # otherwise a normal multi-minute finishing run reads as a hang.
                 _finishing_result = worker.run_issue(
                     claude_cmd=_CLAUDE_CMD,
                     model=_FINISHING_MODEL,
-                    prompt=prompt.build_finishing(identifier, worktree_path, base),
+                    prompt=prompt.build_finishing(
+                        identifier, worktree_path, base, stack=stack
+                    ),
                     cwd=worktree_path,
                     token_limit=limits.per_issue_tokens,
                     time_limit_seconds=limits.per_issue_seconds,
                     cost_limit_usd=limits.per_issue_cost_usd,
+                    on_progress=_make_on_progress(marker, identifier),
                     passthrough=console.AgentSink(),
                 )
                 _finishing_finished = _now_iso()
+                _log_finishing_done(identifier, _finishing_result)
                 finishing_runs.append({
                     "trigger": "err-issue-not-done",
                     "started_at": _finishing_started,
@@ -752,11 +787,15 @@ def _drain_one_issue(
                     **_worker_log_fields(_finishing_result),
                 })
                 finished_at = _finishing_finished
-                # Re-read to see whether finishing succeeded
+                # Re-read to see whether finishing succeeded. In stack mode the
+                # finishing agent records ``pr_urls`` and (per governance) leaves
+                # the issue In Progress, so re-read the submission signal too —
+                # the success gate below accepts it whether or not Done was set.
                 refreshed = linear.get_issue(issue["id"])
                 post_spawn_state = refreshed["state"]["name"]
                 is_done = refreshed["state"]["type"] == _DONE_STATE_TYPE
                 issue_span.set_attribute("issue.is_done", is_done)
+                submitted = handoff.read(worktree_path) if stack else None
                 # Pull any verdicts the finishing agent wrote to the handoff so
                 # the verifier gate below uses the freshest available signal.
                 _fhov, _fhpv = handoff.read_partial(worktree_path)
@@ -767,16 +806,19 @@ def _drain_one_issue(
                         prep_verdict=_fhpv if _fhpv is not None else outcome.prep_verdict,
                     )
 
-        if is_done:
-            # Stack-mode confirmation gate, read before teardown removes the
-            # worktree. A Done issue in stack mode must have left a non-empty
-            # ``pr_urls`` — that is the orchestrator's proof submission ran.
-            # If it's missing, the worker marked Done without opening a PR:
-            # revert + halt, preserve the worktree for inspection, and do NOT
-            # extend the baton — the next same-repo issue must not stack onto a
-            # branch that was never pushed. Push-mode issues have no stack to
-            # extend and no handoff, so they bypass the gate entirely.
-            submitted = handoff.read(worktree_path) if stack else None
+        if is_done or submitted is not None:
+            # Success gate. The cycle completes when the worker either marked the
+            # issue Done (push mode: the push to main is the completion proof) or
+            # left a non-empty ``pr_urls`` (stack mode: the submitted PR is the
+            # proof, and the issue stays In Progress until that PR merges).
+            #
+            # Stack-mode confirmation, read before teardown removes the worktree:
+            # a stack issue that reached here on Done alone but left no ``pr_urls``
+            # was marked Done without opening a PR. Revert + halt, preserve the
+            # worktree for inspection, and do NOT extend the baton — the next
+            # same-repo issue must not stack onto a branch that was never pushed.
+            # Push-mode issues have no stack to extend and no handoff, so they
+            # bypass this confirmation entirely.
             if stack and submitted is None:
                 # Recovery: Done but no pr_urls → spawn finishing sub-agent once
                 # (guard skips a second attempt if not-Done recovery already ran).
@@ -789,14 +831,18 @@ def _drain_one_issue(
                     _finishing_result = worker.run_issue(
                         claude_cmd=_CLAUDE_CMD,
                         model=_FINISHING_MODEL,
-                        prompt=prompt.build_finishing(identifier, worktree_path, base),
+                        prompt=prompt.build_finishing(
+                            identifier, worktree_path, base, stack=stack
+                        ),
                         cwd=worktree_path,
                         token_limit=limits.per_issue_tokens,
                         time_limit_seconds=limits.per_issue_seconds,
                         cost_limit_usd=limits.per_issue_cost_usd,
+                        on_progress=_make_on_progress(marker, identifier),
                         passthrough=console.AgentSink(),
                     )
                     _finishing_finished = _now_iso()
+                    _log_finishing_done(identifier, _finishing_result)
                     finishing_runs.append({
                         "trigger": "err-stack-no-prs",
                         "started_at": _finishing_started,

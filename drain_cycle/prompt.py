@@ -73,13 +73,21 @@ def build(
     )
 
 
-def build_finishing(identifier: str, worktree: Path, base: str) -> str:
+def build_finishing(
+    identifier: str, worktree: Path, base: str, *, stack: bool = True
+) -> str:
     """Build a finishing-only prompt for a committed-but-unfinished issue.
 
     The implementation is already committed. The agent runs review → fix →
-    pr-finishing → Done. It must not re-implement or add commits beyond those
-    needed to fix Critical/Required review findings.
+    pr-finishing → records the submission. It must not re-implement or add
+    commits beyond those needed to fix Critical/Required review findings.
     Critical/Required fixes are delegated to ``_FINISHING_OPUS_MODEL`` sub-agents.
+
+    The completion step is mode-dependent. In ``stack`` mode the submitted PR is
+    the completion proof and the issue stays In Progress until that PR merges —
+    the agent must not transition to Done. In push mode there is no PR to merge,
+    so the push to main is the completion proof and the agent marks the issue
+    Done.
     """
     if base == "main":
         base_clause = ""
@@ -88,6 +96,28 @@ def build_finishing(identifier: str, worktree: Path, base: str) -> str:
             f" These commits are stacked on `{base}`, not `main`, so pass "
             f"`{base}` to the skill as its base branch (it slices `{base}..HEAD`)."
         )
+    if stack:
+        finish_step = (
+            "  5. Confirm `exec-state.json` now contains a non-empty `pr_urls` "
+            "list — that submitted PR is the completion signal. Leave the issue "
+            "In Progress: do not transition it to Done; it stays In Progress "
+            "until the PR merges. If the skill could not submit, leave the issue "
+            "In Progress and comment the blocker.\n\n"
+            "before finishing: confirm the PR URLs are in `exec-state.json` and "
+            "leave the issue In Progress.\n"
+        )
+        steps_lead = "- Steps (run in order):\n"
+    else:
+        finish_step = (
+            "  5. Confirm `exec-state.json` now contains a non-empty `pr_urls` "
+            "list. If the skill could not submit, leave the issue In Progress and "
+            "comment the blocker — do not mark Done.\n"
+            "  6. Transition issue to Done via `mcp__claude_ai_Linear__save_issue` "
+            '(state: "Done").\n\n'
+            "before marking Done: confirm the PR URLs are in `exec-state.json` "
+            "and transition to Done.\n"
+        )
+        steps_lead = "- Steps (run in order, before marking Done):\n"
     return (
         f"# Finishing incomplete issue {identifier}\n\n"
         f"The implementation for this issue is already committed on this branch. "
@@ -99,7 +129,7 @@ def build_finishing(identifier: str, worktree: Path, base: str) -> str:
         f"Finishing instructions for issue {identifier}:\n"
         f"- Working directory: {worktree}\n"
         f"- Base branch: {base}\n"
-        "- Steps (run in order, before marking Done):\n"
+        f"{steps_lead}"
         "  1. Review the committed changes for correctness and quality.\n"
         "  2. Fix any Critical or Required findings. For each fix that needs "
         f"significant code changes, spawn a sub-agent on `{_FINISHING_OPUS_MODEL}` "
@@ -111,11 +141,5 @@ def build_finishing(identifier: str, worktree: Path, base: str) -> str:
         "`exec-state.json` (`pr_urls`), and posts the review-summary comment "
         "on the Linear issue. Do not run `gt`/`gh` by hand or write "
         "`exec-state.json` yourself — the skill owns both.\n"
-        "  5. Confirm `exec-state.json` now contains a non-empty `pr_urls` "
-        "list. If the skill could not submit, leave the issue In Progress and "
-        "comment the blocker — do not mark Done.\n"
-        "  6. Transition issue to Done via `mcp__claude_ai_Linear__save_issue` "
-        '(state: "Done").\n\n'
-        "before marking Done: confirm the PR URLs are in `exec-state.json` "
-        "and transition to Done.\n"
+        f"{finish_step}"
     )
