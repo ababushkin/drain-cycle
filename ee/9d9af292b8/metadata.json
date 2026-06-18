@@ -3,8 +3,9 @@
   "checkpoint_id": "ee9d9af292b8",
   "strategy": "manual-commit",
   "branch": "trust-mise-in-worktrees",
-  "checkpoints_count": 0,
+  "checkpoints_count": 2,
   "files_touched": [
+    "conftest.py",
     "drain_cycle/worktree.py",
     "tests/test_worktree.py"
   ],
@@ -14,13 +15,19 @@
       "transcript": "/ee/9d9af292b8/0/full.jsonl",
       "content_hash": "/ee/9d9af292b8/0/content_hash.txt",
       "prompt": "/ee/9d9af292b8/0/prompt.txt"
+    },
+    {
+      "metadata": "/ee/9d9af292b8/1/metadata.json",
+      "transcript": "/ee/9d9af292b8/1/full.jsonl",
+      "content_hash": "/ee/9d9af292b8/1/content_hash.txt",
+      "prompt": "/ee/9d9af292b8/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 57946,
-    "cache_creation_tokens": 406221,
-    "cache_read_tokens": 7011541,
-    "output_tokens": 88965,
-    "api_call_count": 83
+    "input_tokens": 74924,
+    "cache_creation_tokens": 651191,
+    "cache_read_tokens": 10237398,
+    "output_tokens": 122866,
+    "api_call_count": 117
   }
 }
