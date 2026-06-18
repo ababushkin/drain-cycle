@@ -1,0 +1,150 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "8a0defec37b7",
+  "session_id": "6d19145b-86d2-4b0d-9077-624706537065",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-18T12:34:58.835497Z",
+  "branch": "ABA-409-live-execution-swimlanes",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "docs/design-docs/live-execution-swimlanes/design-doc.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "949b6ee9dbd4",
+  "checkpoint_transcript_start": 122,
+  "transcript_lines_at_start": 122,
+  "token_usage": {
+    "input_tokens": 3329,
+    "cache_creation_tokens": 224205,
+    "cache_read_tokens": 5247141,
+    "output_tokens": 68483,
+    "api_call_count": 41
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_0157GkDGDFPMDW2F1LNrXbmj",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape:delivery"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "949b6ee9dbd4",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 240,
+        "end": 241,
+        "entry_ids": [
+          "ecf6b68e-55e9-4a63-b499-10ece0afc383"
+        ],
+        "tool_use_id": "toolu_0157GkDGDFPMDW2F1LNrXbmj"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_0157GkDGDFPMDW2F1LNrXbmj"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape:delivery",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01DN5dWVwZta2XvzhbZvYYvU",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-delivery"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "949b6ee9dbd4",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 244,
+        "end": 245,
+        "entry_ids": [
+          "5a216db0-b9c5-4c2d-bfe8-dddf47c8236c"
+        ],
+        "tool_use_id": "toolu_01DN5dWVwZta2XvzhbZvYYvU"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01DN5dWVwZta2XvzhbZvYYvU"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-delivery",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01V77iPE4qnzCgbTaVqE12uw",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-writing-refinement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "949b6ee9dbd4",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 324,
+        "end": 325,
+        "entry_ids": [
+          "fc0f8899-2a6e-4684-bad1-cc89225bbbfc"
+        ],
+        "tool_use_id": "toolu_01V77iPE4qnzCgbTaVqE12uw"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01V77iPE4qnzCgbTaVqE12uw"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-writing-refinement",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-18T12:34:58.813216Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 1,
+    "total_committed": 0,
+    "total_lines_changed": 1,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1,
+      "user_lines_removed": 1,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/design-docs/live-execution-swimlanes/design-doc.md": 1
+      },
+      "user_removed_per_file": {
+        "docs/design-docs/live-execution-swimlanes/design-doc.md": 1
+      }
+    }
+  ]
+}
