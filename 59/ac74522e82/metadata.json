@@ -3,7 +3,7 @@
   "checkpoint_id": "59ac74522e82",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 2,
+  "checkpoints_count": 4,
   "files_touched": [
     "drain_cycle/orchestrator.py",
     "drain_cycle/prompt.py",
@@ -23,13 +23,19 @@
       "transcript": "/59/ac74522e82/1/full.jsonl",
       "content_hash": "/59/ac74522e82/1/content_hash.txt",
       "prompt": "/59/ac74522e82/1/prompt.txt"
+    },
+    {
+      "metadata": "/59/ac74522e82/2/metadata.json",
+      "transcript": "/59/ac74522e82/2/full.jsonl",
+      "content_hash": "/59/ac74522e82/2/content_hash.txt",
+      "prompt": "/59/ac74522e82/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 39327,
-    "cache_creation_tokens": 195096,
-    "cache_read_tokens": 6867605,
-    "output_tokens": 80108,
-    "api_call_count": 73
+    "input_tokens": 58663,
+    "cache_creation_tokens": 264589,
+    "cache_read_tokens": 8241932,
+    "output_tokens": 106212,
+    "api_call_count": 96
   }
 }

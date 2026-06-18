@@ -1,0 +1,114 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "59ac74522e82",
+  "session_id": "d352bfde-e72e-4cb0-a4a6-d5eb562f7d21",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-18T07:17:04.04158Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "drain_cycle/orchestrator.py",
+    "drain_cycle/prompt.py",
+    "drain_cycle/stop_guard.py",
+    "tests/test_orchestrator_finishing.py",
+    "tests/test_prompt.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "77e15181b568",
+  "token_usage": {
+    "input_tokens": 19336,
+    "cache_creation_tokens": 69493,
+    "cache_read_tokens": 1374327,
+    "output_tokens": 26104,
+    "api_call_count": 23
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-shape-idea-2026-06-18T06:59:39.156525Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "shape-idea"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "fb4881de00bf",
+      "timestamp": "2026-06-18T06:59:39.156525Z",
+      "native": {
+        "command": "/shape-idea"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/shape-idea",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "prompt-skill-claude-code-shape-design-2026-06-18T07:06:09.481378Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "shape-design"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "5933890fae50",
+      "timestamp": "2026-06-18T07:06:09.481378Z",
+      "native": {
+        "command": "/shape-design"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/shape-design",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-18T07:17:04.032629Z",
+    "agent_lines": 174,
+    "agent_removed": 33,
+    "human_added": 19,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 193,
+    "total_lines_changed": 226,
+    "agent_percentage": 91.5929203539823,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 19,
+      "user_lines_removed": 0,
+      "agent_lines_added": 236,
+      "agent_lines_removed": 32,
+      "user_added_per_file": {
+        "drain_cycle/orchestrator.py": 19
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 306,
+      "agent_lines_removed": 33
+    }
+  ]
+}

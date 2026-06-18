@@ -1,0 +1,19 @@
+/shape-idea swim lanes to show me which "agents" are doing what during the execution run
+
+for example i want to be able to see something like:
+
+ABA-313: Issue Picked Up
+--| Starting supervising agent
+--| [Code is written]
+----| Starting code-review sub-agent
+----| Starting code-simplification sub-agent
+
+etc
+
+Basically it should follow the architecture and personas I have but I want to be able to see what's going on while drain-cycle is running
+
+This is equivalent to a kanban board, but in a vertical UI rather than a horizontal Kanban
+
+---
+
+/shape-design
