@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "04bb0cc12ecc",
+  "strategy": "manual-commit",
+  "branch": "ABA-401-sectioned-reader",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".gitignore",
+    "drain_cycle/handoff.py",
+    "tests/test_handoff.py",
+    "tests/test_orchestrator_multi_repo.py",
+    "tests/test_stop_guard.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/04/bb0cc12ecc/0/metadata.json",
+      "transcript": "/04/bb0cc12ecc/0/full.jsonl",
+      "content_hash": "/04/bb0cc12ecc/0/content_hash.txt",
+      "prompt": "/04/bb0cc12ecc/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 58894,
+    "cache_creation_tokens": 464083,
+    "cache_read_tokens": 11810509,
+    "output_tokens": 127238,
+    "api_call_count": 118
+  }
+}

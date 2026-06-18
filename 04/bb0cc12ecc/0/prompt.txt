@@ -1,0 +1,9 @@
+yes and tell me which PR(s) to focus on again
+
+---
+
+i've merged aba-399 - you're saying i need to run drain-cycle now before i merge 32 to make sure its all working?
+
+---
+
+yes create a plan for the fix - i also noticed the weird "finish" node in the JSON contract but wasn't sure why it was there, seems like its a lot less work to just push forward
