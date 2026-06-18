@@ -30,14 +30,17 @@ from drain_cycle import linear, orchestrator, repos
 # ``pr_urls`` as proof the issue's PRs were submitted before tearing down.
 # Dual-write mirrors the migration period: exec-state.json is the primary file
 # the orchestrator now reads, with .drain-handoff.json kept as the legacy copy.
-_HANDOFF_PAYLOAD = '{\"pr_urls\":[{\"title\":\"feat\",\"url\":\"https://x/pull/1\"}]}'
+# The two files differ in shape: exec-state.json keys pr_urls under the
+# ``finish`` section (ADR 0030); the legacy file keeps them top-level.
+_EXEC_STATE_PAYLOAD = '{\"finish\":{\"pr_urls\":[{\"title\":\"feat\",\"url\":\"https://x/pull/1\"}]}}'
+_LEGACY_PAYLOAD = '{\"pr_urls\":[{\"title\":\"feat\",\"url\":\"https://x/pull/1\"}]}'
 _HANDOFF_LINE = (
-    f"printf '%s' '{_HANDOFF_PAYLOAD}' > exec-state.json\n"
-    f"printf '%s' '{_HANDOFF_PAYLOAD}' > .drain-handoff.json\n"
+    f"printf '%s' '{_EXEC_STATE_PAYLOAD}' > exec-state.json\n"
+    f"printf '%s' '{_LEGACY_PAYLOAD}' > .drain-handoff.json\n"
 )
 # Variant that writes only exec-state.json (pack has fully cut over).
 _EXEC_STATE_ONLY_LINE = (
-    f"printf '%s' '{_HANDOFF_PAYLOAD}' > exec-state.json\n"
+    f"printf '%s' '{_EXEC_STATE_PAYLOAD}' > exec-state.json\n"
 )
 
 

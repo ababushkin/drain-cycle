@@ -9,6 +9,8 @@
 .drain-base
 pickup-envelope.json
 exec-state.json
+# but the vendored test fixture of that file is a checked-in sample, not an artefact.
+!tests/fixtures/exec-state.json
 
 # Operator secrets (LINEAR_API_KEY etc).
 .env
