@@ -17,3 +17,8 @@ This is equivalent to a kanban board, but in a vertical UI rather than a horizon
 ---
 
 /shape-design
+
+---
+
+i want to construct an interactive demo now that shows me how this would work end to end
+it should be a prototype that runs in python and takes an issue (that requires coding) and runs through all of the steps that drain-cycle would along side the `agent-skills-shaper` pack that's bundled with this project
