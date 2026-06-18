@@ -1,0 +1,15 @@
+/crit:crit design doc
+
+---
+
+<task-notification>
+<task-id>bb5fjqejt</task-id>
+<tool-use-id>toolu_01JEycGFGVPx55WGH7SKPnNP</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-anton-src-drain-cycle/b6059d7f-0645-4377-9949-d5578cdb1a38/tasks/bb5fjqejt.output</output-file>
+<status>completed</status>
+<summary>Background command "Launch crit review on design doc" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+yes go ahead to both, but do not start implementation. i just want to plan the work out and make sure we have everything setup in linear
