@@ -12,18 +12,15 @@ its absence means submission never completed and the per-repo chain must halt �
 and the ``verify`` section, which it maps to its ``outcome_verdict`` for the
 run-log and the verifier-fail gate.
 
-``read`` prefers ``exec-state.json`` (sectioned) and falls back to the legacy
-``.drain-handoff.json`` (a flat top-level ``pr_urls``) so the orchestrator works
-whether or not the pack has cut over. Neither file present (or both structurally
-invalid) returns ``None``.
+``read`` reads the sectioned ``exec-state.json`` — the only state file. The
+legacy flat ``.drain-handoff.json`` has been dropped. A missing or structurally
+invalid file returns ``None``.
 
 ``outcome_verdict`` is derived from the pack's ``verify`` section: a ``FAIL``
 verdict maps to ``result == "fail"`` with the failed AC items as ``findings``.
 ``read_partial`` extracts that verdict without the ``pr_urls`` validity gate, so
 halt paths can carry whatever the worker managed to write. ``prep_verdict`` has
-no producer in the ``exec:*`` workflow today, so it is ``None`` from the
-sectioned file; the legacy reader still surfaces a top-level ``prep_verdict`` if
-one is present.
+no producer in the ``exec:*`` workflow today, so it is always ``None``.
 
 ``read`` never raises: a missing or malformed file returns ``None`` so callers
 can treat it as "not submitted yet."
@@ -36,7 +33,6 @@ from pathlib import Path
 from typing import Any
 
 EXEC_STATE_FILE = "exec-state.json"
-HANDOFF_FILE = ".drain-handoff.json"
 
 
 @dataclass(frozen=True)
@@ -50,23 +46,6 @@ class HandoffData:
     pr_urls: tuple[PullRequest, ...]
     outcome_verdict: dict[str, Any] | None = None
     prep_verdict: dict[str, Any] | None = None
-
-
-def write(worktree: Path, data: HandoffData) -> None:
-    """Serialise ``data`` to ``<worktree>/.drain-handoff.json``.
-
-    Writes the legacy flat shape. Used only by tests and any remaining
-    legacy writer; the pack writes the sectioned ``exec-state.json`` directly.
-    """
-    path = worktree / HANDOFF_FILE
-    payload: dict[str, Any] = {
-        "pr_urls": [{"title": pr.title, "url": pr.url} for pr in data.pr_urls],
-    }
-    if data.outcome_verdict is not None:
-        payload["outcome_verdict"] = data.outcome_verdict
-    if data.prep_verdict is not None:
-        payload["prep_verdict"] = data.prep_verdict
-    path.write_text(json.dumps(payload, indent=2))
 
 
 def _load(path: Path) -> dict[str, Any] | None:
@@ -163,39 +142,16 @@ def _read_exec_state(path: Path) -> HandoffData | None:
     )
 
 
-def _read_legacy(path: Path) -> HandoffData | None:
-    """Parse the legacy flat ``.drain-handoff.json``, returning HandoffData or None.
-
-    A valid file has a top-level ``pr_urls`` list with at least one entry.
-    Verdicts are read from top-level ``outcome_verdict``/``prep_verdict``.
-    """
-    payload = _load(path)
-    if payload is None:
-        return None
-    prs = _parse_pr_urls(payload.get("pr_urls"))
-    if prs is None:
-        return None
-    return HandoffData(
-        pr_urls=prs,
-        outcome_verdict=_parse_dict(payload.get("outcome_verdict")),
-        prep_verdict=_parse_dict(payload.get("prep_verdict")),
-    )
-
-
 def read(worktree: Path) -> HandoffData | None:
     """Return the handoff data for ``worktree``, or ``None`` if absent or invalid.
 
-    Prefers the sectioned ``exec-state.json`` (the pack-named file) and falls
-    back to the legacy flat ``.drain-handoff.json``. Returns ``None`` when
-    neither file exists or both are structurally invalid.
+    Reads the sectioned ``exec-state.json`` (the pack-named file). Returns
+    ``None`` when the file is absent or structurally invalid.
 
     ``outcome_verdict`` and ``prep_verdict`` are optional: missing sections/keys
     are read as ``None`` and do not affect validity.
     """
-    result = _read_exec_state(worktree / EXEC_STATE_FILE)
-    if result is not None:
-        return result
-    return _read_legacy(worktree / HANDOFF_FILE)
+    return _read_exec_state(worktree / EXEC_STATE_FILE)
 
 
 def read_partial(
@@ -205,19 +161,12 @@ def read_partial(
 
     Used by halt and breach paths to carry any verdicts the worker recorded
     even when ``pr_urls`` is absent or empty and ``read`` would return ``None``.
-    Prefers the sectioned ``exec-state.json`` (``verify`` section → outcome
-    verdict; no prep producer there yet), then falls back to the legacy flat
-    file's top-level verdicts. Returns ``(None, None)`` when neither is present.
+    Reads the ``verify`` section of ``exec-state.json`` for the outcome verdict;
+    there is no ``prep_verdict`` producer in the ``exec:*`` workflow today, so it
+    is always ``None``. Returns ``(None, None)`` when the file is absent or
+    malformed.
     """
     exec_state = _load(worktree / EXEC_STATE_FILE)
     if exec_state is not None:
-        outcome = _verify_to_outcome(exec_state.get("verify"))
-        if outcome is not None:
-            return outcome, None
-    legacy = _load(worktree / HANDOFF_FILE)
-    if legacy is not None:
-        return (
-            _parse_dict(legacy.get("outcome_verdict")),
-            _parse_dict(legacy.get("prep_verdict")),
-        )
+        return _verify_to_outcome(exec_state.get("verify")), None
     return None, None

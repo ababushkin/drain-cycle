@@ -28,18 +28,11 @@ from drain_cycle import linear, orchestrator, repos
 # Shell fragment a fake stack-mode worker appends to emit the handoff a real
 # `/shape:pr-finishing` run would write — the orchestrator reads its non-empty
 # ``pr_urls`` as proof the issue's PRs were submitted before tearing down.
-# Dual-write mirrors the migration period: exec-state.json is the primary file
-# the orchestrator now reads, with .drain-handoff.json kept as the legacy copy.
-# The two files differ in shape: exec-state.json keys pr_urls under the
-# ``finish`` section (ADR 0030); the legacy file keeps them top-level.
+# exec-state.json is the only state file. It keys pr_urls under the ``finish``
+# section (ADR 0030); a non-empty ``finish.pr_urls`` is the orchestrator's
+# proof the issue's PRs were submitted before tearing down.
 _EXEC_STATE_PAYLOAD = '{\"finish\":{\"pr_urls\":[{\"title\":\"feat\",\"url\":\"https://x/pull/1\"}]}}'
-_LEGACY_PAYLOAD = '{\"pr_urls\":[{\"title\":\"feat\",\"url\":\"https://x/pull/1\"}]}'
 _HANDOFF_LINE = (
-    f"printf '%s' '{_EXEC_STATE_PAYLOAD}' > exec-state.json\n"
-    f"printf '%s' '{_LEGACY_PAYLOAD}' > .drain-handoff.json\n"
-)
-# Variant that writes only exec-state.json (pack has fully cut over).
-_EXEC_STATE_ONLY_LINE = (
     f"printf '%s' '{_EXEC_STATE_PAYLOAD}' > exec-state.json\n"
 )
 
@@ -248,11 +241,10 @@ def test_stack_mode_chains_same_repo_worktrees_off_prior_branch(
     assert main_b[0] in hashes_3
 
 
-def test_stack_mode_exec_state_only_handoff_accepted(
+def test_stack_mode_exec_state_handoff_accepted(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A worker that writes only exec-state.json (no legacy .drain-handoff.json)
-    must be accepted: the orchestrator's handoff.read() prefers exec-state.json."""
+    """A worker that writes exec-state.json is accepted by the orchestrator."""
     repo = tmp_path / "repo"
     repo.mkdir()
     _init_repo(repo)
@@ -280,7 +272,7 @@ def test_stack_mode_exec_state_only_handoff_accepted(
     script.write_text(
         "#!/bin/sh\n"
         f'printf "%s\\n" "$(basename "$PWD")" >> "{marker}"\n'
-        f"{_EXEC_STATE_ONLY_LINE}"
+        f"{_HANDOFF_LINE}"
     )
     script.chmod(0o755)
     monkeypatch.setattr(orchestrator, "_CLAUDE_CMD", [str(script)])
@@ -322,7 +314,7 @@ def test_stack_mode_done_without_handoff_halts_and_preserves_worktree(
     monkeypatch.setattr(linear, "get_issue", fake_get_issue)
     monkeypatch.setattr(linear, "set_state", lambda issue_id, name: None)
 
-    # Worker marks the issue Done but writes no .drain-handoff.json.
+    # Worker marks the issue Done but writes no exec-state.json.
     script = tmp_path / "no-handoff-claude.sh"
     script.write_text(
         "#!/bin/sh\n"
