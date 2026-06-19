@@ -5,6 +5,29 @@ active `exec:*` step on stderr. The parser is the single source of truth for
 "is this content block a Skill delegation, and which skill" — extracted from
 ``watch_format`` so the pane filter and the live-output renderer agree by
 construction rather than by parallel implementations drifting apart.
+
+Redraw mechanism (OQ-4 settled): hand-rolled ANSI (carriage return +
+``CSI 2K`` erase-line) emitted synchronously inside the reader thread on
+every step transition. Considered and rejected: ``rich.Live``, which owns
+the cursor on a refresh loop and would conflict with append-only writes to
+the same stream — ``console.worker_event`` and the AgentSink-prefixed
+diagnostic lines that the orchestrator and the agent already emit there.
+Hand-rolled ANSI keeps the row bounded to "exactly one line at the current
+cursor position" and cohabits with append-only writes by re-emitting the
+row on each transition: an intervening newline-terminated log line just
+moves the row to the next physical line on the next emit. The trade-off
+is that on a non-TTY pipe the escape sequences would be visible bytes,
+so the renderer is silent unless ``tty`` resolves to True (auto-detected
+via the stream's ``isatty()`` by default; T5's fitness tests pin this).
+
+Stdout contract: this layer never writes to stdout. The renderer's TextIO
+is exclusively ``sys.stderr`` (or a test fake). The worker drain's
+``passthrough`` sink (AgentSink in production) is fed only by
+``_drain_stream``'s ``_echo`` path; ``on_step`` returns ``None`` and the
+renderer's writes go to a separate file handle. The parity test in
+``tests/test_swimlanes.py`` pins this: a run with the renderer active and
+a run without produce byte-identical passthrough output on the same
+fixture.
 """
 from __future__ import annotations
 

@@ -366,6 +366,95 @@ def test_run_issue_on_step_failure_does_not_break_drain(tmp_path):
     assert result.num_turns == 1
 
 
+def test_run_issue_passthrough_byte_identical_with_and_without_swimlanes(tmp_path):
+    """The chosen redraw mechanism (hand-rolled ANSI on stderr) must leave the
+    worker's stdout passthrough byte-identical to a feature-off run on the
+    same fixture. The renderer writes to its own stderr region; the sink that
+    AgentSink fronts must never see a single byte from this layer.
+    """
+    events = [
+        _assistant_event("m1", _skill("exec:pickup")),
+        # A non-JSON diagnostic line — these go to the passthrough sink.
+        # The renderer must NEVER touch this stream.
+        _assistant_event("m2", _skill("exec:breakdown")),
+        {
+            "type": "result",
+            "total_cost_usd": 0.0,
+            "num_turns": 2,
+            "session_id": "s",
+            "is_error": False,
+        },
+    ]
+    raw = "\n".join(json.dumps(e) for e in events)
+    raw += "\nnot-a-json-diagnostic-line\n"
+    raw += '"a bare string event"\n'
+    raw += "42\n"
+
+    sink_with_feature = io.StringIO()
+    renderer_stderr = io.StringIO()
+    renderer = swimlanes.StepRenderer(renderer_stderr, tty=True)
+    worker.run_issue(
+        claude_cmd=["unused"],
+        model="claude-opus-4-8",
+        prompt="ignored",
+        cwd=tmp_path,
+        token_limit=None,
+        time_limit_seconds=None,
+        cost_limit_usd=None,
+        passthrough=sink_with_feature,
+        external_stream=io.StringIO(raw),
+        on_step=renderer.feed,
+    )
+
+    sink_without_feature = io.StringIO()
+    worker.run_issue(
+        claude_cmd=["unused"],
+        model="claude-opus-4-8",
+        prompt="ignored",
+        cwd=tmp_path,
+        token_limit=None,
+        time_limit_seconds=None,
+        cost_limit_usd=None,
+        passthrough=sink_without_feature,
+        external_stream=io.StringIO(raw),
+    )
+
+    assert sink_with_feature.getvalue() == sink_without_feature.getvalue()
+    # Sanity: the non-JSON diagnostic lines DID make it into the sink (so the
+    # parity is not "both empty" by accident).
+    assert "not-a-json-diagnostic-line" in sink_with_feature.getvalue()
+    # And the renderer's stream really did render both steps — proving the
+    # passthrough integrity holds with the feature active, not bypassed.
+    rendered = renderer_stderr.getvalue()
+    assert "exec:pickup" in rendered
+    assert "exec:breakdown" in rendered
+    assert "\r\x1b[2K" in rendered
+
+
+def test_step_renderer_redraw_mechanism_is_hand_rolled_ansi():
+    """OQ-4 settled: hand-rolled CR + clear-to-EOL, not rich.Live.
+
+    rich.Live would take over the cursor on a refresh loop, conflicting with
+    the worker thread's append-only writes to stderr (console.worker_event,
+    the AgentSink prefix lines). Hand-rolled ANSI writes one fixed escape
+    sequence per transition synchronously inside the reader thread — no
+    refresh loop, no cursor takeover, no thread coordination, and the line
+    stays bounded to "exactly one row at the current cursor position." The
+    renderer cohabits with append-only stderr writes by always leading with
+    CR + clear-EOL: an intervening newline-terminated log line just moves
+    the row to the next physical line on the next emit.
+    """
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True)
+    renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
+    out = err.getvalue()
+    # The chosen-mechanism contract: every emit starts with CR + CSI 2K
+    # (carriage return then "erase line").
+    assert out.startswith("\r\x1b[2K")
+    # No newline written — the row stays on the current line until finalize.
+    assert "\n" not in out
+
+
 def test_drain_stream_does_not_call_on_step_with_non_dict_events():
     """A non-JSON-object line goes to the sink; the step callback never sees it."""
     sink = io.StringIO()
