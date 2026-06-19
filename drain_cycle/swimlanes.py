@@ -31,10 +31,28 @@ fixture.
 """
 from __future__ import annotations
 
+import os
 import sys
 import threading
 from dataclasses import dataclass
 from typing import Any, TextIO
+
+_DISABLE_ENV_VAR = "DRAIN_CYCLE_NO_SWIMLANES"
+"""Setting this env var (to any truthy value) turns the swimlanes view off
+end-to-end: the renderer becomes silent regardless of TTY, and the keyboard
+listener becomes a strict no-op. Reverts the operator to today's flat
+stream — pinned by the golden-output fitness test (NFR-4, OQ-5)."""
+
+
+def is_disabled() -> bool:
+    """Return True when the swimlanes view is disabled via the env switch.
+
+    Read at every construction site (not cached) so a test that sets the
+    env var inside a single process sees it; the orchestrator constructs
+    one renderer per issue so this is read once per drain anyway.
+    """
+    return bool(os.environ.get(_DISABLE_ENV_VAR))
+
 
 _ANSI_CR_CLEAR = "\r\x1b[2K"
 """Carriage return + clear-to-EOL: rewinds the cursor to column 0 and erases
@@ -176,7 +194,9 @@ class StepRenderer:
 
     def __init__(self, stderr: TextIO, tty: bool | None = None) -> None:
         self._stderr = stderr
-        if tty is None:
+        if is_disabled():
+            tty = False
+        elif tty is None:
             isatty = getattr(stderr, "isatty", None)
             try:
                 tty = bool(isatty()) if callable(isatty) else False
@@ -347,8 +367,11 @@ class KeyboardListener:
             self._renderer.focus_issue(items[idx].identifier)
 
     def start(self) -> None:
-        """Begin the TTY listener thread. Strict no-op on a non-TTY stdin."""
+        """Begin the TTY listener thread. Strict no-op on a non-TTY stdin or
+        when the swimlanes view is disabled via the env switch."""
         if self.active:
+            return
+        if is_disabled():
             return
         isatty = getattr(self._stdin, "isatty", None)
         try:
