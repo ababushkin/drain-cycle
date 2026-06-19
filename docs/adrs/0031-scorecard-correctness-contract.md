@@ -1,7 +1,8 @@
 # ADR 0031: The scorecard correctness contract — outcome pass AND review GO
 
 **Date:** 2026-06-18
-**Status:** Proposed
+**Status:** Accepted
+**Plan-review:** APPROVE (Full tier, 2026-06-18) — condition: name the `grade` deprecation owner (addressed in Consequences §1).
 
 The scorecard project replaces the manual `grade` command with an automated `drain-cycle scorecard` that reports duration, cost, and correctness across a cycle's runs ([`architecture.html`](../architecture.html) §7 supervisor-as-process). Before the rule is built, its semantics need to be fixed — otherwise the automation re-encodes today's bug, where a confirmed Done with `outcome_verdict.result == "fail"` is counted as a pass because `grade.py` checks only that the verdict exists, not what it says (`drain_cycle/grade.py:72-77`).
 
@@ -33,7 +34,7 @@ Producers (the review skill, today `exec:review`) write it when they run; the or
 
 **Consequences.**
 
-- The manual `drain-cycle grade` command and its draft/confirmed file workflow are deprecated; the scorecard reads run-log entries directly.
+- The manual `drain-cycle grade` command and its draft/confirmed file workflow are deprecated; the scorecard reads run-log entries directly. Removal of the `grade` command is tracked as the cycle's ktlo node (N05); until then the two coexist and the scorecard is the source of truth.
 - `exec:review` is the producer of `review_verdict`; the orchestrator records it in the run-log entry alongside `outcome_verdict` and `prep_verdict`.
 - The scorecard's correctness rule has one place to read — the run-log entry — and one assertion to make: outcome pass AND review GO. Both gates are independently invoked, neither writes the other's field.
 - A run with no review verdict is visible in the report (outcome-only-pass row), not silently counted as correct.

@@ -36,4 +36,4 @@ ADRs 0003 and 0004 are intentionally unused locally — those numbers name the p
 | [0028](0028-keystone-cutover.md) | The keystone cutover — `prompt.py` collapses to a pointer at `exec:pickup` | Accepted |
 | [0029](0029-stop-guard-via-settings.md) | The stop-guard hook is injected at spawn via `--settings` | Accepted |
 | [0030](0030-execution-state-file.md) | The supervisor guarantees the execution state; each skill writes its own section | Accepted |
-| [0031](0031-scorecard-correctness-contract.md) | The scorecard correctness contract — outcome pass AND review GO | Proposed |
+| [0031](0031-scorecard-correctness-contract.md) | The scorecard correctness contract — outcome pass AND review GO | Accepted |
