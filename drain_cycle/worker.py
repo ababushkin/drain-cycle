@@ -213,6 +213,7 @@ def run_issue(
     on_progress: Callable[[int, int, int, float | None, float], None] | None = None,
     external_stream: TextIO | None = None,
     kill_fn: Callable[[], None] | None = None,
+    on_step: Callable[[dict[str, Any]], None] | None = None,
 ) -> WorkerResult:
     """Run one streaming ``claude -p`` session and return its usage.
 
@@ -289,7 +290,7 @@ def run_issue(
 
         reader = threading.Thread(
             target=_drain_stream,
-            args=(stream, accumulator, sink, _progress_cb),
+            args=(stream, accumulator, sink, _progress_cb, on_step),
             daemon=True,
         )
         reader.start()

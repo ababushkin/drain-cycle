@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from dataclasses import dataclass, field, replace as dataclass_replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,7 +19,7 @@ from typing import Callable, TextIO
 
 from opentelemetry.trace import Span
 
-from . import console, grade_draft, handoff, linear, model, progress, prompt, runlog, stop_guard, telemetry, worker, worktree
+from . import console, grade_draft, handoff, linear, model, progress, prompt, runlog, stop_guard, swimlanes, telemetry, worker, worktree
 from . import watch as watch_pane
 from .limits import Limits, check_cycle
 from .linear import DependencyCycleError
@@ -663,6 +664,7 @@ def _drain_one_issue(
         prep_verdict: dict | None = None
         responder_runs: list[dict] = []
 
+        step_renderer = swimlanes.StepRenderer(sys.stderr)
         try:
             result = worker.run_issue(
                 claude_cmd=_CLAUDE_CMD,
@@ -676,9 +678,11 @@ def _drain_one_issue(
                 external_stream=external_stream,
                 kill_fn=kill_fn,
                 on_progress=_make_on_progress(marker, identifier),
+                on_step=step_renderer.feed,
                 passthrough=console.AgentSink(),
             )
         finally:
+            step_renderer.finalize()
             progress.clear()
             if session is not None:
                 session.cleanup()

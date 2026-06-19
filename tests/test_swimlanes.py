@@ -299,6 +299,73 @@ def test_drain_stream_without_on_step_callback_is_unchanged():
     assert sink.getvalue() == ""
 
 
+def test_run_issue_invokes_on_step_for_recognised_events(tmp_path):
+    """The active-step plumbing reaches the worker entry point — operators
+    see the live row, not only direct ``_drain_stream`` callers."""
+    events = [
+        _assistant_event("m1", _skill("exec:pickup")),
+        _assistant_event("m2", _skill("exec:breakdown")),
+        {
+            "type": "result",
+            "total_cost_usd": 0.0,
+            "num_turns": 2,
+            "session_id": "s",
+            "is_error": False,
+        },
+    ]
+    stream = io.StringIO("\n".join(json.dumps(e) for e in events) + "\n")
+    seen: list[dict] = []
+    result = worker.run_issue(
+        claude_cmd=["unused"],
+        model="claude-opus-4-8",
+        prompt="ignored",
+        cwd=tmp_path,
+        token_limit=None,
+        time_limit_seconds=None,
+        cost_limit_usd=None,
+        passthrough=io.StringIO(),
+        external_stream=stream,
+        on_step=seen.append,
+    )
+    assert result.breach is None
+    types = [e.get("type") for e in seen]
+    assert types.count("assistant") == 2
+    assert "result" in types
+
+
+def test_run_issue_on_step_failure_does_not_break_drain(tmp_path):
+    """Render-path exceptions never propagate into the worker drain."""
+    events = [
+        _assistant_event("m1", _skill("exec:pickup")),
+        {
+            "type": "result",
+            "total_cost_usd": 0.0,
+            "num_turns": 1,
+            "session_id": "s",
+            "is_error": False,
+        },
+    ]
+    stream = io.StringIO("\n".join(json.dumps(e) for e in events) + "\n")
+
+    def _raise(_event: dict) -> None:
+        raise RuntimeError("renderer is on fire")
+
+    result = worker.run_issue(
+        claude_cmd=["unused"],
+        model="claude-opus-4-8",
+        prompt="ignored",
+        cwd=tmp_path,
+        token_limit=None,
+        time_limit_seconds=None,
+        cost_limit_usd=None,
+        passthrough=io.StringIO(),
+        external_stream=stream,
+        on_step=_raise,
+    )
+    assert result.breach is None
+    assert result.num_turns == 1
+
+
 def test_drain_stream_does_not_call_on_step_with_non_dict_events():
     """A non-JSON-object line goes to the sink; the step callback never sees it."""
     sink = io.StringIO()
