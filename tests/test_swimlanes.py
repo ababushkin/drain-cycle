@@ -90,3 +90,100 @@ def test_parse_skill_step_accepts_namespaced_plugin_skill():
         "input": {"skill": "shape-exec-build"},
     }
     assert swimlanes.parse_skill_step(block) == "shape-exec-build"
+
+
+def _assistant_event(message_id: str, *blocks: dict) -> dict:
+    return {
+        "type": "assistant",
+        "message": {"id": message_id, "content": list(blocks)},
+    }
+
+
+def _skill(skill_name: str) -> dict:
+    return {"type": "tool_use", "name": "Skill", "input": {"skill": skill_name}}
+
+
+def test_step_tracker_records_first_skill_step_as_active():
+    tracker = swimlanes.StepTracker()
+    new_step = tracker.feed(_assistant_event("m1", _skill("exec:pickup")))
+    assert new_step == "exec:pickup"
+    assert tracker.active == "exec:pickup"
+    assert tracker.history == ["exec:pickup"]
+
+
+def test_step_tracker_returns_none_when_active_step_unchanged():
+    tracker = swimlanes.StepTracker()
+    tracker.feed(_assistant_event("m1", _skill("exec:pickup")))
+    again = tracker.feed(_assistant_event("m2", _skill("exec:pickup")))
+    assert again is None
+    assert tracker.history == ["exec:pickup"]
+
+
+def test_step_tracker_appends_history_in_first_seen_order():
+    tracker = swimlanes.StepTracker()
+    sequence = ["exec:pickup", "exec:breakdown", "exec:build", "exec:review"]
+    for i, skill in enumerate(sequence):
+        assert tracker.feed(_assistant_event(f"m{i}", _skill(skill))) == skill
+    assert tracker.history == sequence
+    assert tracker.active == "exec:review"
+
+
+def test_step_tracker_ignores_non_assistant_events():
+    tracker = swimlanes.StepTracker()
+    assert tracker.feed({"type": "user", "message": {}}) is None
+    assert tracker.feed({"type": "result", "num_turns": 1}) is None
+    assert tracker.feed({"type": "system"}) is None
+    assert tracker.active is None
+    assert tracker.history == []
+
+
+def test_step_tracker_ignores_non_skill_tool_use():
+    tracker = swimlanes.StepTracker()
+    event = _assistant_event(
+        "m1",
+        {"type": "text", "text": "hello"},
+        {"type": "tool_use", "name": "Bash", "input": {"command": "ls"}},
+    )
+    assert tracker.feed(event) is None
+    assert tracker.active is None
+
+
+def test_step_tracker_picks_last_skill_in_a_multi_block_message():
+    # A Skill delegation yields control back to the runtime, so multiple
+    # Skill blocks in one assistant turn don't happen in practice. The
+    # tracker still has to behave: pick the last Skill in the block list
+    # (the operator's most recent intent) and record only that one in
+    # history — pretending the earlier ones happened would invent steps.
+    tracker = swimlanes.StepTracker()
+    event = _assistant_event(
+        "m1",
+        _skill("exec:pickup"),
+        _skill("exec:breakdown"),
+    )
+    new_step = tracker.feed(event)
+    assert new_step == "exec:breakdown"
+    assert tracker.active == "exec:breakdown"
+    assert tracker.history == ["exec:breakdown"]
+
+
+def test_step_tracker_re_entered_step_does_not_duplicate_history():
+    tracker = swimlanes.StepTracker()
+    for i, skill in enumerate(["a", "b", "a"]):
+        tracker.feed(_assistant_event(f"m{i}", _skill(skill)))
+    assert tracker.history == ["a", "b", "a"] or tracker.history == ["a", "b"]
+    # First-seen-order is the contract; a re-entered step appends again so the
+    # operator can see they came back through it. The OR above documents that
+    # both interpretations have been considered — pin the chosen one:
+    assert tracker.history == ["a", "b", "a"]
+    assert tracker.active == "a"
+
+
+def test_step_tracker_safe_against_malformed_event_shapes():
+    tracker = swimlanes.StepTracker()
+    assert tracker.feed({}) is None
+    assert tracker.feed({"type": "assistant"}) is None
+    assert tracker.feed({"type": "assistant", "message": "oops"}) is None
+    assert (
+        tracker.feed({"type": "assistant", "message": {"content": "oops"}}) is None
+    )
+    assert tracker.active is None

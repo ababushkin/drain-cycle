@@ -57,3 +57,46 @@ def parse_skill_step(block: Any) -> str | None:
     if not isinstance(skill, str) or not skill:
         return None
     return skill
+
+
+class StepTracker:
+    """Track the currently-active ``exec:*`` step across stream events.
+
+    State machine: feed assistant events, get back the new step name on a
+    transition (or ``None`` when the active step is unchanged or the event
+    carries no Skill delegation). The tracker keeps the first-seen order of
+    every skill it has observed so the renderer can draw the full stepper
+    row, and re-records a re-entered step at the tail so the operator sees
+    they came back through it.
+
+    Malformed events (non-dict, missing ``message``, ``content`` not a list)
+    are silently ignored — the live renderer must never fault the worker
+    drain it feeds off.
+    """
+
+    def __init__(self) -> None:
+        self.history: list[str] = []
+        self.active: str | None = None
+
+    def feed(self, event: Any) -> str | None:
+        if not isinstance(event, dict):
+            return None
+        if event.get("type") != "assistant":
+            return None
+        message = event.get("message")
+        if not isinstance(message, dict):
+            return None
+        content = message.get("content")
+        if not isinstance(content, list):
+            return None
+        new_active: str | None = None
+        for block in content:
+            step = parse_skill_step(block)
+            if step is None:
+                continue
+            new_active = step
+        if new_active is None or new_active == self.active:
+            return None
+        self.active = new_active
+        self.history.append(new_active)
+        return new_active
