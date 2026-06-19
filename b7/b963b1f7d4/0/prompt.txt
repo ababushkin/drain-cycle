@@ -1,0 +1,5 @@
+For this repo what is the runnable verification command?
+
+---
+
+add this to AGENTS.md
