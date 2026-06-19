@@ -31,12 +31,33 @@ fixture.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, TextIO
 
 _ANSI_CR_CLEAR = "\r\x1b[2K"
 """Carriage return + clear-to-EOL: rewinds the cursor to column 0 and erases
 to the right, so the next write lands on top of the previous row without
 appending a new line."""
+
+_ANSI_UP_ONE = "\x1b[1A"
+"""Cursor up one line: used to re-anchor the redraw region when both the
+queue and stepper rows are visible."""
+
+_QUEUE_STATES = ("done", "running", "queued")
+_QUEUE_GLYPH = {"done": "✓", "running": "▶", "queued": "◯"}
+
+
+@dataclass(frozen=True)
+class QueueItem:
+    """A single issue's slot in the cycle queue.
+
+    ``identifier`` is the human-readable Linear ID (e.g. ``"ABA-411"``).
+    ``state`` is one of ``"done"``, ``"running"``, ``"queued"`` — anything
+    else renders as ``"queued"`` to avoid lying about the lane state.
+    """
+
+    identifier: str
+    state: str
 
 
 def parse_tool_use(block: Any) -> tuple[str, dict[str, Any]] | None:
@@ -161,6 +182,28 @@ class StepRenderer:
                 tty = False
         self._tty = tty
         self._tracker = StepTracker()
+        self._queue: list[QueueItem] = []
+        self._has_queue_row = False
+
+    def set_queue(self, items: list[QueueItem]) -> None:
+        """Install the cycle queue, sourced from the orchestrator's pick order.
+
+        Position-in-list is the source of truth — the renderer does NOT
+        re-sort by identifier, state, or any other heuristic (OQ-6).
+        """
+        self._queue = list(items)
+
+    def mark_issue(self, identifier: str, state: str) -> None:
+        """Advance one issue's lane state in place. Unknown ids are a no-op.
+
+        Mutates the queue list to swap the matched item for one carrying
+        the new state; preserves position-in-list, so the next render
+        keeps the orchestrator's pick order.
+        """
+        for i, item in enumerate(self._queue):
+            if item.identifier == identifier:
+                self._queue[i] = QueueItem(identifier=identifier, state=state)
+                return
 
     @property
     def tracker(self) -> StepTracker:
@@ -175,18 +218,44 @@ class StepRenderer:
     def _render(self) -> None:
         if not self._tty:
             return
+        stepper_row = self._render_stepper_row()
+        queue_row = self._render_queue_row()
+        try:
+            if queue_row is None:
+                # Single-row layout: stepper only, redraw in place.
+                self._stderr.write(f"{_ANSI_CR_CLEAR}{stepper_row}")
+            else:
+                # Two-row layout: queue above stepper. On the first emit, draw
+                # both rows; on subsequent emits, move the cursor up one line
+                # to re-anchor on the queue row before rewriting both.
+                if self._has_queue_row:
+                    self._stderr.write(_ANSI_UP_ONE)
+                self._stderr.write(
+                    f"{_ANSI_CR_CLEAR}{queue_row}\n{_ANSI_CR_CLEAR}{stepper_row}"
+                )
+                self._has_queue_row = True
+            self._stderr.flush()
+        except (OSError, ValueError):
+            pass
+
+    def _render_stepper_row(self) -> str:
         parts = [
             f"{self._ACTIVE_GLYPH} {step}"
             if step == self._tracker.active
             else f"{self._PRIOR_GLYPH} {step}"
             for step in self._tracker.history
         ]
-        row = " ".join(parts)
-        try:
-            self._stderr.write(f"{_ANSI_CR_CLEAR}{row}")
-            self._stderr.flush()
-        except (OSError, ValueError):
-            pass
+        return " ".join(parts)
+
+    def _render_queue_row(self) -> str | None:
+        if not self._queue:
+            return None
+        parts = []
+        for item in self._queue:
+            state = item.state if item.state in _QUEUE_STATES else "queued"
+            glyph = _QUEUE_GLYPH[state]
+            parts.append(f"{glyph} {item.identifier}")
+        return "  ".join(parts)
 
     def finalize(self) -> None:
         """Write a terminating newline so subsequent stderr writes start fresh.

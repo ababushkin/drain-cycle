@@ -431,6 +431,118 @@ def test_run_issue_passthrough_byte_identical_with_and_without_swimlanes(tmp_pat
     assert "\r\x1b[2K" in rendered
 
 
+def test_step_renderer_renders_cycle_queue_above_stepper():
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True)
+    renderer.set_queue(
+        [
+            swimlanes.QueueItem("ABA-410", "done"),
+            swimlanes.QueueItem("ABA-411", "running"),
+            swimlanes.QueueItem("ABA-412", "queued"),
+        ]
+    )
+    renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
+    out = err.getvalue()
+    # All three issues appear on the queue row.
+    assert "ABA-410" in out
+    assert "ABA-411" in out
+    assert "ABA-412" in out
+    # Active step appears on the stepper row.
+    assert "exec:pickup" in out
+    # Queue row is above the stepper row — its first occurrence comes earlier.
+    assert out.find("ABA-411") < out.find("exec:pickup")
+
+
+def test_step_renderer_queue_distinguishes_done_running_queued_states():
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True)
+    renderer.set_queue(
+        [
+            swimlanes.QueueItem("ABA-410", "done"),
+            swimlanes.QueueItem("ABA-411", "running"),
+            swimlanes.QueueItem("ABA-412", "queued"),
+        ]
+    )
+    renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
+    out = err.getvalue()
+    # Distinct glyphs per state — the operator must tell them apart at a glance.
+    assert "✓ ABA-410" in out
+    assert "▶ ABA-411" in out
+    assert "◯ ABA-412" in out
+
+
+def test_step_renderer_mark_issue_advances_lane_state_on_next_render():
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True)
+    renderer.set_queue(
+        [
+            swimlanes.QueueItem("ABA-411", "running"),
+            swimlanes.QueueItem("ABA-412", "queued"),
+        ]
+    )
+    renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
+    renderer.mark_issue("ABA-411", "done")
+    renderer.mark_issue("ABA-412", "running")
+    renderer.feed(_assistant_event("m2", _skill("exec:breakdown")))
+    out = err.getvalue()
+    # Most recent render reflects the advanced state — look at the tail.
+    # (The renderer re-emits the full row each transition.)
+    assert out.rfind("✓ ABA-411") > out.rfind("▶ ABA-411")
+    assert out.rfind("▶ ABA-412") > out.rfind("◯ ABA-412")
+
+
+def test_step_renderer_preserves_orchestrator_pick_order_does_not_resort():
+    """OQ-6: the queue order is the orchestrator's pick order, sourced
+    not recomputed. The renderer must not re-sort by identifier or by
+    state — it would lie about the orchestrator's actual sequence."""
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True)
+    renderer.set_queue(
+        [
+            swimlanes.QueueItem("ABA-412", "queued"),
+            swimlanes.QueueItem("ABA-410", "running"),
+            swimlanes.QueueItem("ABA-411", "done"),
+        ]
+    )
+    renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
+    out = err.getvalue()
+    # Position-in-string order matches the input list order.
+    assert out.find("ABA-412") < out.find("ABA-410") < out.find("ABA-411")
+
+
+def test_step_renderer_empty_queue_still_renders_stepper():
+    """T1 behaviour preserved: an empty queue keeps the single-line stepper."""
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True)
+    renderer.set_queue([])
+    renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
+    out = err.getvalue()
+    assert "exec:pickup" in out
+    # No queue glyphs leaked through.
+    assert "✓" not in out
+    assert "◯" not in out
+
+
+def test_step_renderer_queue_without_step_does_not_render():
+    """Queue alone, with no step transition, emits nothing. Rendering is
+    transition-driven — until the first Skill block, there's no row."""
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True)
+    renderer.set_queue([swimlanes.QueueItem("ABA-411", "running")])
+    assert err.getvalue() == ""
+
+
+def test_step_renderer_mark_issue_unknown_id_is_a_noop():
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True)
+    renderer.set_queue([swimlanes.QueueItem("ABA-411", "running")])
+    renderer.mark_issue("ABA-999", "done")  # not in queue; must not raise
+    renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
+    out = err.getvalue()
+    assert "ABA-411" in out
+    assert "ABA-999" not in out
+
+
 def test_step_renderer_redraw_mechanism_is_hand_rolled_ansi():
     """OQ-4 settled: hand-rolled CR + clear-to-EOL, not rich.Live.
 
