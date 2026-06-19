@@ -27,6 +27,8 @@ import sys
 from datetime import datetime, timezone
 from typing import Any, TextIO
 
+from drain_cycle import swimlanes
+
 _INPUT_MAX = 80
 """Per-argument cap on the ``repr`` of a tool_use input value, so a large
 prompt or file body renders as a short ``key='...'`` rather than flooding
@@ -98,11 +100,12 @@ class StreamFormatter:
                 if text:
                     self._write(text)
             elif btype == "tool_use":
-                name = block.get("name", "?")
-                inp = block.get("input") or {}
+                parsed = swimlanes.parse_tool_use(block)
+                if parsed is None:
+                    continue
+                name, inp = parsed
                 args = ", ".join(
-                    f"{k}={repr(v)}"[:_INPUT_MAX]
-                    for k, v in (inp.items() if isinstance(inp, dict) else [])
+                    f"{k}={repr(v)}"[:_INPUT_MAX] for k, v in inp.items()
                 )
                 self._write(f"→ {name}({args})")
 
