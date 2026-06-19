@@ -472,7 +472,7 @@ def test_step_renderer_queue_distinguishes_done_running_queued_states():
     assert "◯ ABA-412" in out
 
 
-def test_step_renderer_mark_issue_advances_lane_state_on_next_render():
+def test_step_renderer_set_queue_advances_lane_state_on_next_render():
     err = io.StringIO()
     renderer = swimlanes.StepRenderer(err, tty=True)
     renderer.set_queue(
@@ -482,22 +482,27 @@ def test_step_renderer_mark_issue_advances_lane_state_on_next_render():
         ]
     )
     renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
-    renderer.mark_issue("ABA-411", "done")
-    renderer.mark_issue("ABA-412", "running")
+    # Lane state is advanced by the orchestrator owning the queue list and
+    # re-passing it on each transition — the renderer never recomputes it.
+    renderer.set_queue(
+        [
+            swimlanes.QueueItem("ABA-411", "done"),
+            swimlanes.QueueItem("ABA-412", "running"),
+        ]
+    )
     renderer.feed(_assistant_event("m2", _skill("exec:breakdown")))
     out = err.getvalue()
     # Most recent render reflects the advanced state — look at the tail.
-    # (The renderer re-emits the full row each transition.) The running
-    # issue is auto-focused (bracketed) — that brackets the active running
-    # lane label.
+    # The running issue is auto-focused (bracketed) — that brackets the
+    # active running lane label.
     assert out.rfind("✓ ABA-411") > out.rfind("▶ [ABA-411]")
     assert out.rfind("▶ [ABA-412]") > out.rfind("◯ ABA-412")
 
 
 def test_step_renderer_preserves_orchestrator_pick_order_does_not_resort():
-    """OQ-6: the queue order is the orchestrator's pick order, sourced
-    not recomputed. The renderer must not re-sort by identifier or by
-    state — it would lie about the orchestrator's actual sequence."""
+    """Queue order is the orchestrator's pick order, sourced not recomputed.
+    The renderer must not re-sort by identifier or by state — it would lie
+    about the orchestrator's actual sequence."""
     err = io.StringIO()
     renderer = swimlanes.StepRenderer(err, tty=True)
     renderer.set_queue(
@@ -514,7 +519,7 @@ def test_step_renderer_preserves_orchestrator_pick_order_does_not_resort():
 
 
 def test_step_renderer_empty_queue_still_renders_stepper():
-    """T1 behaviour preserved: an empty queue keeps the single-line stepper."""
+    """An empty queue keeps the single-line stepper."""
     err = io.StringIO()
     renderer = swimlanes.StepRenderer(err, tty=True)
     renderer.set_queue([])
@@ -535,15 +540,41 @@ def test_step_renderer_queue_without_step_does_not_render():
     assert err.getvalue() == ""
 
 
-def test_step_renderer_mark_issue_unknown_id_is_a_noop():
+def test_step_renderer_on_progress_appends_proof_of_life_sub_status():
+    """Proof-of-life sub-status — the active node carries a live
+    ``turn N · X tok · elapsed`` line so the operator can see it's alive
+    between step transitions."""
     err = io.StringIO()
     renderer = swimlanes.StepRenderer(err, tty=True)
-    renderer.set_queue([swimlanes.QueueItem("ABA-411", "running")])
-    renderer.mark_issue("ABA-999", "done")  # not in queue; must not raise
-    renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
+    renderer.feed(_assistant_event("m1", _skill("exec:build")))
+    renderer.on_progress(turns=3, cumulative_tokens=12_500, elapsed_seconds=42.0)
     out = err.getvalue()
-    assert "ABA-411" in out
-    assert "ABA-999" not in out
+    assert "turn 3" in out
+    assert "exec:build" in out
+    # The sub-status is part of the active step's row, not a separate line.
+    last_active = out.rfind("▶ exec:build")
+    last_sub = out.rfind("turn 3")
+    assert last_sub > last_active
+
+
+def test_step_renderer_sanitises_ansi_escapes_in_skill_name():
+    """A model-controlled skill name carrying ANSI escapes (or other control
+    bytes) must not bleed through the row — the embedded escape would let
+    a prompt-injected payload move the cursor or rewrite the operator's
+    scrollback."""
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True)
+    poisoned = "exec:\x1b[31mevil\x1b[0m\rhidden"
+    renderer.feed(_assistant_event("m1", _skill(poisoned)))
+    out = err.getvalue()
+    # The control bytes are replaced with `?` — they never reach stderr raw,
+    # apart from the renderer's own framing escapes (the CR + CSI 2K prefix).
+    # Strip the framing prefix before checking for embedded escapes.
+    payload = out.replace("\r\x1b[2K", "")
+    assert "\x1b[31m" not in payload
+    assert "\x1b[0m" not in payload
+    # The carriage return embedded in the skill name is also sanitised.
+    assert "\rhidden" not in payload
 
 
 def test_step_renderer_focus_issue_highlights_the_focused_lane():

@@ -6,19 +6,18 @@ active `exec:*` step on stderr. The parser is the single source of truth for
 ``watch_format`` so the pane filter and the live-output renderer agree by
 construction rather than by parallel implementations drifting apart.
 
-Redraw mechanism (OQ-4 settled): hand-rolled ANSI (carriage return +
-``CSI 2K`` erase-line) emitted synchronously inside the reader thread on
-every step transition. Considered and rejected: ``rich.Live``, which owns
-the cursor on a refresh loop and would conflict with append-only writes to
-the same stream — ``console.worker_event`` and the AgentSink-prefixed
-diagnostic lines that the orchestrator and the agent already emit there.
+Redraw mechanism: hand-rolled ANSI (carriage return + ``CSI 2K`` erase-line)
+emitted synchronously inside the reader thread on every step transition.
+Rejected ``rich.Live``: it owns the cursor on a refresh loop and would
+conflict with the append-only writes to the same stream that
+``console.worker_event`` and the AgentSink-prefixed diagnostic lines emit.
 Hand-rolled ANSI keeps the row bounded to "exactly one line at the current
 cursor position" and cohabits with append-only writes by re-emitting the
 row on each transition: an intervening newline-terminated log line just
-moves the row to the next physical line on the next emit. The trade-off
-is that on a non-TTY pipe the escape sequences would be visible bytes,
-so the renderer is silent unless ``tty`` resolves to True (auto-detected
-via the stream's ``isatty()`` by default; T5's fitness tests pin this).
+moves the row to the next physical line on the next emit. On a non-TTY
+pipe the escape sequences would be visible bytes, so the renderer is
+silent unless ``tty`` resolves to True (auto-detected via the stream's
+``isatty()`` by default).
 
 Stdout contract: this layer never writes to stdout. The renderer's TextIO
 is exclusively ``sys.stderr`` (or a test fake). The worker drain's
@@ -37,11 +36,14 @@ import threading
 from dataclasses import dataclass
 from typing import Any, TextIO
 
+from drain_cycle.progress import fmt_elapsed as _fmt_elapsed
+from drain_cycle.progress import fmt_tokens as _fmt_tokens
+
 _DISABLE_ENV_VAR = "DRAIN_CYCLE_NO_SWIMLANES"
 """Setting this env var (to any truthy value) turns the swimlanes view off
 end-to-end: the renderer becomes silent regardless of TTY, and the keyboard
 listener becomes a strict no-op. Reverts the operator to today's flat
-stream — pinned by the golden-output fitness test (NFR-4, OQ-5)."""
+stream."""
 
 
 def is_disabled() -> bool:
@@ -65,6 +67,21 @@ queue and stepper rows are visible."""
 
 _QUEUE_STATES = ("done", "running", "queued")
 _QUEUE_GLYPH = {"done": "✓", "running": "▶", "queued": "◯"}
+
+_CONTROL_BYTES = "".join(chr(c) for c in range(0x20)) + "\x7f"
+_CONTROL_TABLE = str.maketrans({c: "?" for c in _CONTROL_BYTES})
+
+
+def _safe_label(value: str) -> str:
+    """Strip control bytes (including ``\\x1b`` and ``\\r``/``\\n``) from a
+    label before writing it into the redraw row.
+
+    Skill names originate from the model's ``tool_use.input.skill`` and an
+    embedded escape would let the model move the cursor, clear scrollback,
+    or rewrite earlier output. Substituting each control byte with ``?``
+    keeps the row width predictable without dropping characters that would
+    misalign column counts."""
+    return value.translate(_CONTROL_TABLE)
 
 
 @dataclass(frozen=True)
@@ -104,8 +121,7 @@ def parse_tool_use(block: Any) -> tuple[str, dict[str, Any]] | None:
 def parse_skill_step(block: Any) -> str | None:
     """Return the skill name when ``block`` is a Skill tool_use, else ``None``.
 
-    Pre-build gate OQ-1 fixes the shape: a step delegation in the Claude Code
-    stream is a content block of the form ::
+    A step delegation in the Claude Code stream is a content block of the form ::
 
         {"type": "tool_use", "name": "Skill", "input": {"skill": "<name>"}}
 
@@ -207,12 +223,13 @@ class StepRenderer:
         self._queue: list[QueueItem] = []
         self._has_queue_row = False
         self._focused: str | None = None
+        self._sub_status: str = ""
 
     def set_queue(self, items: list[QueueItem]) -> None:
         """Install the cycle queue, sourced from the orchestrator's pick order.
 
         Position-in-list is the source of truth — the renderer does NOT
-        re-sort by identifier, state, or any other heuristic (OQ-6).
+        re-sort by identifier, state, or any other heuristic.
         """
         self._queue = list(items)
 
@@ -233,18 +250,6 @@ class StepRenderer:
         the focus with ``None`` to restore auto-follow."""
         self._focused = identifier
 
-    def mark_issue(self, identifier: str, state: str) -> None:
-        """Advance one issue's lane state in place. Unknown ids are a no-op.
-
-        Mutates the queue list to swap the matched item for one carrying
-        the new state; preserves position-in-list, so the next render
-        keeps the orchestrator's pick order.
-        """
-        for i, item in enumerate(self._queue):
-            if item.identifier == identifier:
-                self._queue[i] = QueueItem(identifier=identifier, state=state)
-                return
-
     @property
     def tracker(self) -> StepTracker:
         return self._tracker
@@ -253,6 +258,23 @@ class StepRenderer:
         new_step = self._tracker.feed(event)
         if new_step is None:
             return
+        self._render()
+
+    def on_progress(
+        self, turns: int, cumulative_tokens: int, elapsed_seconds: float
+    ) -> None:
+        """Update the proof-of-life sub-status and redraw the row.
+
+        Called by the worker once per new assistant turn (deduplicated by
+        message id). The sub-status reuses the live snapshot the orchestrator
+        already drives — ``turn N · X tok · 12.3s`` — so the operator can see
+        the active step is still alive between step transitions.
+        """
+        self._sub_status = (
+            f"turn {turns}"
+            f" · {_fmt_tokens(cumulative_tokens)} tok"
+            f" · {_fmt_elapsed(elapsed_seconds)}"
+        )
         self._render()
 
     def _render(self) -> None:
@@ -280,12 +302,15 @@ class StepRenderer:
 
     def _render_stepper_row(self) -> str:
         parts = [
-            f"{self._ACTIVE_GLYPH} {step}"
+            f"{self._ACTIVE_GLYPH} {_safe_label(step)}"
             if step == self._tracker.active
-            else f"{self._PRIOR_GLYPH} {step}"
+            else f"{self._PRIOR_GLYPH} {_safe_label(step)}"
             for step in self._tracker.history
         ]
-        return " ".join(parts)
+        row = " ".join(parts)
+        if self._sub_status:
+            row = f"{row} · {_safe_label(self._sub_status)}"
+        return row
 
     def _render_queue_row(self) -> str | None:
         if not self._queue:
@@ -295,9 +320,8 @@ class StepRenderer:
         for item in self._queue:
             state = item.state if item.state in _QUEUE_STATES else "queued"
             glyph = _QUEUE_GLYPH[state]
-            label = (
-                f"[{item.identifier}]" if item.identifier == focus else item.identifier
-            )
+            ident = _safe_label(item.identifier)
+            label = f"[{ident}]" if item.identifier == focus else ident
             parts.append(f"{glyph} {label}")
         return "  ".join(parts)
 
@@ -330,14 +354,14 @@ class StepRenderer:
 class KeyboardListener:
     """Raw-mode TTY keyboard watcher that routes digit keys to the renderer.
 
-    Skeleton wiring (T4): on a TTY stdin, ``start()`` spins a daemon thread
-    that reads stdin character-by-character in cbreak mode and maps digit
-    keys ``1``–``9`` to ``focus_issue(queue[n-1].identifier)``; ``0`` clears
-    the focus, restoring auto-follow on the running issue. On a non-TTY the
-    listener is a strict no-op: no thread, no termios state — the
-    non-TTY pipe contract (zero ANSI, zero stdout bytes, no input handling)
-    relies on this being byte-for-byte equivalent to never constructing the
-    listener at all.
+    On a TTY stdin, ``start()`` spins a daemon thread that reads stdin
+    character-by-character in cbreak mode and maps digit keys ``1``–``9``
+    to ``focus_issue(queue[n-1].identifier)``; ``0`` clears the focus,
+    restoring auto-follow on the running issue. On a non-TTY the listener
+    is a strict no-op: no thread, no termios state — the non-TTY pipe
+    contract (zero ANSI, zero stdout bytes, no input handling) relies on
+    this being byte-for-byte equivalent to never constructing the listener
+    at all.
 
     ``handle_key(ch)`` is the testable seam — the live thread calls it for
     each character read; tests call it directly with synthetic input.
