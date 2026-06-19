@@ -432,6 +432,7 @@ def _drain_stream(
     accumulator: _UsageAccumulator,
     sink: TextIO,
     on_progress: Callable[[int, int, int, float | None], None] | None = None,
+    on_step: Callable[[dict[str, Any]], None] | None = None,
 ) -> None:
     """Read the session's stream-json output line by line until EOF.
 
@@ -439,7 +440,9 @@ def _drain_stream(
     else (non-JSON diagnostics, JSON that isn't an object) is echoed to
     ``sink`` so the operator keeps the visibility a captured pipe would
     otherwise hide. ``on_progress`` is called once per new turn (deduplicated
-    by message id) with a live usage snapshot. Reaching EOF (and closing the
+    by message id) with a live usage snapshot. ``on_step`` is called with
+    every recognised JSON-object event — the swimlanes view subscribes here
+    to track the active ``exec:*`` step. Reaching EOF (and closing the
     stream) is also how the external-path monitor learns the session ended.
     """
     if stream is None:
@@ -457,6 +460,11 @@ def _drain_stream(
                 continue
             if isinstance(event, dict):
                 accumulator.feed(event)
+                if on_step is not None:
+                    try:
+                        on_step(event)
+                    except Exception:
+                        pass
                 if event.get("type") == "assistant":
                     mid = (event.get("message") or {}).get("id")
                     if on_progress is not None and mid != last_message_id:

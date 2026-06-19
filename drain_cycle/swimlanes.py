@@ -8,7 +8,12 @@ construction rather than by parallel implementations drifting apart.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TextIO
+
+_ANSI_CR_CLEAR = "\r\x1b[2K"
+"""Carriage return + clear-to-EOL: rewinds the cursor to column 0 and erases
+to the right, so the next write lands on top of the previous row without
+appending a new line."""
 
 
 def parse_tool_use(block: Any) -> tuple[str, dict[str, Any]] | None:
@@ -100,3 +105,76 @@ class StepTracker:
         self.active = new_active
         self.history.append(new_active)
         return new_active
+
+
+class StepRenderer:
+    """Draw a single-line stepper row on stderr, redrawn in place per transition.
+
+    Wraps a :class:`StepTracker` for state and a TextIO (typically
+    ``sys.stderr``) for output. On every step transition the row is
+    rewritten with a leading ``\\r\\x1b[2K`` so each emit overwrites the
+    previous one — the operator sees the row "flip" rather than a scrolling
+    log. The active step is marked with ``▶``; prior steps are dimmed to
+    ``·``.
+
+    The renderer is silent when ``tty`` resolves to False — so a non-TTY
+    pipe (CI, redirected output, test capture) emits zero bytes from this
+    layer. ``tty=None`` (the default) auto-detects via the stream's
+    ``isatty()``; pass ``True`` from tests to force emission to a
+    StringIO. Render-path exceptions are swallowed (``OSError``, ``ValueError``)
+    — this view is strictly non-gating on the worker drain that feeds it.
+    """
+
+    _ACTIVE_GLYPH = "▶"
+    _PRIOR_GLYPH = "·"
+
+    def __init__(self, stderr: TextIO, tty: bool | None = None) -> None:
+        self._stderr = stderr
+        if tty is None:
+            isatty = getattr(stderr, "isatty", None)
+            try:
+                tty = bool(isatty()) if callable(isatty) else False
+            except Exception:
+                tty = False
+        self._tty = tty
+        self._tracker = StepTracker()
+
+    @property
+    def tracker(self) -> StepTracker:
+        return self._tracker
+
+    def feed(self, event: Any) -> None:
+        new_step = self._tracker.feed(event)
+        if new_step is None:
+            return
+        self._render()
+
+    def _render(self) -> None:
+        if not self._tty:
+            return
+        parts = [
+            f"{self._ACTIVE_GLYPH} {step}"
+            if step == self._tracker.active
+            else f"{self._PRIOR_GLYPH} {step}"
+            for step in self._tracker.history
+        ]
+        row = " ".join(parts)
+        try:
+            self._stderr.write(f"{_ANSI_CR_CLEAR}{row}")
+            self._stderr.flush()
+        except (OSError, ValueError):
+            pass
+
+    def finalize(self) -> None:
+        """Write a terminating newline so subsequent stderr writes start fresh.
+
+        Called by the worker after the stream closes — without it, the next
+        log line would land on top of the stepper row.
+        """
+        if not self._tty:
+            return
+        try:
+            self._stderr.write("\n")
+            self._stderr.flush()
+        except (OSError, ValueError):
+            pass
