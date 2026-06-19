@@ -691,6 +691,8 @@ def _drain_one_issue(
         step_renderer = swimlanes.StepRenderer(sys.stderr)
         if queue is not None:
             step_renderer.set_queue(queue)
+        keyboard = swimlanes.KeyboardListener(step_renderer)
+        keyboard.start()
         try:
             result = worker.run_issue(
                 claude_cmd=_CLAUDE_CMD,
@@ -708,6 +710,7 @@ def _drain_one_issue(
                 passthrough=console.AgentSink(),
             )
         finally:
+            keyboard.stop()
             step_renderer.finalize()
             progress.clear()
             if session is not None:

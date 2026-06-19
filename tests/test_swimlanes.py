@@ -467,7 +467,8 @@ def test_step_renderer_queue_distinguishes_done_running_queued_states():
     out = err.getvalue()
     # Distinct glyphs per state — the operator must tell them apart at a glance.
     assert "✓ ABA-410" in out
-    assert "▶ ABA-411" in out
+    # Running issue is auto-focused (bracketed by the T4 viewing toggle).
+    assert "▶ [ABA-411]" in out
     assert "◯ ABA-412" in out
 
 
@@ -486,9 +487,11 @@ def test_step_renderer_mark_issue_advances_lane_state_on_next_render():
     renderer.feed(_assistant_event("m2", _skill("exec:breakdown")))
     out = err.getvalue()
     # Most recent render reflects the advanced state — look at the tail.
-    # (The renderer re-emits the full row each transition.)
-    assert out.rfind("✓ ABA-411") > out.rfind("▶ ABA-411")
-    assert out.rfind("▶ ABA-412") > out.rfind("◯ ABA-412")
+    # (The renderer re-emits the full row each transition.) The running
+    # issue is auto-focused (bracketed) — that brackets the active running
+    # lane label.
+    assert out.rfind("✓ ABA-411") > out.rfind("▶ [ABA-411]")
+    assert out.rfind("▶ [ABA-412]") > out.rfind("◯ ABA-412")
 
 
 def test_step_renderer_preserves_orchestrator_pick_order_does_not_resort():
@@ -541,6 +544,101 @@ def test_step_renderer_mark_issue_unknown_id_is_a_noop():
     out = err.getvalue()
     assert "ABA-411" in out
     assert "ABA-999" not in out
+
+
+def test_step_renderer_focus_issue_highlights_the_focused_lane():
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True)
+    renderer.set_queue(
+        [
+            swimlanes.QueueItem("ABA-410", "running"),
+            swimlanes.QueueItem("ABA-411", "queued"),
+        ]
+    )
+    renderer.focus_issue("ABA-411")
+    renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
+    out = err.getvalue()
+    # Focused issue is wrapped in brackets so it stands out from the
+    # auto-follow target (the running one).
+    assert "[ABA-411]" in out
+    # The auto-follow target is no longer the visual focus.
+    assert "[ABA-410]" not in out
+
+
+def test_step_renderer_clears_focus_restoring_auto_follow_on_running_issue():
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True)
+    renderer.set_queue(
+        [
+            swimlanes.QueueItem("ABA-410", "running"),
+            swimlanes.QueueItem("ABA-411", "queued"),
+        ]
+    )
+    renderer.focus_issue("ABA-411")
+    renderer.focus_issue(None)
+    renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
+    out = err.getvalue()
+    # Auto-follow → the focus follows the running issue, not a stale selection.
+    assert "[ABA-410]" in out
+    assert "[ABA-411]" not in out
+
+
+def test_step_renderer_focused_identifier_property_tracks_explicit_focus():
+    renderer = swimlanes.StepRenderer(io.StringIO(), tty=True)
+    assert renderer.focused_identifier is None  # auto-follow default
+    renderer.focus_issue("ABA-411")
+    assert renderer.focused_identifier == "ABA-411"
+    renderer.focus_issue(None)
+    assert renderer.focused_identifier is None
+
+
+def test_keyboard_listener_is_a_noop_when_stdin_is_not_a_tty():
+    """The done_when: a piped run auto-follows with no input handling.
+    KeyboardListener.start() on a non-TTY stream must not raise, must not
+    spawn a thread, and must not touch termios — so a piped drain-cycle run
+    completes with WorkerResult and exit code identical to a TTY-less run
+    that didn't construct the listener at all.
+    """
+
+    class NotATty:
+        def isatty(self) -> bool:
+            return False
+
+    renderer = swimlanes.StepRenderer(io.StringIO(), tty=False)
+    listener = swimlanes.KeyboardListener(renderer, stdin=NotATty())
+    listener.start()
+    assert listener.active is False
+    # stop() on an inactive listener is also a no-op.
+    listener.stop()
+    assert listener.active is False
+
+
+def test_keyboard_listener_routes_digit_key_to_focus_n_th_queue_item():
+    """When a digit 1-9 is received the listener focuses the nth queue item.
+    This test drives the parser directly (the live termios loop is exercised
+    only on a TTY in integration); here we verify the key→focus mapping."""
+    renderer = swimlanes.StepRenderer(io.StringIO(), tty=True)
+    renderer.set_queue(
+        [
+            swimlanes.QueueItem("ABA-410", "running"),
+            swimlanes.QueueItem("ABA-411", "queued"),
+            swimlanes.QueueItem("ABA-412", "queued"),
+        ]
+    )
+    listener = swimlanes.KeyboardListener(renderer)
+    listener.handle_key("2")
+    assert renderer.focused_identifier == "ABA-411"
+    listener.handle_key("3")
+    assert renderer.focused_identifier == "ABA-412"
+    # Out-of-range digit → noop (no crash, focus unchanged).
+    listener.handle_key("9")
+    assert renderer.focused_identifier == "ABA-412"
+    # Non-digit → also noop.
+    listener.handle_key("x")
+    assert renderer.focused_identifier == "ABA-412"
+    # "0" clears focus → auto-follow.
+    listener.handle_key("0")
+    assert renderer.focused_identifier is None
 
 
 def test_step_renderer_redraw_mechanism_is_hand_rolled_ansi():

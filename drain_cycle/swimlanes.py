@@ -31,6 +31,8 @@ fixture.
 """
 from __future__ import annotations
 
+import sys
+import threading
 from dataclasses import dataclass
 from typing import Any, TextIO
 
@@ -184,6 +186,7 @@ class StepRenderer:
         self._tracker = StepTracker()
         self._queue: list[QueueItem] = []
         self._has_queue_row = False
+        self._focused: str | None = None
 
     def set_queue(self, items: list[QueueItem]) -> None:
         """Install the cycle queue, sourced from the orchestrator's pick order.
@@ -192,6 +195,23 @@ class StepRenderer:
         re-sort by identifier, state, or any other heuristic (OQ-6).
         """
         self._queue = list(items)
+
+    @property
+    def queue(self) -> list[QueueItem]:
+        """The current queue snapshot, in pick order. Used by the keyboard
+        listener to map digit keys to identifiers."""
+        return list(self._queue)
+
+    @property
+    def focused_identifier(self) -> str | None:
+        """The explicitly-focused issue identifier; ``None`` means auto-follow
+        the currently-running issue (the default)."""
+        return self._focused
+
+    def focus_issue(self, identifier: str | None) -> None:
+        """Set the focused issue (its swimlane gets visual emphasis) or clear
+        the focus with ``None`` to restore auto-follow."""
+        self._focused = identifier
 
     def mark_issue(self, identifier: str, state: str) -> None:
         """Advance one issue's lane state in place. Unknown ids are a no-op.
@@ -250,12 +270,27 @@ class StepRenderer:
     def _render_queue_row(self) -> str | None:
         if not self._queue:
             return None
+        focus = self._resolve_focus()
         parts = []
         for item in self._queue:
             state = item.state if item.state in _QUEUE_STATES else "queued"
             glyph = _QUEUE_GLYPH[state]
-            parts.append(f"{glyph} {item.identifier}")
+            label = (
+                f"[{item.identifier}]" if item.identifier == focus else item.identifier
+            )
+            parts.append(f"{glyph} {label}")
         return "  ".join(parts)
+
+    def _resolve_focus(self) -> str | None:
+        """Effective focus: explicit selection wins; otherwise auto-follow the
+        running issue. ``None`` means the queue carries no running issue and
+        no explicit focus was set."""
+        if self._focused is not None:
+            return self._focused
+        for item in self._queue:
+            if item.state == "running":
+                return item.identifier
+        return None
 
     def finalize(self) -> None:
         """Write a terminating newline so subsequent stderr writes start fresh.
@@ -270,3 +305,101 @@ class StepRenderer:
             self._stderr.flush()
         except (OSError, ValueError):
             pass
+
+
+class KeyboardListener:
+    """Raw-mode TTY keyboard watcher that routes digit keys to the renderer.
+
+    Skeleton wiring (T4): on a TTY stdin, ``start()`` spins a daemon thread
+    that reads stdin character-by-character in cbreak mode and maps digit
+    keys ``1``–``9`` to ``focus_issue(queue[n-1].identifier)``; ``0`` clears
+    the focus, restoring auto-follow on the running issue. On a non-TTY the
+    listener is a strict no-op: no thread, no termios state — the
+    non-TTY pipe contract (zero ANSI, zero stdout bytes, no input handling)
+    relies on this being byte-for-byte equivalent to never constructing the
+    listener at all.
+
+    ``handle_key(ch)`` is the testable seam — the live thread calls it for
+    each character read; tests call it directly with synthetic input.
+    """
+
+    def __init__(self, renderer: "StepRenderer", stdin: Any | None = None) -> None:
+        self._renderer = renderer
+        self._stdin = stdin if stdin is not None else sys.stdin
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    @property
+    def active(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def handle_key(self, ch: str) -> None:
+        """Apply a single keystroke. Public so tests can drive the mapping
+        without standing up a real PTY."""
+        if not ch or not ch.isdigit():
+            return
+        if ch == "0":
+            self._renderer.focus_issue(None)
+            return
+        idx = int(ch) - 1
+        items = self._renderer.queue
+        if 0 <= idx < len(items):
+            self._renderer.focus_issue(items[idx].identifier)
+
+    def start(self) -> None:
+        """Begin the TTY listener thread. Strict no-op on a non-TTY stdin."""
+        if self.active:
+            return
+        isatty = getattr(self._stdin, "isatty", None)
+        try:
+            tty_ok = bool(isatty()) if callable(isatty) else False
+        except Exception:
+            tty_ok = False
+        if not tty_ok:
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        """Signal the listener thread to exit. Daemon threads die with the
+        process anyway, so we don't join here — that would block teardown if
+        the read() is parked inside a syscall."""
+        self._stop.set()
+
+    def _loop(self) -> None:  # pragma: no cover — exercised only on a real TTY
+        try:
+            import select
+            import termios
+            import tty as tty_mod
+        except ImportError:
+            return
+        try:
+            fd = self._stdin.fileno()
+        except (AttributeError, ValueError, OSError):
+            return
+        try:
+            old = termios.tcgetattr(fd)
+        except termios.error:
+            return
+        try:
+            tty_mod.setcbreak(fd)
+            while not self._stop.is_set():
+                ready, _, _ = select.select([self._stdin], [], [], 0.1)
+                if not ready:
+                    continue
+                try:
+                    ch = self._stdin.read(1)
+                except (OSError, ValueError):
+                    return
+                if not ch:
+                    return
+                try:
+                    self.handle_key(ch)
+                except Exception:
+                    pass
+        finally:
+            try:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old)
+            except termios.error:
+                pass
