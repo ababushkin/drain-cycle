@@ -3,8 +3,8 @@
 Zero-arg invocation drains the current Linear cycle. Each issue's target
 repo is resolved from a ``repo:<name>`` label against
 ``~/.drain-cycle/repos.yml``; the operator runs ``drain-cycle`` from
-anywhere, not from inside a target repo. The ``grade`` subcommand reads
-the run logs and prints a health read.
+anywhere, not from inside a target repo. The ``scorecard`` subcommand reads
+the run logs and reports per-run quality.
 
 Secrets load before any module reads ``os.environ``, first hit wins:
 shell-exported vars → ``~/.drain-cycle/.env`` → the drain-cycle repo
@@ -25,7 +25,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from . import grade, grade_draft, limits, orchestrator, repos, scorecard, telemetry
+from . import limits, orchestrator, repos, scorecard, telemetry
 
 _REPO_ENV = Path(__file__).resolve().parent.parent / ".env"
 
@@ -46,8 +46,6 @@ def _load_secrets() -> None:
 _USAGE = (
     "usage: drain-cycle [--watch|-w] [--no-stack]  drain the current Linear cycle\n"
     "       drain-cycle scorecard                   report per-run quality from run logs\n"
-    "       drain-cycle grade                       print health read from run logs\n"
-    "       drain-cycle grade-draft <issue>         write per-ticket grade draft\n"
     "       drain-cycle status                      show status of the active run\n"
     "       drain-cycle --help\n"
     "\n"
@@ -94,14 +92,6 @@ def main() -> None:
 
     if remaining == ["scorecard"] and not watch:
         sys.exit(scorecard.run(scorecard.runs_dir()))
-    if remaining == ["grade"] and not watch:
-        sys.exit(grade.run(grade.default_grades_dir(), grade.default_runs_dir()))
-    if (
-        len(remaining) == 2
-        and remaining[0] == "grade-draft"
-        and not watch
-    ):
-        sys.exit(grade_draft.run(remaining[1]))
     if remaining == ["status"] and not watch:
         from . import status
         sys.exit(status.run())

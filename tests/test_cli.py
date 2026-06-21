@@ -1,12 +1,12 @@
 """CLI dispatch tests for ``drain-cycle``.
 
-Pins the four dispatch paths in ``cli.main``: zero-arg → orchestrator,
-``grade`` → grade.run, ``-h`` / ``--help`` → usage + exit 0, anything
-else → usage on stderr + exit 2. The behaviour guarded against is the
+Pins the dispatch paths in ``cli.main``: zero-arg → orchestrator,
+``scorecard`` → scorecard.run, ``-h`` / ``--help`` → usage + exit 0,
+anything else → usage on stderr + exit 2. The behaviour guarded against is the
 old fall-through where a misspelled subcommand silently triggered a
 real cycle drain.
 
-A fifth path: zero-arg must first eagerly load ``repos.yml`` and exit 1
+A further path: zero-arg must first eagerly load ``repos.yml`` and exit 1
 (without invoking the orchestrator, without writing any run-log) when
 the config is broken. That test sits below.
 """
@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from drain_cycle import cli, grade, limits, orchestrator, repos, scorecard, status
+from drain_cycle import cli, limits, orchestrator, repos, scorecard, status
 
 _SECRET = "DRAIN_CYCLE_TEST_SECRET"
 
@@ -93,18 +93,6 @@ def _stub_no_op_orchestrator(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
     return calls
 
 
-def _stub_no_op_grade(monkeypatch: pytest.MonkeyPatch) -> list[bool]:
-    called: list[bool] = []
-
-    def fake_run(grades_dir, runs_dir) -> int:
-        called.append(True)
-        return 0
-
-    monkeypatch.setattr(grade, "run", fake_run)
-    monkeypatch.setattr(cli, "load_dotenv", lambda *_a, **_kw: False)
-    return called
-
-
 def test_no_args_dispatches_to_orchestrator(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = _stub_no_op_orchestrator(monkeypatch)
     monkeypatch.setattr("sys.argv", ["drain-cycle"])
@@ -114,19 +102,6 @@ def test_no_args_dispatches_to_orchestrator(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert exc.value.code == 0
     assert calls == [{"watch": False, "no_stack": False}]
-
-
-def test_grade_subcommand_dispatches_to_grade_run(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    called = _stub_no_op_grade(monkeypatch)
-    monkeypatch.setattr("sys.argv", ["drain-cycle", "grade"])
-
-    with pytest.raises(SystemExit) as exc:
-        cli.main()
-
-    assert exc.value.code == 0
-    assert called == [True]
 
 
 @pytest.mark.parametrize("flag", ["-h", "--help"])
@@ -151,8 +126,10 @@ def test_help_flag_prints_usage_and_exits_zero(
     "argv_tail",
     [
         ["bogus"],
+        ["grade"],
         ["grade", "extra"],
         ["grade", "--verbose"],
+        ["grade-draft", "ABA-42"],
         ["--unknown"],
     ],
 )
@@ -165,7 +142,6 @@ def test_unknown_invocation_prints_usage_to_stderr_and_exits_two(
     That's a foot-gun — the orchestrator is destructive (creates worktrees,
     transitions Linear state). Misspellings must fail loudly."""
     forbid_orchestrator(monkeypatch)
-    forbid_grade(monkeypatch)
     monkeypatch.setattr(cli, "load_dotenv", lambda *_a, **_kw: False)
     monkeypatch.setattr("sys.argv", ["drain-cycle", *argv_tail])
 
@@ -183,13 +159,6 @@ def forbid_orchestrator(monkeypatch: pytest.MonkeyPatch) -> None:
         raise AssertionError("orchestrator.run() must not be called on unknown args")
 
     monkeypatch.setattr(orchestrator, "run", boom)
-
-
-def forbid_grade(monkeypatch: pytest.MonkeyPatch) -> None:
-    def boom(_grades_dir, _runs_dir) -> int:
-        raise AssertionError("grade.run() must not be called on unknown args")
-
-    monkeypatch.setattr(grade, "run", boom)
 
 
 def test_status_subcommand_dispatches_to_status_run(

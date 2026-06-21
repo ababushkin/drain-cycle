@@ -14,7 +14,7 @@ from drain_cycle import scorecard
 
 
 _PASS_VERDICT = {"result": "pass", "findings": [], "invoked_at": "2026-05-22T10:05:00+00:00"}
-_GO_VERDICT = {"result": "GO", "findings": [], "invocation_id": "abc"}
+_GO_VERDICT = {"result": "go", "findings": [], "invocation_id": "abc"}
 _AUTO_MERGE_PREP = {"result": "ok", "route": "auto-merge", "reasoning": "clean"}
 _HUMAN_REVIEW_PREP = {"result": "needs-review", "route": "human-review", "reasoning": "risk"}
 

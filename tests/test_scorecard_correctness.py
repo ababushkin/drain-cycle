@@ -1,7 +1,7 @@
 """Correctness function tests for ``drain-cycle scorecard``.
 
 Pins the correctness rule from ADR 0031: a run is correct when
-outcome_verdict.result == "pass" AND review_verdict.result == "GO".
+outcome_verdict.result == "pass" AND review_verdict.result == "go".
 Each case is independent — the function reads entry dicts directly.
 """
 from __future__ import annotations
@@ -15,8 +15,8 @@ from drain_cycle.scorecard import _is_correct, _is_silent_done
 
 _PASS_VERDICT = {"result": "pass", "findings": [], "invoked_at": "2026-05-22T10:05:00+00:00"}
 _FAIL_VERDICT = {"result": "fail", "findings": ["not met"], "invoked_at": "2026-05-22T10:05:00+00:00"}
-_GO_VERDICT = {"result": "GO", "findings": [], "invocation_id": "abc"}
-_NOGO_VERDICT = {"result": "NO-GO", "findings": ["review failed"], "invocation_id": "def"}
+_GO_VERDICT = {"result": "go", "findings": [], "invocation_id": "abc"}
+_NOGO_VERDICT = {"result": "no-go", "findings": ["review failed"], "invocation_id": "def"}
 
 
 def _entry(

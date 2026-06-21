@@ -19,7 +19,7 @@ from typing import Callable, TextIO
 
 from opentelemetry.trace import Span
 
-from . import console, grade_draft, handoff, linear, model, progress, prompt, runlog, stop_guard, swimlanes, telemetry, worker, worktree
+from . import console, handoff, linear, model, progress, prompt, runlog, stop_guard, swimlanes, telemetry, worker, worktree
 from . import watch as watch_pane
 from .limits import Limits, check_cycle
 from .linear import DependencyCycleError
@@ -1037,15 +1037,6 @@ def _drain_one_issue(
                 **_worker_log_fields(outcome.result),
             )
             _set_verdict_span_attrs(issue_span, outcome)
-            try:
-                draft_path = grade_draft.write_draft_from_entry(
-                    identifier, log.entries[-1]
-                )
-                console.worker_event(identifier, f"grade draft → {draft_path}")
-            except Exception as exc:
-                console.orch(
-                    f"{identifier}: grade-draft write failed (non-fatal): {exc}"
-                )
             if remove_error is None:
                 console.worker_event(identifier, "done; worktree removed")
             return None, pane_id

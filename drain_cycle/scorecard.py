@@ -4,7 +4,7 @@ Reads run-log JSON files and reports each run's duration, cost, tokens,
 and correctness without any manual confirmation step.
 
 Correctness rule (ADR 0031):
-  correct = outcome_verdict.result == "pass" AND review_verdict.result == "GO"
+  correct = outcome_verdict.result == "pass" AND review_verdict.result == "go"
   A missing review verdict is not-correct but is not a violation.
   A Done entry with null outcome_verdict is a silent-Done violation (exit 1).
   prep_verdict.route is advisory — it appears in output but never affects
@@ -27,7 +27,7 @@ def _is_correct(entry: dict[str, Any]) -> bool:
     review = entry.get("review_verdict") or {}
     return (
         outcome.get("result") == "pass"
-        and review.get("result") == "GO"
+        and review.get("result") == "go"
     )
 
 
