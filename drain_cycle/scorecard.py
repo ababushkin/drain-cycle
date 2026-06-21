@@ -13,7 +13,6 @@ Correctness rule (ADR 0031):
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Any
 

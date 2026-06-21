@@ -45,6 +45,7 @@ def _load_secrets() -> None:
 
 _USAGE = (
     "usage: drain-cycle [--watch|-w] [--no-stack]  drain the current Linear cycle\n"
+    "       drain-cycle scorecard                   report per-run quality from run logs\n"
     "       drain-cycle grade                       print health read from run logs\n"
     "       drain-cycle grade-draft <issue>         write per-ticket grade draft\n"
     "       drain-cycle status                      show status of the active run\n"
