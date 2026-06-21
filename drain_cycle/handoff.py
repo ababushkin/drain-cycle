@@ -46,6 +46,7 @@ class HandoffData:
     pr_urls: tuple[PullRequest, ...]
     outcome_verdict: dict[str, Any] | None = None
     prep_verdict: dict[str, Any] | None = None
+    review_verdict: dict[str, Any] | None = None
 
 
 def _load(path: Path) -> dict[str, Any] | None:
@@ -120,6 +121,28 @@ def _verify_to_outcome(raw: object) -> dict[str, Any] | None:
     }
 
 
+def _review_to_verdict(raw: object) -> dict[str, Any] | None:
+    """Map the pack's ``review`` section to the supervisor's review verdict.
+
+    The pack records ``{"verdict": "GO"|"NO-GO", "findings": [...]}``.
+    Downstream the supervisor reads ``result`` ("go"/"no-go") and ``findings``.
+    A section without a recognised verdict is dropped to ``None``.
+    """
+    if not isinstance(raw, dict):
+        return None
+    verdict = raw.get("verdict")
+    if verdict not in ("GO", "NO-GO"):
+        return None
+    findings = raw.get("findings")
+    safe_findings: list[str] = []
+    if isinstance(findings, list):
+        safe_findings = [f for f in findings if isinstance(f, str)]
+    return {
+        "result": verdict.lower(),
+        "findings": safe_findings,
+    }
+
+
 def _read_exec_state(path: Path) -> HandoffData | None:
     """Parse the sectioned ``exec-state.json``, returning HandoffData or None.
 
@@ -139,6 +162,7 @@ def _read_exec_state(path: Path) -> HandoffData | None:
         pr_urls=prs,
         outcome_verdict=_verify_to_outcome(payload.get("verify")),
         prep_verdict=None,
+        review_verdict=_review_to_verdict(payload.get("review")),
     )
 
 
