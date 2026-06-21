@@ -25,7 +25,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from . import grade, grade_draft, limits, orchestrator, repos, telemetry
+from . import grade, grade_draft, limits, orchestrator, repos, scorecard, telemetry
 
 _REPO_ENV = Path(__file__).resolve().parent.parent / ".env"
 
@@ -91,6 +91,8 @@ def main() -> None:
             sys.exit(1)
         sys.exit(orchestrator.run(loaded_repos, loaded_limits, watch=watch, no_stack=no_stack))
 
+    if remaining == ["scorecard"] and not watch:
+        sys.exit(scorecard.run(scorecard.runs_dir()))
     if remaining == ["grade"] and not watch:
         sys.exit(grade.run(grade.default_grades_dir(), grade.default_runs_dir()))
     if (
