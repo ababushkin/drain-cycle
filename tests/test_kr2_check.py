@@ -1,7 +1,7 @@
 """Tests for ``drain_cycle.kr2_check``.
 
-The KR2 schema check must exit 0 when every Done entry carries both verdicts,
-and exit 1 when any Done entry is missing either. Non-Done entries with null
+The KR2 schema check must exit 0 when every Done entry carries outcome_verdict,
+and exit 1 when any Done entry is missing it. Non-Done entries with null
 verdicts are always compliant (halt_reason explains the missing assessment).
 """
 from __future__ import annotations
@@ -19,14 +19,12 @@ def _entry(
     *,
     state: str = "Done",
     outcome_verdict: object = None,
-    prep_verdict: object = None,
     halt_reason: object = None,
 ) -> dict:
     return {
         "issue_identifier": identifier,
         "final_linear_state": state,
         "outcome_verdict": outcome_verdict,
-        "prep_verdict": prep_verdict,
         "halt_reason": halt_reason,
     }
 
@@ -38,25 +36,14 @@ def _write_log(path: Path, entries: list[dict]) -> Path:
 
 
 _OV = {"result": "pass", "findings": [], "invoked_at": "2026-01-01T00:00:00Z"}
-_PV = {"result": "ok", "route": "auto-merge", "reasoning": "looks good"}
 
 
 def test_compliant_log_exits_zero(tmp_path: Path) -> None:
-    log = _write_log(tmp_path, [_entry("ABA-1", outcome_verdict=_OV, prep_verdict=_PV)])
+    log = _write_log(tmp_path, [_entry("ABA-1", outcome_verdict=_OV)])
     assert main([str(log)]) == 0
 
 
 def test_done_entry_missing_outcome_verdict_exits_one(tmp_path: Path) -> None:
-    log = _write_log(tmp_path, [_entry("ABA-1", prep_verdict=_PV)])
-    assert main([str(log)]) == 1
-
-
-def test_done_entry_missing_prep_verdict_exits_one(tmp_path: Path) -> None:
-    log = _write_log(tmp_path, [_entry("ABA-1", outcome_verdict=_OV)])
-    assert main([str(log)]) == 1
-
-
-def test_done_entry_missing_both_verdicts_exits_one(tmp_path: Path) -> None:
     log = _write_log(tmp_path, [_entry("ABA-1")])
     assert main([str(log)]) == 1
 
@@ -73,8 +60,8 @@ def test_mixed_log_exits_one_for_bad_done_entry(tmp_path: Path) -> None:
     log = _write_log(
         tmp_path,
         [
-            _entry("ABA-1", outcome_verdict=_OV, prep_verdict=_PV),
-            _entry("ABA-2"),  # Done, missing verdicts
+            _entry("ABA-1", outcome_verdict=_OV),
+            _entry("ABA-2"),  # Done, missing outcome_verdict
         ],
     )
     assert main([str(log)]) == 1
@@ -97,6 +84,5 @@ def test_unreadable_file_exits_one(tmp_path: Path) -> None:
 def test_check_file_returns_violations(tmp_path: Path) -> None:
     log = _write_log(tmp_path, [_entry("ABA-1")])
     violations = check_file(log)
-    assert len(violations) == 2
+    assert len(violations) == 1
     assert any("outcome_verdict" in v for v in violations)
-    assert any("prep_verdict" in v for v in violations)

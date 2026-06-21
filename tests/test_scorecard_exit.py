@@ -15,7 +15,7 @@ from drain_cycle import scorecard
 
 _PASS_VERDICT = {"result": "pass", "findings": [], "invoked_at": "2026-05-22T10:05:00+00:00"}
 _FAIL_VERDICT = {"result": "fail", "findings": ["not met"], "invoked_at": "2026-05-22T10:05:00+00:00"}
-_GO_VERDICT = {"result": "GO", "findings": [], "invocation_id": "abc"}
+_GO_VERDICT = {"result": "go", "findings": [], "invocation_id": "abc"}
 
 
 def _write_run(runs_dir: Path, cycle_id: str, entries: list[dict], filename: str) -> None:
@@ -211,3 +211,22 @@ def test_multi_cycle_overall_aggregates_all(
     scorecard.run(runs_dir)
     out = capsys.readouterr().out
     assert "2/3 (67%)" in out
+
+
+def test_fail_verdict_not_counted_correct(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Regression: a FAIL outcome_verdict must show 0/1 correct, not 1/1.
+
+    The old grade.py bug (grade.py:131) never read outcome_verdict.result and
+    counted every Done entry as passing. The scorecard must not repeat this.
+    """
+    runs_dir = tmp_path / "runs"
+    _write_run(
+        runs_dir, "cycle-1",
+        [_done_entry("ABA-1", _FAIL_VERDICT)],
+        "cycle-1-20260522T100000000000Z.json",
+    )
+    scorecard.run(runs_dir)
+    out = capsys.readouterr().out
+    assert "overall pass-rate: 0/1" in out

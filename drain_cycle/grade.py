@@ -24,11 +24,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from . import grade_draft, runlog
+from . import runlog
 
 
 def default_grades_dir() -> Path:
-    return grade_draft.grades_dir()
+    return Path.home() / ".drain-cycle" / "grades"
 
 
 def default_runs_dir() -> Path:
