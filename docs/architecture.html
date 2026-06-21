@@ -302,7 +302,7 @@
       <div class="preamble">
         <p>Shipping a piece of agentic work is never one action — it is a sequence: code it, review it against the right standards, open the PR, make the description read well. A capable agent handles any one of these steps, one at a time, and driving each by hand holds up fine while the work is small. As the work grows more complex, that hand-driving breaks down — and what breaks reveals that the operator was holding three fused jobs together: the <strong>state</strong> (where the work stands), the <strong>steps</strong> (what runs, in what order, to what standard), and the <strong>supervision</strong> (moving each piece from one step to the next). Holding all three by hand carries two costs: execution quality swings with the operator's discipline on the day, and the operator must drive every transition by hand instead of planning the next work.</p>
         <p>So the question this architecture answers: how do you build the thing that holds the work together once — so the workflow runs the same way every time, without a person driving it — and how do the pieces of that system fit together?</p>
-        <p>The answer is two layers over one shared record. <strong>Layer 1 — supervision</strong> (<code>drain-cycle</code>) drives the work and grades each result. <strong>Layer 2 — workflow</strong> (the Shaper pack) is the procedure itself, captured as composable skills. They meet at an <strong>artifact boundary</strong>: Layer 2 writes signals, Layer 1 reads them, and neither reaches inside the other. Both work off one <strong>state plane</strong> — a single authoritative record of where the work stands. The move that makes this real is small: <code>prompt.py</code> stops inlining the workflow and becomes a thin pointer at the workflow's front door, <code>exec:pickup</code>. The pack then owns the procedure, so any vendor's worker follows the same prose. The payoff removes both costs above — the workflow is captured once and a content-blind supervisor runs it unattended, so execution is consistent on every run instead of varying by the day, and the operator is needed only to point the system at planned work and to step in when a run halts.</p>
+        <p>The answer is two layers over one shared record. <strong>Layer 1 — supervision</strong> (<code>drain-cycle</code>) drives the work and scores each result. <strong>Layer 2 — workflow</strong> (the Shaper pack) is the procedure itself, captured as composable skills. They meet at an <strong>artifact boundary</strong>: Layer 2 writes signals, Layer 1 reads them, and neither reaches inside the other. Both work off one <strong>state plane</strong> — a single authoritative record of where the work stands. The move that makes this real is small: <code>prompt.py</code> stops inlining the workflow and becomes a thin pointer at the workflow's front door, <code>exec:pickup</code>. The pack then owns the procedure, so any vendor's worker follows the same prose. The payoff removes both costs above — the workflow is captured once and a content-blind supervisor runs it unattended, so execution is consistent on every run instead of varying by the day, and the operator is needed only to point the system at planned work and to step in when a run halts.</p>
       </div>
 
       <div class="diagram diagram-apex" role="img" aria-label="Apex architecture diagram: operator points the control plane at planned work; the control plane spawns one execution-coordinator per unit; the coordinator drives a planned unit (project containing milestone containing task) through three Layer 2 phase skills, with review altitudes rolling up the right side.">
@@ -414,14 +414,14 @@
     <div class="act-head" id="act1">
       <div class="act-kicker">Structure</div>
       <h2 class="act-title">The split: two layers, one record</h2>
-      <p class="act-tldr">Two layers over one authoritative record — a supervisor that drives and grades, a workflow pack that holds the procedure as skills.</p>
+      <p class="act-tldr">Two layers over one authoritative record — a supervisor that drives and scores, a workflow pack that holds the procedure as skills.</p>
     </div>
 
     <section class="s" id="s1">
       <header><span class="ix">§1</span><h2>Split the work into two layers, one product</h2></header>
       <p>The work splits into two layers:</p>
       <ul>
-        <li><strong>Layer 1 — supervision (<code>drain-cycle</code>).</strong> Picks up a body of planned work and spawns a worker per phase per issue, holding the guardrails — halting, reverting, resuming, or recovering as the run demands. It then records and grades each outcome. It is vendor-agnostic: each worker is a <code>claude -p</code> (or any equivalent) subprocess.</li>
+        <li><strong>Layer 1 — supervision (<code>drain-cycle</code>).</strong> Picks up a body of planned work and spawns a worker per phase per issue, holding the guardrails — halting, reverting, resuming, or recovering as the run demands. It then records and scores each outcome. It is vendor-agnostic: each worker is a <code>claude -p</code> (or any equivalent) subprocess.</li>
         <li><strong>Layer 2 — workflow (the Shaper pack).</strong> The intra-issue procedure, captured as composable skills: how a piece of work goes from picked-up to merged PR. This is the knowledge that used to live in the operator's head, written down once.</li>
       </ul>
       <p>The vision's three pieces map onto this split: "one place for state" is the state plane (§7), "the steps become skills" is Layer 2, and "the supervision becomes a supervisor" is Layer 1.</p>
@@ -444,12 +444,12 @@
         <span class="pl-step">exec:finish</span>
       </div>
       <p><code>exec:pickup</code> is the front door; <code>exec:review</code> fans out reviewer personas; <code>exec:finish</code> is Graphite-first with a plain-git fallback and produces the trail artefacts (What/Why/Focus PR body, review-summary comment, Linear status move).</p>
-      <p>Every step is also a standalone skill, so a human can run any one by hand. The <strong>execution-state file</strong> carries the issue's acceptance criteria from pickup through to review, so the spec-compliance persona can grade <em>built-the-wrong-thing</em>, not just <em>built-it-badly</em>.</p>
+      <p>Every step is also a standalone skill, so a human can run any one by hand. The <strong>execution-state file</strong> carries the issue's acceptance criteria from pickup through to review, so the spec-compliance persona can catch <em>built-the-wrong-thing</em>, not just <em>built-it-badly</em>.</p>
     </section>
 
     <section class="s" id="s3">
       <header><span class="ix">§3</span><h2>Layer 1 owns process, not procedure</h2></header>
-      <p><code>drain-cycle</code> owns process concerns only: spawn, guardrails, halt, revert, resume, recover, record, grade. It reads Linear state and the worker's artifacts to decide whether to advance to the next issue or stop. It does not contain workflow prose — the worker's prompt points at the entry skill and the procedure lives in Layer 2.</p>
+      <p><code>drain-cycle</code> owns process concerns only: spawn, guardrails, halt, revert, resume, recover, record, score. It reads Linear state and the worker's artifacts to decide whether to advance to the next issue or stop. It does not contain workflow prose — the worker's prompt points at the entry skill and the procedure lives in Layer 2.</p>
       <p>The supervisor mechanics are documented in the ADRs under <code>docs/adrs/</code>.</p>
     </section>
 
@@ -611,17 +611,17 @@ me         → review the finished work; step in only where it halted</code></pr
       <header><span class="ix">§9</span><h2>Extend the autonomy horizon as the run-logs earn trust</h2></header>
       <p>The autonomy horizon is how far the supervisor runs without the operator. Today it drains a cycle transactionally — one issue, one worker, one diff — and halts when it runs out of runnable work or hits a result it cannot get past. It widens as the records earn more trust: building on unmerged work, auto-merging trusted classes, and eventually a resident process that watches its own PRs through the review-and-merge loop. That work is shaped in <a href="ideas/drain-past-the-merge-gate.md"><code>ideas/drain-past-the-merge-gate.md</code></a>.</p>
       <p>Widening is a deliberate trade, not a default: the supervisor runs unattended only where the delayed feedback loop (§7) makes it safe to stop watching live.</p>
-      <p><code>grade</code> is how that trust is measured. It reads every run-log under <code>~/.drain-cycle/runs/</code> and scores the series — a Done-rate per cycle, a trend across the last three, the <code>(final_linear_state, exit_code)</code> failures that recur, and a verdict band the operator reads against their own kill rule:</p>
+      <p><code>scorecard</code> is how that trust is measured. It reads every run-log under <code>~/.drain-cycle/runs/</code> and scores the series — a correctness rate per cycle, the <code>(outcome_verdict, review_verdict)</code> failures that recur, and a verdict the operator reads against their own kill rule:</p>
 
       <pre class="code-py"><code><span class="tok-kw">def</span> <span class="tok-fn">verdict</span>(cycles):                              <span class="tok-com"># cycles built from ~/.drain-cycle/runs/*.json</span>
-    recent = [c.completion_percent <span class="tok-kw">for</span> c <span class="tok-kw">in</span> cycles[-3:]]   <span class="tok-com"># Done-rate per cycle</span>
+    recent = [c.correctness_percent <span class="tok-kw">for</span> c <span class="tok-kw">in</span> cycles[-3:]]   <span class="tok-com"># correct-rate per cycle</span>
     trend  = <span class="tok-fn">_trend_label</span>(recent)                 <span class="tok-com"># improving / flat / regressing</span>
     pct    = recent[-1]
     <span class="tok-kw">if</span> pct &gt;= 80:  <span class="tok-kw">return</span> <span class="tok-str">"HEALTHY"</span>               <span class="tok-com"># the horizon may widen</span>
     <span class="tok-kw">if</span> pct &gt;= 50:  <span class="tok-kw">return</span> <span class="tok-str">"WATCH"</span>
     <span class="tok-kw">return</span> <span class="tok-str">"CONCERNING"</span>                          <span class="tok-com"># pull it back</span></code></pre>
 
-      <p>Records (§7) feed grades, and grades decide whether the supervisor takes on more: it drains, records, grades, then decides how far to go next.</p>
+      <p>Records (§7) feed the scorecard, and the scorecard decides whether the supervisor takes on more: it drains, records, scores, then decides how far to go next.</p>
     </section>
 
     <section class="s" id="s10">

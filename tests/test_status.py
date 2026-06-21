@@ -48,7 +48,7 @@ def test_status_no_marker(
     assert rc == 0
     out = capsys.readouterr().out
     assert "No active" in out
-    assert "grade" in out
+    assert "scorecard" in out
 
 
 def test_status_stale_marker(

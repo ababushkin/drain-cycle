@@ -218,7 +218,7 @@ def test_fail_verdict_not_counted_correct(
 ) -> None:
     """Regression: a FAIL outcome_verdict must show 0/1 correct, not 1/1.
 
-    The old grade.py bug (grade.py:131) never read outcome_verdict.result and
+    The pre-scorecard grading bug never read outcome_verdict.result and
     counted every Done entry as passing. The scorecard must not repeat this.
     """
     runs_dir = tmp_path / "runs"
