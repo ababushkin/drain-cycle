@@ -167,6 +167,7 @@ class RunLog:
         is_error: bool | None = None,
         outcome_verdict: dict[str, Any] | None = None,
         prep_verdict: dict[str, Any] | None = None,
+        review_verdict: dict[str, Any] | None = None,
         responder_runs: list[dict[str, Any]] | None = None,
         finishing_runs: list[dict[str, Any]] | None = None,
     ) -> None:
@@ -193,6 +194,7 @@ class RunLog:
                 "is_error": is_error,
                 "outcome_verdict": outcome_verdict,
                 "prep_verdict": prep_verdict,
+                "review_verdict": review_verdict,
                 "responder_runs": responder_runs if responder_runs is not None else [],
                 "finishing_runs": finishing_runs if finishing_runs is not None else [],
             }
