@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from drain_cycle import cli, grade, limits, orchestrator, repos, status
+from drain_cycle import cli, grade, limits, orchestrator, repos, scorecard, status
 
 _SECRET = "DRAIN_CYCLE_TEST_SECRET"
 
@@ -317,6 +317,26 @@ def test_watch_flag_no_warning_when_tmux_set(
     # No TMUX warning on stderr (drain-cycle: picked ... lines are fine).
     stderr_lines = [l for l in captured.err.splitlines() if "tmux" in l.lower() and "warning" in l.lower()]
     assert stderr_lines == []
+
+
+def test_scorecard_subcommand_dispatches_to_scorecard_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called: list[bool] = []
+
+    def fake_run(_runs_dir: object) -> int:
+        called.append(True)
+        return 0
+
+    monkeypatch.setattr(scorecard, "run", fake_run)
+    monkeypatch.setattr(cli, "load_dotenv", lambda *_a, **_kw: False)
+    monkeypatch.setattr("sys.argv", ["drain-cycle", "scorecard"])
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 0
+    assert called == [True]
 
 
 def test_no_stack_flag_passes_no_stack_true_to_orchestrator(
