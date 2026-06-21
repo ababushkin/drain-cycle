@@ -16,8 +16,8 @@ from drain_cycle import scorecard
 
 _PASS_VERDICT = {"result": "pass", "findings": [], "invoked_at": "2026-05-22T10:05:00+00:00"}
 _FAIL_VERDICT = {"result": "fail", "findings": ["not met"], "invoked_at": "2026-05-22T10:05:00+00:00"}
-_GO_VERDICT = {"result": "GO", "findings": [], "invocation_id": "abc"}
-_NOGO_VERDICT = {"result": "NO-GO", "findings": ["review failed"], "invocation_id": "def"}
+_GO_VERDICT = {"result": "go", "findings": [], "invocation_id": "abc"}
+_NOGO_VERDICT = {"result": "no-go", "findings": ["review failed"], "invocation_id": "def"}
 
 
 def _write_run(
