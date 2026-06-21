@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from dataclasses import dataclass, field, replace as dataclass_replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,7 +19,7 @@ from typing import Callable, TextIO
 
 from opentelemetry.trace import Span
 
-from . import console, grade_draft, handoff, linear, model, progress, prompt, runlog, stop_guard, telemetry, worker, worktree
+from . import console, grade_draft, handoff, linear, model, progress, prompt, runlog, stop_guard, swimlanes, telemetry, worker, worktree
 from . import watch as watch_pane
 from .limits import Limits, check_cycle
 from .linear import DependencyCycleError
@@ -379,11 +380,21 @@ def _run(
     repo_baton: dict[str, str] = {}
 
     total = len(plan.order)
+    # Cycle queue rendered above the live stepper row, sourced from the
+    # orchestrator's pick order — the renderer never recomputes this.
+    # Mutated in place as each issue starts (queued → running) and finishes
+    # (running → done), so a multi-issue drain shows live lane state.
+    queue: list[swimlanes.QueueItem] = [
+        swimlanes.QueueItem(identifier=i["identifier"], state="queued")
+        for i in plan.order
+    ]
     for index, issue in enumerate(plan.order):
         # Kill the pane from the previous issue before opening one for this issue.
         if current_pane_id is not None:
             watch_pane.close_pane(current_pane_id)
             current_pane_id = None
+
+        _mark_queue(queue, issue["identifier"], "running")
 
         halt_code, current_pane_id = _drain_one_issue(
             issue,
@@ -398,10 +409,13 @@ def _run(
             in_tmux=in_tmux,
             no_stack=no_stack,
             repo_baton=repo_baton,
+            queue=queue,
         )
         if halt_code is not None:
             _emit_summary(log, total=total, halted_on=issue["identifier"])
             return halt_code  # type: ignore[return-value]
+
+        _mark_queue(queue, issue["identifier"], "done")
 
         # Cycle-wide circuit breaker: every issue may stay under its own
         # per-issue caps while their sum drains the quota. Check the
@@ -427,6 +441,16 @@ def _run(
     return 0
 
 
+def _mark_queue(
+    queue: list[swimlanes.QueueItem], identifier: str, state: str
+) -> None:
+    """In-place lane-state advance for the cycle queue. Unknown id is a no-op."""
+    for i, item in enumerate(queue):
+        if item.identifier == identifier:
+            queue[i] = swimlanes.QueueItem(identifier=identifier, state=state)
+            return
+
+
 def _drain_one_issue(
     issue: dict,
     *,
@@ -441,6 +465,7 @@ def _drain_one_issue(
     in_tmux: bool = False,
     no_stack: bool = False,
     repo_baton: dict[str, str] | None = None,
+    queue: list[swimlanes.QueueItem] | None = None,
 ) -> tuple[int | None, str | None]:
     """Drain a single issue end to end inside a ``drain.issue`` span.
 
@@ -663,6 +688,29 @@ def _drain_one_issue(
         prep_verdict: dict | None = None
         responder_runs: list[dict] = []
 
+        step_renderer = swimlanes.StepRenderer(sys.stderr)
+        if queue is not None:
+            step_renderer.set_queue(queue)
+        keyboard = swimlanes.KeyboardListener(step_renderer)
+        keyboard.start()
+
+        # Chain the swimlanes proof-of-life sub-status onto the existing
+        # progress callback so the renderer flips the active step's sub-line
+        # on every new assistant turn (`turn N · X tok · 12.3s`).
+        base_on_progress = _make_on_progress(marker, identifier)
+
+        def _on_progress(
+            turns: int,
+            cumulative_tokens: int,
+            peak_context_tokens: int,
+            cost_usd: float | None,
+            elapsed_seconds: float,
+        ) -> None:
+            base_on_progress(
+                turns, cumulative_tokens, peak_context_tokens, cost_usd, elapsed_seconds
+            )
+            step_renderer.on_progress(turns, cumulative_tokens, elapsed_seconds)
+
         try:
             result = worker.run_issue(
                 claude_cmd=_CLAUDE_CMD,
@@ -675,10 +723,13 @@ def _drain_one_issue(
                 debug_file=debug_file,
                 external_stream=external_stream,
                 kill_fn=kill_fn,
-                on_progress=_make_on_progress(marker, identifier),
+                on_progress=_on_progress,
+                on_step=step_renderer.feed,
                 passthrough=console.AgentSink(),
             )
         finally:
+            keyboard.stop()
+            step_renderer.finalize()
             progress.clear()
             if session is not None:
                 session.cleanup()
