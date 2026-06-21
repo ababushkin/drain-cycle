@@ -142,7 +142,7 @@ def test_legacy_handoff_file_is_not_read(tmp_path: Path) -> None:
     }
     (tmp_path / ".drain-handoff.json").write_text(json.dumps(legacy_payload))
     assert read(tmp_path) is None
-    assert read_partial(tmp_path) == (None, None)
+    assert read_partial(tmp_path) == (None, None, None)
 
 
 # --- verify section → outcome_verdict ---
@@ -228,28 +228,37 @@ def test_read_partial_reads_verify_section_from_exec_state(tmp_path: Path) -> No
         }
     })
     assert read(tmp_path) is None
-    got_ov, got_pv = read_partial(tmp_path)
+    got_ov, got_pv, got_rv = read_partial(tmp_path)
     assert got_ov == {"result": "fail", "findings": ["does Y"]}
     assert got_pv is None
+    assert got_rv is None
 
 
-def test_read_partial_no_verify_section_returns_none_none(tmp_path: Path) -> None:
+def test_read_partial_surfaces_review_verdict(tmp_path: Path) -> None:
+    _write_exec_state(tmp_path, {
+        "review": {"verdict": "GO", "findings": []},
+    })
+    _, _, got_rv = read_partial(tmp_path)
+    assert got_rv == {"result": "go", "findings": []}
+
+
+def test_read_partial_no_verify_section_returns_none_none_none(tmp_path: Path) -> None:
     _write_exec_state(tmp_path, _finish([{"title": "t", "url": "https://x/pull/1"}]))
-    assert read_partial(tmp_path) == (None, None)
+    assert read_partial(tmp_path) == (None, None, None)
 
 
-def test_read_partial_returns_none_none_on_missing_file(tmp_path: Path) -> None:
-    assert read_partial(tmp_path) == (None, None)
+def test_read_partial_returns_none_none_none_on_missing_file(tmp_path: Path) -> None:
+    assert read_partial(tmp_path) == (None, None, None)
 
 
-def test_read_partial_returns_none_none_on_malformed_json(tmp_path: Path) -> None:
+def test_read_partial_returns_none_none_none_on_malformed_json(tmp_path: Path) -> None:
     (tmp_path / EXEC_STATE_FILE).write_text("not json{{{")
-    assert read_partial(tmp_path) == (None, None)
+    assert read_partial(tmp_path) == (None, None, None)
 
 
-def test_read_partial_returns_none_none_on_non_dict_payload(tmp_path: Path) -> None:
+def test_read_partial_returns_none_none_none_on_non_dict_payload(tmp_path: Path) -> None:
     _write_exec_state(tmp_path, [1, 2, 3])
-    assert read_partial(tmp_path) == (None, None)
+    assert read_partial(tmp_path) == (None, None, None)
 
 
 def test_exec_state_file_constant_value() -> None:
@@ -290,9 +299,10 @@ def test_pack_fixture_reads_through_supervisor(tmp_path: Path) -> None:
 
 def test_pack_fixture_read_partial_surfaces_verify_verdict(tmp_path: Path) -> None:
     (tmp_path / EXEC_STATE_FILE).write_text(_PACK_FIXTURE.read_text())
-    got_ov, got_pv = read_partial(tmp_path)
+    got_ov, got_pv, got_rv = read_partial(tmp_path)
     assert got_ov == {"result": "pass", "findings": []}
     assert got_pv is None
+    assert got_rv == {"result": "go", "findings": []}
 
 
 # --- review section → review_verdict ---

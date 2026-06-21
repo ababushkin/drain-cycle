@@ -41,7 +41,9 @@ _FAIL_VERDICT = {
 # are read from the ``verify`` section via read_partial.
 _HANDOFF = {
     "verify": {"verdict": "PASS", "ac_results": []},
+    "review": {"verdict": "GO", "findings": []},
 }
+_REVIEW_VERDICT = {"result": "go", "findings": []}
 _FAIL_HANDOFF = {
     "verify": {
         "verdict": "FAIL",
@@ -158,6 +160,7 @@ def test_done_path_entry_carries_verdicts_from_handoff(
     (entry,) = payload["entries"]
     assert entry["outcome_verdict"] == _OUTCOME_VERDICT
     assert entry["prep_verdict"] is None
+    assert entry["review_verdict"] == _REVIEW_VERDICT
     assert entry["halt_reason"] is None
 
 
@@ -193,6 +196,7 @@ def test_halt_path_entry_carries_halt_reason_and_partial_verdicts(
     # Verdicts from the partial handoff are carried despite the halt.
     assert entry["outcome_verdict"] == _OUTCOME_VERDICT
     assert entry["prep_verdict"] is None
+    assert entry["review_verdict"] == _REVIEW_VERDICT
 
 
 def _make_stateful_fakes(

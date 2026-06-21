@@ -222,6 +222,7 @@ class _WorkerOutcome:
     result: worker.WorkerResult
     outcome_verdict: dict | None = None
     prep_verdict: dict | None = None
+    review_verdict: dict | None = None
     responder_runs: list[dict] = field(default_factory=list)
 
 
@@ -237,6 +238,9 @@ def _set_verdict_span_attrs(
     prep_result = (outcome.prep_verdict or {}).get("result")
     if prep_result is not None:
         issue_span.set_attribute("issue.prep_verdict", prep_result)
+    review_result = (outcome.review_verdict or {}).get("result")
+    if review_result is not None:
+        issue_span.set_attribute("issue.review_verdict", review_result)
 
 
 @dataclass(frozen=True)
@@ -273,6 +277,7 @@ class _HaltContext:
             entry_fields = {
                 "outcome_verdict": outcome.outcome_verdict,
                 "prep_verdict": outcome.prep_verdict,
+                "review_verdict": outcome.review_verdict,
                 "responder_runs": outcome.responder_runs,
                 **_worker_log_fields(outcome.result),
             }
@@ -736,11 +741,12 @@ def _drain_one_issue(
         finished_at = _now_iso()
         # Read any verdicts the worker recorded in the handoff. M2+-populated
         # locals take precedence; handoff fills the gap when they are None.
-        _hov, _hpv = handoff.read_partial(worktree_path)
+        _hov, _hpv, _hrv = handoff.read_partial(worktree_path)
         outcome = _WorkerOutcome(
             result=result,
             outcome_verdict=outcome_verdict if outcome_verdict is not None else _hov,
             prep_verdict=prep_verdict if prep_verdict is not None else _hpv,
+            review_verdict=_hrv,
             responder_runs=responder_runs,
         )
 
@@ -849,12 +855,13 @@ def _drain_one_issue(
                 submitted = handoff.read(worktree_path) if stack else None
                 # Pull any verdicts the finishing agent wrote to the handoff so
                 # the verifier gate below uses the freshest available signal.
-                _fhov, _fhpv = handoff.read_partial(worktree_path)
-                if _fhov is not None or _fhpv is not None:
+                _fhov, _fhpv, _fhrv = handoff.read_partial(worktree_path)
+                if _fhov is not None or _fhpv is not None or _fhrv is not None:
                     outcome = dataclass_replace(
                         outcome,
                         outcome_verdict=_fhov if _fhov is not None else outcome.outcome_verdict,
                         prep_verdict=_fhpv if _fhpv is not None else outcome.prep_verdict,
+                        review_verdict=_fhrv if _fhrv is not None else outcome.review_verdict,
                     )
 
         if is_done or submitted is not None:
@@ -911,12 +918,13 @@ def _drain_one_issue(
                     # Propagate any verdicts the finishing agent wrote so the
                     # verifier gate below reads the freshest signal.
                     if submitted is not None:
-                        _fhov, _fhpv = handoff.read_partial(worktree_path)
-                        if _fhov is not None or _fhpv is not None:
+                        _fhov, _fhpv, _fhrv = handoff.read_partial(worktree_path)
+                        if _fhov is not None or _fhpv is not None or _fhrv is not None:
                             outcome = dataclass_replace(
                                 outcome,
                                 outcome_verdict=_fhov if _fhov is not None else outcome.outcome_verdict,
                                 prep_verdict=_fhpv if _fhpv is not None else outcome.prep_verdict,
+                                review_verdict=_fhrv if _fhrv is not None else outcome.review_verdict,
                             )
 
                 if stack and submitted is None:
@@ -1023,6 +1031,7 @@ def _drain_one_issue(
                 halt_reason=remove_error,
                 outcome_verdict=outcome.outcome_verdict,
                 prep_verdict=outcome.prep_verdict,
+                review_verdict=outcome.review_verdict,
                 responder_runs=outcome.responder_runs,
                 finishing_runs=finishing_runs,
                 **_worker_log_fields(outcome.result),
