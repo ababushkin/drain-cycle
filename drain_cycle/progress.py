@@ -3,7 +3,7 @@
 The orchestrator writes the marker just before spawning each worker and
 clears it once the worker returns (try/finally, every exit path). A
 ``drain-cycle status`` in a second terminal reads the marker to show what
-the run is doing. The file lives above ``runs/`` so ``grade``'s
+the run is doing. The file lives above ``runs/`` so ``scorecard``'s
 ``runs/*.json`` glob never sees it.
 
 Schema::

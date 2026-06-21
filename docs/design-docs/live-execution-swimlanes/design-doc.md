@@ -98,7 +98,7 @@ File-watch `exec-state.json`; infer active step as "the one after the last popul
 
 The pack writes an `_active` pointer as the natural, additive output of entering a step/persona — co-located with the `exec-state.json` section writes ADR 0030 already mandates. Carrier decision (active.json vs an `exec-state.json` pointer field) is an open question (OQ-3); either way the field is **non-gating by contract**:
 
-> **Invariant (boundary reconciliation).** The active-marker is read by Layer 1 **for display only**. No advancement, halt, grade, retry, exit code, or stop-guard decision may read it. It is to the swimlane what a run-log timestamp is to the run record: Layer-2-authored content the supervisor may *show* but never *decide on*. This keeps the feature inside architecture §5 — the supervisor stays content-blind for every decision; it gains sight only for the screen.
+> **Invariant (boundary reconciliation).** The active-marker is read by Layer 1 **for display only**. No advancement, halt, score, retry, exit code, or stop-guard decision may read it. It is to the swimlane what a run-log timestamp is to the run record: Layer-2-authored content the supervisor may *show* but never *decide on*. This keeps the feature inside architecture §5 — the supervisor stays content-blind for every decision; it gains sight only for the screen.
 
 This is the line that distinguishes "swimlanes" from "the supervisor now understands phases." It must be stated in the follow-up ADR and enforced by NFR-3's fault-injection test plus a guard test asserting no decision path imports the marker reader.
 

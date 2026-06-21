@@ -8,7 +8,7 @@ def run() -> int:
     """Read the active marker and print run status. Always exits 0."""
     marker = progress.read()
     if marker is None:
-        print("No active drain-cycle run. Use `drain-cycle grade` to review completed runs.")
+        print("No active drain-cycle run. Use `drain-cycle scorecard` to review completed runs.")
         return 0
 
     pid = marker.get("pid")

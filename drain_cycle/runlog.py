@@ -71,9 +71,9 @@ setup-failure halts) carry ``null`` for ``model`` / ``usage`` /
 ``cost_usd`` / ``num_turns`` / ``session_id`` / ``is_error``; every entry
 keeps the same key set. ``usage.cumulative`` is the billed-token total
 across turns; ``usage.peak_context`` is the largest single-turn context.
-These fields are additive — ``grade.py`` reads only ``cycle_id`` and
-``entries[].final_linear_state`` / ``exit_code``, so existing run logs
-without them grade unchanged.
+These fields are additive — ``scorecard.py`` reads them all and treats
+``null`` values as zero or absent, so existing run logs without them
+score unchanged.
 
 ``cycle_cost_usd`` and ``cycle_tokens_cumulative`` are per-invocation
 totals over ``entries`` (entries with ``null`` cost or usage contribute

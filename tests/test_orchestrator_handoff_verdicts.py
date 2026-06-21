@@ -279,6 +279,6 @@ def test_verifier_fail_verdict_halts_cycle(
     assert "outcome verifier fail" in entry["halt_reason"]
     assert entry["final_linear_state"] != "Done"
     assert entry["outcome_verdict"] == _FAIL_VERDICT
-    # cycle_halt_reason is set so grade can identify verifier-fail halts.
+    # cycle_halt_reason is set so the scorecard can identify verifier-fail halts.
     assert payload["cycle_halt_reason"] is not None
     assert "outcome verifier fail" in payload["cycle_halt_reason"]
