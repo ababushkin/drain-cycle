@@ -37,3 +37,4 @@ ADRs 0003 and 0004 are intentionally unused locally — those numbers name the p
 | [0029](0029-stop-guard-via-settings.md) | The stop-guard hook is injected at spawn via `--settings` | Accepted |
 | [0030](0030-execution-state-file.md) | The supervisor guarantees the execution state; each skill writes its own section | Accepted |
 | [0031](0031-scorecard-correctness-contract.md) | The scorecard correctness contract — outcome pass AND review GO | Accepted |
+| [0032](0032-non-gating-active-marker.md) | The `_active` step/persona marker is read for display only | Accepted |
