@@ -30,14 +30,25 @@ fixture.
 """
 from __future__ import annotations
 
+import json
+import logging
 import os
 import sys
 import threading
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, TextIO
 
 from drain_cycle.progress import fmt_elapsed as _fmt_elapsed
 from drain_cycle.progress import fmt_tokens as _fmt_tokens
+
+_log = logging.getLogger(__name__)
+
+_DEFAULT_STALE_THRESHOLD_S = 120.0
+"""Seconds since the ``_active`` marker last changed, while the run is still
+live, after which the renderer treats the marker as stale — a skill likely
+forgot to update or clear it. Display-only: a stale marker dims the last-known
+node and logs one warning; it never blocks the run (design-doc NFR-3)."""
 
 _DISABLE_ENV_VAR = "DRAIN_CYCLE_NO_SWIMLANES"
 """Setting this env var (to any truthy value) turns the swimlanes view off
@@ -95,6 +106,59 @@ class QueueItem:
 
     identifier: str
     state: str
+
+
+_EXEC_STATE_FILE = "exec-state.json"
+"""The pack-owned execution-state artifact (ADR 0030). The renderer reads its
+top-level ``_active`` pointer for display only — no decision path imports this
+reader (ADR 0032)."""
+
+
+@dataclass(frozen=True)
+class ActiveMarker:
+    """The currently-executing step and review persona, read from the pack's
+    ``_active`` pointer.
+
+    ``step`` is the phase name the executing ``exec:*`` skill is in (e.g.
+    ``"review"``). ``persona`` is the active review persona (e.g.
+    ``"code-quality"``) or ``None`` outside a persona dispatch. A single string,
+    last-write-wins, per ADR 0032 — never a set.
+    """
+
+    step: str
+    persona: str | None
+
+
+def read_active_marker(worktree_path: str | Path | None) -> ActiveMarker | None:
+    """Return the ``_active`` marker from ``exec-state.json``, or ``None``.
+
+    Display-only read across the artifact boundary (ADR 0032): the renderer
+    prefers this pointer over the stream-derived step so persona depth shows on
+    every worker, not just Claude Code. Returns ``None`` — never raises — when
+    the worktree path is unset, the file is absent or unreadable, the JSON is
+    malformed, or the ``_active`` pointer is missing or carries no string
+    ``step``. Every miss is a clean fall-back to the stream path, so an old pack
+    or a forgetful skill degrades rather than blocks.
+    """
+    if worktree_path is None:
+        return None
+    path = Path(worktree_path) / _EXEC_STATE_FILE
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    active = payload.get("_active")
+    if not isinstance(active, dict):
+        return None
+    step = active.get("step")
+    if not isinstance(step, str) or not step:
+        return None
+    persona = active.get("persona")
+    if not isinstance(persona, str) or not persona:
+        persona = None
+    return ActiveMarker(step=step, persona=persona)
 
 
 def parse_tool_use(block: Any) -> tuple[str, dict[str, Any]] | None:
@@ -207,8 +271,15 @@ class StepRenderer:
 
     _ACTIVE_GLYPH = "▶"
     _PRIOR_GLYPH = "·"
+    _STALE_GLYPH = "◌"
 
-    def __init__(self, stderr: TextIO, tty: bool | None = None) -> None:
+    def __init__(
+        self,
+        stderr: TextIO,
+        tty: bool | None = None,
+        worktree_path: str | Path | None = None,
+        stale_threshold_s: float = _DEFAULT_STALE_THRESHOLD_S,
+    ) -> None:
         self._stderr = stderr
         if is_disabled():
             tty = False
@@ -219,6 +290,12 @@ class StepRenderer:
             except Exception:
                 tty = False
         self._tty = tty
+        self._worktree_path = worktree_path
+        self._stale_threshold_s = stale_threshold_s
+        self._marker_fingerprint: tuple | None = None
+        self._marker_fresh_at: float | None = None
+        self._marker_stale = False
+        self._stale_warned = False
         self._tracker = StepTracker()
         self._queue: list[QueueItem] = []
         self._has_queue_row = False
@@ -275,7 +352,57 @@ class StepRenderer:
             f" · {_fmt_tokens(cumulative_tokens)} tok"
             f" · {_fmt_elapsed(elapsed_seconds)}"
         )
+        self._evaluate_staleness(elapsed_seconds)
         self._render()
+
+    def _marker_mtime(self) -> float | None:
+        if self._worktree_path is None:
+            return None
+        try:
+            return (Path(self._worktree_path) / _EXEC_STATE_FILE).stat().st_mtime
+        except OSError:
+            return None
+
+    def _evaluate_staleness(self, elapsed_seconds: float) -> None:
+        """Age the marker against the run clock; flag and warn once if stale.
+
+        Called from ``on_progress`` — so every evaluation happens while the run
+        is demonstrably live (a new assistant turn just landed). A marker that
+        stops changing past ``stale_threshold_s`` while turns keep advancing is
+        a skill that forgot to update or clear it: dim the last-known node and
+        log one warning. A marker-miss (no ``_active``) is not stale — there is
+        nothing to age — so it resets the state and falls back to the stream.
+        """
+        marker = read_active_marker(self._worktree_path)
+        if marker is None:
+            self._marker_fingerprint = None
+            self._marker_fresh_at = None
+            self._marker_stale = False
+            self._stale_warned = False
+            return
+        fingerprint = (self._marker_mtime(), marker.step, marker.persona)
+        if fingerprint != self._marker_fingerprint:
+            self._marker_fingerprint = fingerprint
+            self._marker_fresh_at = elapsed_seconds
+            self._marker_stale = False
+            self._stale_warned = False
+            return
+        age = elapsed_seconds - (self._marker_fresh_at or elapsed_seconds)
+        self._marker_stale = age > self._stale_threshold_s
+        if self._marker_stale and not self._stale_warned:
+            self._stale_warned = True
+            node = (
+                f"{marker.step} / {marker.persona}"
+                if marker.persona
+                else marker.step
+            )
+            _log.warning(
+                "swimlanes: _active marker stale (%.0fs since last update, run "
+                "still live) — showing last-known node %r dimmed; a skill may "
+                "have forgotten to update or clear it.",
+                age,
+                node,
+            )
 
     def _render(self) -> None:
         if not self._tty:
@@ -300,13 +427,36 @@ class StepRenderer:
         except (OSError, ValueError):
             pass
 
+    def _effective_active(self) -> tuple[str | None, str | None]:
+        """Resolve the active step and persona, marker-first.
+
+        The pack-written ``_active`` marker wins when present — it carries
+        persona depth on every worker and is rename-proof (ADR 0032). With no
+        marker (old pack, or a worker that writes none), fall back to the
+        stream-derived active step and a Claude-only ``None`` persona — the N02
+        path. A read failure is a miss, not a fault: the view degrades to the
+        stream, never blocks the run.
+        """
+        marker = read_active_marker(self._worktree_path)
+        if marker is not None:
+            return marker.step, marker.persona
+        return self._tracker.active, None
+
     def _render_stepper_row(self) -> str:
-        parts = [
-            f"{self._ACTIVE_GLYPH} {_safe_label(step)}"
-            if step == self._tracker.active
-            else f"{self._PRIOR_GLYPH} {_safe_label(step)}"
-            for step in self._tracker.history
-        ]
+        active_step, persona = self._effective_active()
+        steps = list(self._tracker.history)
+        if active_step is not None and active_step not in steps:
+            steps.append(active_step)
+        active_glyph = self._STALE_GLYPH if self._marker_stale else self._ACTIVE_GLYPH
+        parts = []
+        for step in steps:
+            if step == active_step:
+                label = f"{active_glyph} {_safe_label(step)}"
+                if persona:
+                    label = f"{label} / {_safe_label(persona)}"
+            else:
+                label = f"{self._PRIOR_GLYPH} {_safe_label(step)}"
+            parts.append(label)
         row = " ".join(parts)
         if self._sub_status:
             row = f"{row} · {_safe_label(self._sub_status)}"
@@ -349,6 +499,26 @@ class StepRenderer:
             self._stderr.flush()
         except (OSError, ValueError):
             pass
+
+
+def build_renderer(
+    stderr: TextIO,
+    *,
+    worktree_path: str | Path | None = None,
+    queue: list[QueueItem] | None = None,
+    tty: bool | None = None,
+) -> StepRenderer:
+    """Construct a :class:`StepRenderer` wired to the run's worktree and queue.
+
+    The single construction seam the orchestrator uses, so the worktree path
+    (the renderer reads the ``_active`` marker from ``exec-state.json`` there)
+    and the cycle queue are threaded in one place rather than at every call
+    site.
+    """
+    renderer = StepRenderer(stderr, tty=tty, worktree_path=worktree_path)
+    if queue is not None:
+        renderer.set_queue(queue)
+    return renderer
 
 
 class KeyboardListener:
