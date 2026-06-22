@@ -1,0 +1,37 @@
+Work on Linear issue ABA-430:
+
+<issue identifier="ABA-430">
+<title>N01 — Record the cycle_id overload decision (ADR + intake)</title>
+<description>
+**type:** adr
+
+## What
+
+Record why a project drain reuses the `cycle_id` identity field instead of renaming it, and file the intake record that routed this work.
+
+## Why
+
+A future maintainer who finds a `cycle_id` holding a project id needs the reason on record. The field is opaque identity at 11 of 13 sites; only `current_cycle_id()` and the `cycle:{id:{eq}}` filter read it as a cycle. Renaming it would touch 29 production and 136 test sites and break existing run-log archives.
+
+## Completion
+
+An ADR at `docs/adrs/0033-project-drain-identity.md` states the decision (overload `cycle_id`, do not rename), the context (site counts, archive compatibility), and the consequences (a cosmetic `target_kind` label fix). The shape:idea triage record exists at `docs/ideas/drain-project-target.md`.
+
+## Assumptions
+
+* ADRs carry no Linear ticket references *(verified)* — repo convention.
+* `docs/adrs/` numbering continues at 0033 *(verified)*.
+
+## Key Risks
+
+* The ADR drifts from the code if written after the fact. Mitigation: write it before N03 lands and link the consequence (the label fix) explicitly.
+
+### Tasks
+
+- [ ] Write `docs/adrs/0033-project-drain-identity.md` recording the overload decision. Done when: the file states the decision, context (the 11/13 and 29/136 site counts, archive compatibility), and consequences. Model: sonnet
+</description>
+<team name="Personal"/>
+<label>repo › drain-cycle</label>
+<label>model › sonnet</label>
+<project name="Drain a chosen Linear project, not only the active cycle"/>
+</issue>

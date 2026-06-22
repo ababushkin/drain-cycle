@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "ab9bbbe04d98",
+  "strategy": "manual-commit",
+  "branch": "anton/aba-430-record-cycle-id-overload-decision",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "docs/adrs/0033-project-drain-identity.md",
+    "docs/adrs/README.md",
+    "docs/ideas/drain-project-target.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ab/9bbbe04d98/0/metadata.json",
+      "transcript": "/ab/9bbbe04d98/0/full.jsonl",
+      "content_hash": "/ab/9bbbe04d98/0/content_hash.txt",
+      "prompt": "/ab/9bbbe04d98/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 25037,
+    "cache_creation_tokens": 114240,
+    "cache_read_tokens": 1024247,
+    "output_tokens": 13966,
+    "api_call_count": 17
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "ab9bbbe04d98",
+  "session_id": "ee8c4e3b-18e7-4233-8794-ac159d120500",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-22T09:53:57.896233Z",
+  "branch": "anton/aba-430-record-cycle-id-overload-decision",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "docs/adrs/0033-project-drain-identity.md",
+    "docs/adrs/README.md",
+    "docs/ideas/drain-project-target.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "bd3b2fb21981",
+  "token_usage": {
+    "input_tokens": 25037,
+    "cache_creation_tokens": 114240,
+    "cache_read_tokens": 1024247,
+    "output_tokens": 13966,
+    "api_call_count": 17
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-22T09:53:57.886791Z",
+    "agent_lines": 70,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 2,
+    "human_removed": 0,
+    "total_committed": 72,
+    "total_lines_changed": 72,
+    "agent_percentage": 97.22222222222221,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
