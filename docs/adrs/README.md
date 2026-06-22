@@ -38,3 +38,4 @@ ADRs 0003 and 0004 are intentionally unused locally — those numbers name the p
 | [0030](0030-execution-state-file.md) | The supervisor guarantees the execution state; each skill writes its own section | Accepted |
 | [0031](0031-scorecard-correctness-contract.md) | The scorecard correctness contract — outcome pass AND review GO | Accepted |
 | [0032](0032-non-gating-active-marker.md) | The `_active` step/persona marker is read for display only | Accepted |
+| [0033](0033-project-drain-identity.md) | A project drain overloads `cycle_id`; it does not rename the field | Accepted |
