@@ -328,6 +328,37 @@ def test_step_renderer_marker_step_without_persona_shows_no_separator(tmp_path):
     assert " / " not in out
 
 
+def test_live_drain_prefers_marker_then_falls_back_when_removed(tmp_path):
+    # End-to-end through the orchestrator's construction seam: the renderer
+    # follows the stream step until the pack writes _active, prefers the
+    # marker's persona while it is present, then falls back to the stream step
+    # the moment the marker is gone.
+    err = io.StringIO()
+    renderer = swimlanes.build_renderer(err, worktree_path=tmp_path, tty=True)
+
+    # Stream-only: no marker yet → today's step depth.
+    renderer.feed(_assistant_event("m1", _skill("exec:review")))
+    assert "exec:review" in err.getvalue()
+
+    # The pack writes the marker mid-run → persona depth appears.
+    _write_marker(tmp_path, "review", "code-quality")
+    err.truncate(0)
+    err.seek(0)
+    renderer.on_progress(2, 200, 2.0)
+    out = err.getvalue()
+    assert "review" in out
+    assert "code-quality" in out
+
+    # Marker cleared (old pack / forgot to write) → fall back to the stream.
+    (tmp_path / "exec-state.json").unlink()
+    err.truncate(0)
+    err.seek(0)
+    renderer.on_progress(3, 300, 3.0)
+    fallback = err.getvalue()
+    assert "exec:review" in fallback
+    assert "code-quality" not in fallback
+
+
 def test_build_renderer_threads_worktree_path_and_queue(tmp_path):
     # The orchestrator's construction seam must thread the worktree path so the
     # renderer reads the marker, and apply the queue in one call.
