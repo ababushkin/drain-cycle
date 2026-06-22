@@ -419,3 +419,33 @@ def test_project_composes_with_other_flags(
 
 def test_usage_string_documents_project_flag() -> None:
     assert "--project" in cli._USAGE
+
+
+def test_project_flag_followed_by_another_flag_exits_two(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "load_dotenv", lambda *_a, **_kw: False)
+    monkeypatch.setattr("sys.argv", ["drain-cycle", "--project", "--watch"])
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert "requires a value" in captured.err
+
+
+def test_project_flag_empty_equals_form_exits_two(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "load_dotenv", lambda *_a, **_kw: False)
+    monkeypatch.setattr("sys.argv", ["drain-cycle", "--project="])
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert "requires a value" in captured.err

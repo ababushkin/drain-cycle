@@ -78,13 +78,17 @@ def _parse_argv(
             watch = True
         elif a in _NO_STACK_FLAGS:
             no_stack = True
-        elif a == _PROJECT_FLAG and i + 1 < len(argv):
+        elif a == _PROJECT_FLAG and i + 1 < len(argv) and not argv[i + 1].startswith("-"):
             project = argv[i + 1]
             i += 1
         elif a == _PROJECT_FLAG:
             project_missing = True
         elif a.startswith(_PROJECT_FLAG + "="):
-            project = a[len(_PROJECT_FLAG) + 1:]
+            value = a[len(_PROJECT_FLAG) + 1:]
+            if value:
+                project = value
+            else:
+                project_missing = True
         else:
             remaining.append(a)
         i += 1
