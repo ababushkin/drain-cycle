@@ -349,7 +349,13 @@ def _run(
     debug = _debug_enabled()
     target_kind = "project" if project is not None else "cycle"
     if project is not None:
-        cycle_id = linear.resolve_project_id(project)
+        try:
+            cycle_id = linear.resolve_project_id(project)
+        except RuntimeError as exc:
+            halt_reason = f"Halt: {exc}"
+            telemetry.mark_error(cycle_span, "err-project-resolution", halt_reason)
+            console.halt(halt_reason)
+            return 1
     else:
         cycle_id = linear.current_cycle_id()
     cycle_span.set_attribute("drain.target_kind", target_kind)

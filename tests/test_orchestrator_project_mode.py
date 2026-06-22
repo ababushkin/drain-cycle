@@ -248,3 +248,43 @@ def test_drain_target_kind_span_attribute_records_cycle(
     )
     assert span.attrs["drain.target_kind"] == "cycle"
     assert span.attrs["drain.cycle_id"] == "cyc-1"
+
+
+def test_project_resolution_failure_halts_cleanly(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A ``resolve_project_id`` RuntimeError (not-found or ambiguous) lands
+    on stderr as a halt line and returns exit 1 — no traceback, no run-log
+    file."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    def fake_resolve(_name: str) -> str:
+        raise RuntimeError("Linear project 'Ghost' not found")
+
+    monkeypatch.setattr(linear, "resolve_project_id", fake_resolve)
+
+    # Linear-side helpers must not be called when resolution fails.
+    monkeypatch.setattr(
+        linear, "project_issues",
+        lambda _id: pytest.fail("project_issues called after resolve failure"),
+    )
+    monkeypatch.setattr(
+        linear, "current_cycle_id",
+        lambda: pytest.fail("current_cycle_id called in project mode"),
+    )
+
+    span = _RecordingSpan()
+    exit_code = orchestrator._run(
+        repos.Repos(mapping={}),
+        orchestrator.Limits(),
+        span,  # type: ignore[arg-type]
+        project="Ghost",
+    )
+    assert exit_code == 1
+    err = capsys.readouterr().err
+    assert "Halt: Linear project 'Ghost' not found" in err
+
+    runs_dir = tmp_path / ".drain-cycle" / "runs"
+    assert not runs_dir.exists() or not list(runs_dir.iterdir())
