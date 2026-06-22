@@ -81,9 +81,14 @@ def _stub_no_op_orchestrator(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
     calls: list[dict] = []
 
     def fake_run(
-        loaded_repos, loaded_limits, *, watch: bool = False, no_stack: bool = False
+        loaded_repos,
+        loaded_limits,
+        *,
+        watch: bool = False,
+        no_stack: bool = False,
+        project: str | None = None,
     ) -> int:
-        calls.append({"watch": watch, "no_stack": no_stack})
+        calls.append({"watch": watch, "no_stack": no_stack, "project": project})
         return 0
 
     monkeypatch.setattr(orchestrator, "run", fake_run)
@@ -101,7 +106,7 @@ def test_no_args_dispatches_to_orchestrator(monkeypatch: pytest.MonkeyPatch) -> 
         cli.main()
 
     assert exc.value.code == 0
-    assert calls == [{"watch": False, "no_stack": False}]
+    assert calls == [{"watch": False, "no_stack": False, "project": None}]
 
 
 @pytest.mark.parametrize("flag", ["-h", "--help"])
@@ -251,7 +256,7 @@ def test_watch_flag_passes_watch_true_to_orchestrator(
         cli.main()
 
     assert exc.value.code == 0
-    assert calls == [{"watch": True, "no_stack": False}]
+    assert calls == [{"watch": True, "no_stack": False, "project": None}]
 
 
 def test_watch_flag_prints_warning_when_tmux_not_set(
@@ -318,4 +323,43 @@ def test_no_stack_flag_passes_no_stack_true_to_orchestrator(
         cli.main()
 
     assert exc.value.code == 0
-    assert calls == [{"watch": False, "no_stack": True}]
+    assert calls == [{"watch": False, "no_stack": True, "project": None}]
+
+
+def test_project_flag_space_form_passes_value_to_orchestrator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _stub_no_op_orchestrator(monkeypatch)
+    monkeypatch.setattr("sys.argv", ["drain-cycle", "--project", "MyProject"])
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 0
+    assert calls == [{"watch": False, "no_stack": False, "project": "MyProject"}]
+
+
+def test_project_flag_equals_form_passes_value_to_orchestrator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _stub_no_op_orchestrator(monkeypatch)
+    monkeypatch.setattr("sys.argv", ["drain-cycle", "--project=MyProject"])
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 0
+    assert calls == [{"watch": False, "no_stack": False, "project": "MyProject"}]
+
+
+def test_zero_arg_passes_project_none_to_orchestrator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _stub_no_op_orchestrator(monkeypatch)
+    monkeypatch.setattr("sys.argv", ["drain-cycle"])
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 0
+    assert calls == [{"watch": False, "no_stack": False, "project": None}]

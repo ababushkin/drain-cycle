@@ -57,6 +57,33 @@ _USAGE = (
 
 _WATCH_FLAGS = frozenset(["--watch", "-w"])
 _NO_STACK_FLAGS = frozenset(["--no-stack"])
+_PROJECT_FLAG = "--project"
+
+
+def _parse_argv(
+    argv: list[str],
+) -> tuple[bool, bool, str | None, list[str]]:
+    """Return (watch, no_stack, project, remaining) from raw sys.argv[1:]."""
+    watch = False
+    no_stack = False
+    project: str | None = None
+    remaining: list[str] = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in _WATCH_FLAGS:
+            watch = True
+        elif a in _NO_STACK_FLAGS:
+            no_stack = True
+        elif a == _PROJECT_FLAG and i + 1 < len(argv):
+            project = argv[i + 1]
+            i += 1
+        elif a.startswith(_PROJECT_FLAG + "="):
+            project = a[len(_PROJECT_FLAG) + 1:]
+        else:
+            remaining.append(a)
+        i += 1
+    return watch, no_stack, project, remaining
 
 
 def main() -> None:
@@ -69,11 +96,7 @@ def main() -> None:
     telemetry.setup()
     argv = sys.argv[1:]
 
-    # Drain invocation: zero or more flags, no subcommand.
-    # Currently --watch/-w and --no-stack are recognised.
-    remaining = [a for a in argv if a not in _WATCH_FLAGS and a not in _NO_STACK_FLAGS]
-    watch = any(a in _WATCH_FLAGS for a in argv)
-    no_stack = any(a in _NO_STACK_FLAGS for a in argv)
+    watch, no_stack, project, remaining = _parse_argv(argv)
 
     if not remaining:
         if watch and not os.environ.get("TMUX"):
@@ -88,7 +111,7 @@ def main() -> None:
         except (repos.RepoConfigError, limits.LimitsConfigError) as exc:
             print(f"drain-cycle: {exc}", file=sys.stderr)
             sys.exit(1)
-        sys.exit(orchestrator.run(loaded_repos, loaded_limits, watch=watch, no_stack=no_stack))
+        sys.exit(orchestrator.run(loaded_repos, loaded_limits, watch=watch, no_stack=no_stack, project=project))
 
     if remaining == ["scorecard"] and not watch:
         sys.exit(scorecard.run(scorecard.runs_dir()))
