@@ -434,6 +434,26 @@ class StepRenderer:
             pass
 
 
+def build_renderer(
+    stderr: TextIO,
+    *,
+    worktree_path: str | Path | None = None,
+    queue: list[QueueItem] | None = None,
+    tty: bool | None = None,
+) -> StepRenderer:
+    """Construct a :class:`StepRenderer` wired to the run's worktree and queue.
+
+    The single construction seam the orchestrator uses, so the worktree path
+    (the renderer reads the ``_active`` marker from ``exec-state.json`` there)
+    and the cycle queue are threaded in one place rather than at every call
+    site.
+    """
+    renderer = StepRenderer(stderr, tty=tty, worktree_path=worktree_path)
+    if queue is not None:
+        renderer.set_queue(queue)
+    return renderer
+
+
 class KeyboardListener:
     """Raw-mode TTY keyboard watcher that routes digit keys to the renderer.
 

@@ -693,9 +693,9 @@ def _drain_one_issue(
         prep_verdict: dict | None = None
         responder_runs: list[dict] = []
 
-        step_renderer = swimlanes.StepRenderer(sys.stderr)
-        if queue is not None:
-            step_renderer.set_queue(queue)
+        step_renderer = swimlanes.build_renderer(
+            sys.stderr, worktree_path=worktree_path, queue=queue
+        )
         keyboard = swimlanes.KeyboardListener(step_renderer)
         keyboard.start()
 

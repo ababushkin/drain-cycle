@@ -328,6 +328,21 @@ def test_step_renderer_marker_step_without_persona_shows_no_separator(tmp_path):
     assert " / " not in out
 
 
+def test_build_renderer_threads_worktree_path_and_queue(tmp_path):
+    # The orchestrator's construction seam must thread the worktree path so the
+    # renderer reads the marker, and apply the queue in one call.
+    _write_marker(tmp_path, "review", "security-auditor")
+    err = io.StringIO()
+    queue = [swimlanes.QueueItem("ABA-1", "running")]
+    renderer = swimlanes.build_renderer(
+        err, worktree_path=tmp_path, queue=queue, tty=True
+    )
+    renderer.on_progress(1, 100, 1.0)
+    out = err.getvalue()
+    assert "security-auditor" in out
+    assert "ABA-1" in out
+
+
 def test_drain_stream_routes_events_to_step_callback_and_leaves_sink_untouched():
     err = io.StringIO()
     sink = io.StringIO()
