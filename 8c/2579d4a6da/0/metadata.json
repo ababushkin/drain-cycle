@@ -1,0 +1,226 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "8c2579d4a6da",
+  "session_id": "311642ee-507c-40ee-977b-417565577d69",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-22T05:32:03.183232Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "27fe92ff99c9",
+  "token_usage": {
+    "input_tokens": 28231,
+    "cache_creation_tokens": 288016,
+    "cache_read_tokens": 28123418,
+    "output_tokens": 152952,
+    "api_call_count": 156
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-shape-exec-pickup-2026-06-21T23:58:53.297807Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "shape-exec-pickup"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "87c8a859dc42",
+      "timestamp": "2026-06-21T23:58:53.297807Z",
+      "native": {
+        "command": "/shape-exec-pickup"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/shape-exec-pickup",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01LEt7qkxA2tDaCiHbmZS36j",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-exec-breakdown"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "27fe92ff99c9",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 126,
+        "end": 127,
+        "entry_ids": [
+          "ef78cc7a-a1aa-445d-a0e9-511572fa49d1"
+        ],
+        "tool_use_id": "toolu_01LEt7qkxA2tDaCiHbmZS36j"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01LEt7qkxA2tDaCiHbmZS36j"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-exec-breakdown",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01R6XEDFPM3hX1FkQHRcCGsC",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-exec-build"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "27fe92ff99c9",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 193,
+        "end": 194,
+        "entry_ids": [
+          "6ca2596b-0d4e-40d0-bec8-e0bc8694acad"
+        ],
+        "tool_use_id": "toolu_01R6XEDFPM3hX1FkQHRcCGsC"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01R6XEDFPM3hX1FkQHRcCGsC"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-exec-build",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01Mtdei25eDD8mNuG4cikNcT",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-exec-review"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "27fe92ff99c9",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 988,
+        "end": 989,
+        "entry_ids": [
+          "4bdb07be-0d46-4266-8ddf-5f65ccb1451b"
+        ],
+        "tool_use_id": "toolu_01Mtdei25eDD8mNuG4cikNcT"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Mtdei25eDD8mNuG4cikNcT"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-exec-review",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01TPZkEXbC9E3PWFQxUtrUqk",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-exec-verify"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "27fe92ff99c9",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1033,
+        "end": 1034,
+        "entry_ids": [
+          "3cd36df1-eadc-4ee1-9c79-c45c5c93013a"
+        ],
+        "tool_use_id": "toolu_01TPZkEXbC9E3PWFQxUtrUqk"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01TPZkEXbC9E3PWFQxUtrUqk"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-exec-verify",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_0171sXdu58yUTyhkvPabFMK5",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-exec-finish"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "27fe92ff99c9",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1055,
+        "end": 1056,
+        "entry_ids": [
+          "7fb71460-694b-4242-a21f-927085790902"
+        ],
+        "tool_use_id": "toolu_0171sXdu58yUTyhkvPabFMK5"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_0171sXdu58yUTyhkvPabFMK5"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-exec-finish",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-22T05:32:03.15427Z",
+    "agent_lines": 14,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 2,
+    "human_removed": 12,
+    "total_committed": 16,
+    "total_lines_changed": 28,
+    "agent_percentage": 50,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
