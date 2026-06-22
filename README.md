@@ -1,8 +1,8 @@
 # drain-cycle
 
-Run `drain-cycle` and watch it methodically build all of the deliverables in your planned project. 
+Run `drain-cycle` and watch it methodically build all of the deliverables in your planned project.
 
-Each task is built in an isolated worktree using a fresh `claude -p` session so it works with your regular Claude subscription (for now - until Anthropic change their license model). 
+Each task is built in an isolated worktree using a fresh `claude -p` session so it works with your regular Claude subscription (for now - until Anthropic change their license model).
 
 Future releases will include support for other models and other task management systems so that you're not coupled to Linear or Claude.
 
@@ -235,6 +235,22 @@ echo 'HONEYCOMB_API_KEY=hcaik_…' >> ~/.drain-cycle/.env
 ```
 
 Each invocation then emits one trace: a `drain.cycle` root span, a `drain.issue` span per attempted issue, and under those the spawned-session (`drain.worker.session`, carrying token/cost/turn usage), worktree (`drain.worktree.add`/`.remove`), and Linear (`linear.*`, wrapping the auto-instrumented `httpx` calls) spans. Traces land in a Honeycomb dataset named `drain-cycle`. Optional overrides: `HONEYCOMB_API_ENDPOINT` (default `https://api.honeycomb.io`; set the EU host for an EU team) and `OTEL_SERVICE_NAME` (default `drain-cycle`, which is also the dataset). See [`docs/adrs/0017-opentelemetry-tracing.md`](docs/adrs/0017-opentelemetry-tracing.md).
+
+## Troubleshooting
+
+### `mise ERROR error parsing config file` in a worktree
+
+Fix it once for the whole repo by trusting every mise config beneath it. Add this to a file your shell always sources (`~/.zshenv` for zsh), so the non-interactive shells that hooks run in pick it up too:
+
+```sh
+export MISE_TRUSTED_CONFIG_PATHS="$HOME/src/<repo>"
+```
+
+New shells read the variable automatically. To clear a worktree in an already-running shell without restarting it, trust that config directly:
+
+```sh
+mise trust ~/src/<repo>/.worktrees/<issue>/mise.toml
+```
 
 ## Design
 
