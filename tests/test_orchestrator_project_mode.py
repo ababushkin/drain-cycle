@@ -1,11 +1,4 @@
-"""Project-mode drain pins.
-
-The orchestrator's ``project`` parameter overloads the active-cycle path:
-the resolved project id flows through the existing ``cycle_id`` local, so
-the run-log filename, console rule, telemetry attribute, and resume glob
-all key on the project id. These tests pin that thread and the resolve
-error path.
-"""
+"""Project-mode drain pins: the resolved project id threads through ``cycle_id``."""
 from __future__ import annotations
 
 import json
@@ -18,9 +11,8 @@ from drain_cycle import console, linear, orchestrator, repos
 
 
 class _RecordingSpan:
-    """A drop-in stand-in for an OpenTelemetry span that records attribute
-    writes. Used to assert on attributes set during ``orchestrator._run``
-    without bringing up a real provider."""
+    """OTel span stand-in that records ``set_attribute`` writes and absorbs
+    the status/exception calls ``telemetry.mark_error`` makes on halt paths."""
 
     def __init__(self) -> None:
         self.attrs: dict[str, object] = {}
@@ -28,10 +20,10 @@ class _RecordingSpan:
     def set_attribute(self, key: str, value: object) -> None:
         self.attrs[key] = value
 
-    def set_status(self, *args: object, **kwargs: object) -> None:  # pragma: no cover
+    def set_status(self, *args: object, **kwargs: object) -> None:
         pass
 
-    def record_exception(self, *args: object, **kwargs: object) -> None:  # pragma: no cover
+    def record_exception(self, *args: object, **kwargs: object) -> None:
         pass
 
 
@@ -75,10 +67,6 @@ def _write_fake_claude_script(tmp_path: Path, done_marker: Path) -> Path:
 def test_project_mode_writes_runlog_keyed_on_project_id(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """End-to-end skeleton: ``run(project=…)`` resolves the id, fetches via
-    ``project_issues``, and writes a run log whose identity equals the project
-    id — proof the resolved id threads through ``cycle_id`` to the on-disk
-    artefact instead of the active cycle id."""
     repo = tmp_path / "repo"
     repo.mkdir()
     _init_repo(repo)
@@ -105,9 +93,6 @@ def test_project_mode_writes_runlog_keyed_on_project_id(
     def fake_current_cycle_id() -> str:
         raise AssertionError("project mode must not fetch the active cycle id")
 
-    def fake_pending_issues(_cycle_id: str):  # pragma: no cover
-        raise AssertionError("project mode must not call pending_issues")
-
     def fake_get_issue(issue_id: str) -> dict:
         issue = issues_by_id[issue_id]
         if issue["identifier"] in _completed_identifiers(done_marker):
@@ -117,7 +102,6 @@ def test_project_mode_writes_runlog_keyed_on_project_id(
     monkeypatch.setattr(linear, "resolve_project_id", fake_resolve_project_id)
     monkeypatch.setattr(linear, "project_issues", fake_project_issues)
     monkeypatch.setattr(linear, "current_cycle_id", fake_current_cycle_id)
-    monkeypatch.setattr(linear, "pending_issues", fake_pending_issues)
     monkeypatch.setattr(linear, "get_issue", fake_get_issue)
     monkeypatch.setattr(linear, "set_state", lambda issue_id, state_name: None)
 

@@ -322,11 +322,9 @@ def run(
     under it via ``_drain_one_issue``'s ``drain.issue`` spans, and the Linear,
     worktree, and worker spans nest under those — yielding one trace per drain.
 
-    When ``project`` is given (a name or UUID), the drain runs over that Linear
-    project's pending issues instead of the active cycle. The same ``cycle_id``
-    local carries the resolved project id through every downstream consumer —
-    run-log filename, resume-glob, progress marker, telemetry — overloading the
-    identity field per ADR 0033.
+    When ``project`` is set, the resolved project id overloads the ``cycle_id``
+    local so every downstream consumer (run-log filename, resume glob, progress
+    marker, telemetry) keys on it without branching. See ADR 0033.
     """
     if limits is None:
         limits = Limits()
