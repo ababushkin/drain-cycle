@@ -1,0 +1,21 @@
+/shape-idea drain-cycle should be able to drain a cycle or a project, project by passing it a parameter
+
+---
+
+yes
+
+---
+
+lets do a design
+
+---
+
+try again
+
+---
+
+try again
+
+---
+
+turn this into a project in linear

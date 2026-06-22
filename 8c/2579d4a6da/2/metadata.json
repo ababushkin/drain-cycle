@@ -1,0 +1,105 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "8c2579d4a6da",
+  "session_id": "fee4cbd6-8562-4b69-832e-09958fe3ab71",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-22T05:32:06.785359Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "README.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "d0865a4c5952",
+  "token_usage": {
+    "input_tokens": 23759,
+    "cache_creation_tokens": 258649,
+    "cache_read_tokens": 1937361,
+    "output_tokens": 39970,
+    "api_call_count": 29
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-shape-idea-2026-06-22T00:01:06.536188Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "shape-idea"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "6e121e7abbee",
+      "timestamp": "2026-06-22T00:01:06.536188Z",
+      "native": {
+        "command": "/shape-idea"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/shape-idea",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01NgJfgB8MRzKLxatpjK1eFa",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-delivery"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "d0865a4c5952",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 271,
+        "end": 272,
+        "entry_ids": [
+          "c120303e-389b-4752-8d86-2b4f2968dc0e"
+        ],
+        "tool_use_id": "toolu_01NgJfgB8MRzKLxatpjK1eFa"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01NgJfgB8MRzKLxatpjK1eFa"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-delivery",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-22T05:32:06.773116Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 2,
+    "human_removed": 12,
+    "total_committed": 0,
+    "total_lines_changed": 14,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 28,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "README.md": 28
+      }
+    }
+  ]
+}
