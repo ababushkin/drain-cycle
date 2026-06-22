@@ -363,3 +363,55 @@ def test_zero_arg_passes_project_none_to_orchestrator(
 
     assert exc.value.code == 0
     assert calls == [{"watch": False, "no_stack": False, "project": None}]
+
+
+def test_project_flag_missing_value_exits_two_with_clear_message(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "load_dotenv", lambda *_a, **_kw: False)
+    monkeypatch.setattr("sys.argv", ["drain-cycle", "--project"])
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert "requires a value" in captured.err
+    assert "usage:" in captured.err
+
+
+@pytest.mark.parametrize(
+    "argv_tail,expected",
+    [
+        (
+            ["--project", "MyProject", "--watch"],
+            {"watch": True, "no_stack": False, "project": "MyProject"},
+        ),
+        (
+            ["--watch", "--project", "MyProject"],
+            {"watch": True, "no_stack": False, "project": "MyProject"},
+        ),
+        (
+            ["--project", "MyProject", "--no-stack"],
+            {"watch": False, "no_stack": True, "project": "MyProject"},
+        ),
+        (
+            ["--no-stack", "--project", "MyProject"],
+            {"watch": False, "no_stack": True, "project": "MyProject"},
+        ),
+    ],
+)
+def test_project_composes_with_other_flags(
+    monkeypatch: pytest.MonkeyPatch,
+    argv_tail: list[str],
+    expected: dict,
+) -> None:
+    calls = _stub_no_op_orchestrator(monkeypatch)
+    monkeypatch.setattr("sys.argv", ["drain-cycle", *argv_tail])
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 0
+    assert calls == [expected]

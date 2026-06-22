@@ -62,11 +62,12 @@ _PROJECT_FLAG = "--project"
 
 def _parse_argv(
     argv: list[str],
-) -> tuple[bool, bool, str | None, list[str]]:
-    """Return (watch, no_stack, project, remaining) from raw sys.argv[1:]."""
+) -> tuple[bool, bool, str | None, list[str], bool]:
+    """Return (watch, no_stack, project, remaining, project_missing) from raw sys.argv[1:]."""
     watch = False
     no_stack = False
     project: str | None = None
+    project_missing = False
     remaining: list[str] = []
     i = 0
     while i < len(argv):
@@ -78,12 +79,14 @@ def _parse_argv(
         elif a == _PROJECT_FLAG and i + 1 < len(argv):
             project = argv[i + 1]
             i += 1
+        elif a == _PROJECT_FLAG:
+            project_missing = True
         elif a.startswith(_PROJECT_FLAG + "="):
             project = a[len(_PROJECT_FLAG) + 1:]
         else:
             remaining.append(a)
         i += 1
-    return watch, no_stack, project, remaining
+    return watch, no_stack, project, remaining, project_missing
 
 
 def main() -> None:
@@ -96,7 +99,12 @@ def main() -> None:
     telemetry.setup()
     argv = sys.argv[1:]
 
-    watch, no_stack, project, remaining = _parse_argv(argv)
+    watch, no_stack, project, remaining, project_missing = _parse_argv(argv)
+
+    if project_missing:
+        print("drain-cycle: --project requires a value", file=sys.stderr)
+        print(_USAGE, file=sys.stderr)
+        sys.exit(2)
 
     if not remaining:
         if watch and not os.environ.get("TMUX"):
