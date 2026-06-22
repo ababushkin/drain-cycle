@@ -415,3 +415,7 @@ def test_project_composes_with_other_flags(
 
     assert exc.value.code == 0
     assert calls == [expected]
+
+
+def test_usage_string_documents_project_flag() -> None:
+    assert "--project" in cli._USAGE

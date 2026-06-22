@@ -44,15 +44,17 @@ def _load_secrets() -> None:
 
 
 _USAGE = (
-    "usage: drain-cycle [--watch|-w] [--no-stack]  drain the current Linear cycle\n"
-    "       drain-cycle scorecard                   report per-run quality from run logs\n"
-    "       drain-cycle status                      show status of the active run\n"
+    "usage: drain-cycle [--watch|-w] [--no-stack] [--project <name|id>]  drain the current Linear cycle\n"
+    "       drain-cycle scorecard                                         report per-run quality from run logs\n"
+    "       drain-cycle status                                            show status of the active run\n"
     "       drain-cycle --help\n"
     "\n"
     "options:\n"
-    "  --watch, -w      open a tmux split-pane per issue running the live\n"
-    "                   claude session (requires running inside tmux)\n"
-    "  --no-stack       push to main instead of stacking PRs (default: stack)"
+    "  --watch, -w           open a tmux split-pane per issue running the live\n"
+    "                        claude session (requires running inside tmux)\n"
+    "  --no-stack            push to main instead of stacking PRs (default: stack)\n"
+    "  --project <name|id>   drain a specific project instead of the active cycle;\n"
+    "                        accepts the project name or its Linear UUID"
 )
 
 _WATCH_FLAGS = frozenset(["--watch", "-w"])
