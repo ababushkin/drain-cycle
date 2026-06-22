@@ -207,3 +207,44 @@ def test_startup_plan_renders_project_label_when_target_kind_is_project(
     assert "project proj-xyz" in err
     # The cycle label must not leak when the target is a project.
     assert "cycle proj-xyz" not in err
+
+
+def test_drain_target_kind_span_attribute_records_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(linear, "resolve_project_id", lambda name: "proj-1")
+    monkeypatch.setattr(
+        linear, "project_issues",
+        lambda _id: linear.ExecutionPlan(order=[], deferred=[]),
+    )
+
+    span = _RecordingSpan()
+    orchestrator._run(
+        repos.Repos(mapping={}),
+        orchestrator.Limits(),
+        span,  # type: ignore[arg-type]
+        project="My Project",
+    )
+    assert span.attrs["drain.target_kind"] == "project"
+    assert span.attrs["drain.cycle_id"] == "proj-1"
+
+
+def test_drain_target_kind_span_attribute_records_cycle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "cyc-1")
+    monkeypatch.setattr(
+        linear, "pending_issues",
+        lambda _id: linear.ExecutionPlan(order=[], deferred=[]),
+    )
+
+    span = _RecordingSpan()
+    orchestrator._run(
+        repos.Repos(mapping={}),
+        orchestrator.Limits(),
+        span,  # type: ignore[arg-type]
+    )
+    assert span.attrs["drain.target_kind"] == "cycle"
+    assert span.attrs["drain.cycle_id"] == "cyc-1"

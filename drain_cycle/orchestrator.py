@@ -352,6 +352,7 @@ def _run(
         cycle_id = linear.resolve_project_id(project)
     else:
         cycle_id = linear.current_cycle_id()
+    cycle_span.set_attribute("drain.target_kind", target_kind)
     cycle_span.set_attribute("drain.cycle_id", cycle_id)
     log = runlog.RunLog(cycle_id=cycle_id)
     try:
