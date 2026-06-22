@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import io
 import json
+import pathlib
 import re
 
 import pytest
@@ -232,3 +233,31 @@ def test_usage_accumulator_totals_are_identical_feature_on_vs_off() -> None:
     # The sink (passthrough) is also untouched — the swimlanes layer does
     # not consume or mutate the non-JSON diagnostic stream.
     assert sink_on == sink_off
+
+
+_MARKER_READER = "read_active_marker"
+"""The marker-reader symbol the import guard pins to the renderer module."""
+
+
+def test_marker_reader_referenced_only_by_the_renderer_module() -> None:
+    """ADR 0032 display-only invariant: only the renderer (``swimlanes``) reads
+    the ``_active`` marker. No decision path — advancement, halt, grade, retry,
+    exit-code, stop-guard — may import or call ``read_active_marker``.
+
+    A static scan over ``drain_cycle/*.py``: every module except the renderer
+    that names the symbol is a boundary violation, caught at review before a
+    decision path can form against inside-phase content. The guard catches a
+    new importer the moment it is added — its job is to fail when the invariant
+    is broken, not to assert today's tree.
+    """
+    pkg = pathlib.Path(swimlanes.__file__).parent
+    offenders = sorted(
+        path.name
+        for path in pkg.glob("*.py")
+        if path.name != "swimlanes.py" and _MARKER_READER in path.read_text()
+    )
+    assert offenders == [], (
+        f"{_MARKER_READER} referenced outside the renderer module by: "
+        f"{offenders} — ADR 0032 forbids any decision path from reading the "
+        f"_active marker."
+    )
