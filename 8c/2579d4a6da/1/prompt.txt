@@ -1,0 +1,10 @@
+/shape-exec-debug i'm seeing this error  PostToolUse:Edit hook error
+  ⎿  Failed with non-blocking status code: mise ERROR error parsing config file: ~/src/drain-cycle/.worktrees/ABA-412/mise.toml
+
+---
+
+lets add a troubleshooting section/common problems (give me a good framing here) to the readme in case other people face this issue when using drain-cycle + mise on projects
+
+---
+
+try again
