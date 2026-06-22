@@ -242,44 +242,38 @@ def resolve_project_id(name_or_id: str) -> str:
     return nodes[0]["id"]
 
 
-def pending_issues(cycle_id: str) -> ExecutionPlan:
-    """Return an ``ExecutionPlan`` for every Todo/Backlog issue in the cycle.
+def _pending_issues(filter_field: str, target_id: str) -> ExecutionPlan:
+    """Fetch pending issues filtered by ``filter_field: {id: {eq: target_id}}``.
 
-    No pagination: personal cycles fit comfortably in one page. If a cycle
-    ever exceeds 100 pending issues, that's a planning problem, not a tool
-    problem (see ``PRODUCT_RULES`` Rule A5 — focus is the multiplier).
-
-    Post-processing flattens two wire-shape fields:
-    - ``labels { nodes { name parent { name } } }`` → ``labels: list[str]``
-      (grouped labels rendered as ``"<group>:<name>"``)
-    - ``inverseRelations`` filtered to ``type == "blocks"``
-      → ``blockers: list[{id, identifier, state_type}]``; raw key removed.
+    ``filter_field`` is either ``"cycle"`` or ``"project"`` — both accept the
+    same ``id: {eq}`` sub-filter in the Linear API.  Post-processing is
+    identical for both: label flattening and blocker extraction.
     """
     data = _post(
-        """
-        query CyclePending($cycleId: ID!, $stateTypes: [String!]!) {
+        f"""
+        query Pending($targetId: ID!, $stateTypes: [String!]!) {{
           issues(
-            filter: {
-              cycle: { id: { eq: $cycleId } }
-              state: { type: { in: $stateTypes } }
-            }
+            filter: {{
+              {filter_field}: {{ id: {{ eq: $targetId }} }}
+              state: {{ type: {{ in: $stateTypes }} }}
+            }}
             first: 100
-          ) {
-            nodes {
+          ) {{
+            nodes {{
               id
               identifier
               title
               description
               sortOrder
-              state { type name }
-              labels { nodes { name parent { name } } }
-              inverseRelations { nodes { type issue { id identifier state { type } } } }
-            }
-          }
-        }
+              state {{ type name }}
+              labels {{ nodes {{ name parent {{ name }} }} }}
+              inverseRelations {{ nodes {{ type issue {{ id identifier state {{ type }} }} }} }}
+            }}
+          }}
+        }}
         """,
-        {"cycleId": cycle_id, "stateTypes": _PENDING_STATE_TYPES},
-        operation="pending_issues",
+        {"targetId": target_id, "stateTypes": _PENDING_STATE_TYPES},
+        operation=f"pending_{filter_field}",
     )
     issues = data["issues"]["nodes"]
     for issue in issues:
@@ -295,6 +289,19 @@ def pending_issues(cycle_id: str) -> ExecutionPlan:
         ]
         del issue["inverseRelations"]
     return _plan(issues)
+
+
+def pending_issues(cycle_id: str) -> ExecutionPlan:
+    """Return an ``ExecutionPlan`` for every Todo/Backlog issue in the cycle.
+
+    No pagination: personal cycles fit comfortably in one page.
+    """
+    return _pending_issues("cycle", cycle_id)
+
+
+def project_issues(project_id: str) -> ExecutionPlan:
+    """Return an ``ExecutionPlan`` for every Todo/Backlog issue in the project."""
+    return _pending_issues("project", project_id)
 
 
 def get_issue(issue_id: str) -> dict[str, Any]:
