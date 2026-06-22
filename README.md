@@ -100,10 +100,12 @@ uv tool install --reinstall .      # or rebuild from scratch after a change
 ## Usage
 
 ```
-drain-cycle
+drain-cycle [--watch|-w] [--no-stack] [--project <name|id>]
 ```
 
-Run from anywhere — `drain-cycle` resolves each issue's target repo from its `repo:<name>` label. Drains the current cycle's Todo/Backlog issues in manual (drag) order, respecting blocks/blocked-by, until either the cycle is empty (exit 0) or an issue halts (exit 1).
+Run from anywhere — `drain-cycle` resolves each issue's target repo from its `repo:<name>` label. With no flags it drains the current cycle's Todo/Backlog issues in manual (drag) order, respecting blocks/blocked-by, until either the cycle is empty (exit 0) or an issue halts (exit 1).
+
+Pass `--project <name|id>` to drain a specific Linear project instead of the active cycle. The value can be the project's display name (matched case-insensitively against all visible projects) or its Linear UUID. When `--project` is used the run log uses the project id in the filename instead of the cycle id: `~/.drain-cycle/runs/<project-id>-<run-timestamp>.json`.
 
 Issues blocked by an unresolved blocker outside the drain set are deferred (skipped with a stderr message, left Todo). A dependency cycle among pending issues halts the entire run immediately (exit 1) with a `Halt:` line naming the involved issues.
 
