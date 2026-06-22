@@ -347,6 +347,7 @@ def _run(
     project: str | None = None,
 ) -> int:
     debug = _debug_enabled()
+    target_kind = "project" if project is not None else "cycle"
     if project is not None:
         cycle_id = linear.resolve_project_id(project)
     else:
@@ -371,12 +372,16 @@ def _run(
 
     if not plan.order and not plan.deferred:
         cycle_span.set_attribute("drain.outcome", "nothing-to-do")
-        console.orch(f"Cycle {cycle_id} has no Todo/Backlog issues — nothing to do.")
+        label = "Project" if target_kind == "project" else "Cycle"
+        console.orch(
+            f"{label} {cycle_id} has no Todo/Backlog issues — nothing to do."
+        )
         return 0
 
     console.startup_plan(
         cycle_id,
         [(i["identifier"], i["title"], model.resolve(i)) for i in plan.order],
+        target_kind=target_kind,
     )
 
     for deferred in plan.deferred:

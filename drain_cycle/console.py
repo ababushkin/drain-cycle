@@ -70,16 +70,20 @@ def agent_line(line: str) -> None:
 
 
 def startup_plan(
-    cycle_id: str,
+    target_id: str,
     rows: Sequence[tuple[str, str, str]],
+    *,
+    target_kind: str = "cycle",
 ) -> None:
     """Print the startup header (Rich rule) and a plan table.
 
     ``rows`` is a sequence of ``(identifier, title, model)`` triples in the
-    order the orchestrator will execute them.
+    order the orchestrator will execute them. ``target_kind`` labels the
+    drain target — ``"cycle"`` (the default) or ``"project"`` — and appears
+    verbatim in the rule alongside ``target_id``.
     """
     c = _console()
-    c.rule(f"[bold]drain-cycle[/bold]  cycle {cycle_id}")
+    c.rule(f"[bold]drain-cycle[/bold]  {target_kind} {target_id}")
     table = Table(show_header=True, header_style="bold", box=None, pad_edge=False)
     table.add_column("Issue", no_wrap=True, width=10)
     table.add_column("Title", overflow="fold")

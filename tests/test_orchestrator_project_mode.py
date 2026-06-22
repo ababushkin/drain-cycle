@@ -14,7 +14,25 @@ from pathlib import Path
 
 import pytest
 
-from drain_cycle import linear, orchestrator, repos
+from drain_cycle import console, linear, orchestrator, repos
+
+
+class _RecordingSpan:
+    """A drop-in stand-in for an OpenTelemetry span that records attribute
+    writes. Used to assert on attributes set during ``orchestrator._run``
+    without bringing up a real provider."""
+
+    def __init__(self) -> None:
+        self.attrs: dict[str, object] = {}
+
+    def set_attribute(self, key: str, value: object) -> None:
+        self.attrs[key] = value
+
+    def set_status(self, *args: object, **kwargs: object) -> None:  # pragma: no cover
+        pass
+
+    def record_exception(self, *args: object, **kwargs: object) -> None:  # pragma: no cover
+        pass
 
 
 def _issue(identifier: str, sort_order: float, *, repo_name: str = "test-repo") -> dict:
@@ -122,3 +140,70 @@ def test_project_mode_writes_runlog_keyed_on_project_id(
     )
     payload = json.loads(log_files[0].read_text())
     assert payload["cycle_id"] == "stub-project-id"
+
+
+def test_project_mode_empty_plan_message_reads_project_label(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The ``nothing to do`` message reads ``Project <id>`` in project mode.
+    The rule itself isn't rendered when the plan is empty; the cycle/project
+    label on the rule is covered separately via ``console.startup_plan``.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(linear, "resolve_project_id", lambda name: "proj-empty")
+    monkeypatch.setattr(
+        linear, "project_issues",
+        lambda _id: linear.ExecutionPlan(order=[], deferred=[]),
+    )
+
+    span = _RecordingSpan()
+    exit_code = orchestrator._run(
+        repos.Repos(mapping={}),
+        orchestrator.Limits(),
+        span,  # type: ignore[arg-type]
+        project="My Project",
+    )
+    assert exit_code == 0
+    err = capsys.readouterr().err
+    assert "Project proj-empty has no Todo/Backlog issues" in err
+    assert "Cycle proj-empty" not in err
+
+
+def test_cycle_mode_empty_plan_message_reads_cycle_label(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Cycle mode (the default) still reads ``Cycle <id>``."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(linear, "current_cycle_id", lambda: "cyc-empty")
+    monkeypatch.setattr(
+        linear, "pending_issues",
+        lambda _id: linear.ExecutionPlan(order=[], deferred=[]),
+    )
+
+    span = _RecordingSpan()
+    exit_code = orchestrator._run(
+        repos.Repos(mapping={}),
+        orchestrator.Limits(),
+        span,  # type: ignore[arg-type]
+    )
+    assert exit_code == 0
+    err = capsys.readouterr().err
+    assert "Cycle cyc-empty has no Todo/Backlog issues" in err
+
+
+def test_startup_plan_renders_project_label_when_target_kind_is_project(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    console.startup_plan(
+        "proj-xyz",
+        [("ABA-1", "first thing", "sonnet-4")],
+        target_kind="project",
+    )
+    err = capsys.readouterr().err
+    assert "project proj-xyz" in err
+    # The cycle label must not leak when the target is a project.
+    assert "cycle proj-xyz" not in err
