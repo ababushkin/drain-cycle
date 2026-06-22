@@ -314,17 +314,27 @@ def run(
     *,
     watch: bool = False,
     no_stack: bool = False,
+    project: str | None = None,
 ) -> int:
     """Drain the current cycle inside the ``drain.cycle`` root span.
 
     The span wrapper is thin so the body keeps its shape; per-issue work nests
     under it via ``_drain_one_issue``'s ``drain.issue`` spans, and the Linear,
     worktree, and worker spans nest under those — yielding one trace per drain.
+
+    When ``project`` is given (a name or UUID), the drain runs over that Linear
+    project's pending issues instead of the active cycle. The same ``cycle_id``
+    local carries the resolved project id through every downstream consumer —
+    run-log filename, resume-glob, progress marker, telemetry — overloading the
+    identity field per ADR 0033.
     """
     if limits is None:
         limits = Limits()
     with telemetry.tracer.start_as_current_span("drain.cycle") as cycle_span:
-        return _run(repos, limits, cycle_span, watch=watch, no_stack=no_stack)
+        return _run(
+            repos, limits, cycle_span,
+            watch=watch, no_stack=no_stack, project=project,
+        )
 
 
 def _run(
@@ -334,13 +344,20 @@ def _run(
     *,
     watch: bool = False,
     no_stack: bool = False,
+    project: str | None = None,
 ) -> int:
     debug = _debug_enabled()
-    cycle_id = linear.current_cycle_id()
+    if project is not None:
+        cycle_id = linear.resolve_project_id(project)
+    else:
+        cycle_id = linear.current_cycle_id()
     cycle_span.set_attribute("drain.cycle_id", cycle_id)
     log = runlog.RunLog(cycle_id=cycle_id)
     try:
-        plan = linear.pending_issues(cycle_id)
+        if project is not None:
+            plan = linear.project_issues(cycle_id)
+        else:
+            plan = linear.pending_issues(cycle_id)
     except DependencyCycleError as exc:
         halt_reason = f"Halt: {exc}"
         log.set_cycle_halt(halt_reason)
