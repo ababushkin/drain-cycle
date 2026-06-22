@@ -268,6 +268,66 @@ def test_step_renderer_swallows_write_errors():
     renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
 
 
+def _write_marker(worktree, step, persona=None):
+    payload = {"_active": {"step": step}}
+    if persona is not None:
+        payload["_active"]["persona"] = persona
+    (worktree / "exec-state.json").write_text(json.dumps(payload))
+
+
+def test_read_active_marker_returns_step_and_persona(tmp_path):
+    _write_marker(tmp_path, "review", "code-quality")
+    marker = swimlanes.read_active_marker(tmp_path)
+    assert marker is not None
+    assert marker.step == "review"
+    assert marker.persona == "code-quality"
+
+
+def test_read_active_marker_returns_none_when_file_absent(tmp_path):
+    assert swimlanes.read_active_marker(tmp_path) is None
+
+
+def test_read_active_marker_returns_none_on_malformed_state(tmp_path):
+    (tmp_path / "exec-state.json").write_text("{not json")
+    assert swimlanes.read_active_marker(tmp_path) is None
+
+
+def test_read_active_marker_returns_none_when_active_key_missing(tmp_path):
+    (tmp_path / "exec-state.json").write_text(json.dumps({"pickup": {}}))
+    assert swimlanes.read_active_marker(tmp_path) is None
+
+
+def test_step_renderer_prefers_active_marker_for_step_and_persona(tmp_path):
+    # The stream alone yields the skill name; only the marker carries the
+    # active review persona. Persona depth in the row proves the marker won.
+    _write_marker(tmp_path, "review", "code-quality")
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True, worktree_path=tmp_path)
+    renderer.on_progress(1, 100, 1.0)
+    out = err.getvalue()
+    assert "review" in out
+    assert "code-quality" in out
+
+
+def test_step_renderer_falls_back_to_stream_step_when_no_marker(tmp_path):
+    # No exec-state.json written → marker absent → today's stream path holds.
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True, worktree_path=tmp_path)
+    renderer.feed(_assistant_event("m1", _skill("exec:build")))
+    out = err.getvalue()
+    assert "exec:build" in out
+
+
+def test_step_renderer_marker_step_without_persona_shows_no_separator(tmp_path):
+    _write_marker(tmp_path, "build")
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(err, tty=True, worktree_path=tmp_path)
+    renderer.on_progress(1, 100, 1.0)
+    out = err.getvalue()
+    assert "build" in out
+    assert " / " not in out
+
+
 def test_drain_stream_routes_events_to_step_callback_and_leaves_sink_untouched():
     err = io.StringIO()
     sink = io.StringIO()
