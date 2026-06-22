@@ -8,6 +8,7 @@ Single-team scope: hardcoded to the ``Personal`` team per README §1.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,6 +20,10 @@ _DEFAULT_GRAPHQL_URL = "https://api.linear.app/graphql"
 _TEAM_NAME = "Personal"
 _PENDING_STATE_TYPES = ["backlog", "unstarted"]
 _RESOLVED_STATE_TYPES = {"completed", "canceled"}
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -203,6 +208,38 @@ def _label_name(node: dict[str, Any]) -> str:
     if parent:
         return f"{parent['name']}:{node['name']}"
     return node["name"]
+
+
+def resolve_project_id(name_or_id: str) -> str:
+    """Return a project id from a name or a UUID.
+
+    A well-formed UUID is returned unchanged with no API call.  A plain name
+    is resolved via ``projects(filter:{name:{eq}})`` against the Linear API.
+    Raises ``RuntimeError`` when no project matches the name or more than one
+    does (listing the conflicting names in the latter case).
+    """
+    if _UUID_RE.match(name_or_id):
+        return name_or_id
+    data = _post(
+        """
+        query ProjectByName($name: String!) {
+          projects(filter: { name: { eq: $name } }) {
+            nodes { id name }
+          }
+        }
+        """,
+        {"name": name_or_id},
+        operation="resolve_project",
+    )
+    nodes = data["projects"]["nodes"]
+    if not nodes:
+        raise RuntimeError(f"Linear project {name_or_id!r} not found")
+    if len(nodes) > 1:
+        names = ", ".join(repr(n["name"]) for n in nodes)
+        raise RuntimeError(
+            f"Linear project name {name_or_id!r} is ambiguous: {names}"
+        )
+    return nodes[0]["id"]
 
 
 def pending_issues(cycle_id: str) -> ExecutionPlan:
