@@ -675,35 +675,51 @@ class StepRenderer:
         # SIG_IGN or None: nothing further to do.
 
     def _on_winch(self, signum: int, frame: Any) -> None:
-        """Re-pin the region to the new terminal size, repaint the block.
+        """Re-pin the region within the new budget on terminal resize.
 
         ``shutil.get_terminal_size`` re-reads the controlling tty's ``ioctl``
-        on every call, so we pick up the new geometry without caching. The
-        region is released and re-issued so the bottom margin moves with the
-        new row count; the paint that follows lands on the new bottom rows.
-        Chains to any prior handler so other ``SIGWINCH`` consumers still see
-        the signal."""
+        on every call, so we pick up the new geometry without caching. Three
+        paths matter:
+
+        * **Shrink below the floor** — release the region cleanly. The
+          operator's shell returns to a normal scrolling layout instead of
+          staying pinned to bottom margins that have moved off-screen.
+        * **Stay above the floor, different size** — release and re-issue
+          DECSTBM at the new bottom margin; the pinned height clamps to the
+          new budget so the passthrough floor stays preserved.
+        * **Grow from sub-minimum back to viable** — open the region. The
+          view returns immediately on resize rather than waiting for the
+          next stream event.
+
+        Chains to any prior handler so other ``SIGWINCH`` consumers still
+        see the signal."""
+        try:
+            cols, rows = self._term_size_fn()
+        except Exception:
+            cols, rows = self._term_cols, self._term_rows
+        new_effective = self._budget_region_height(rows)
         if self._region_active:
-            try:
-                cols, rows = self._term_size_fn()
-            except Exception:
-                cols, rows = self._term_cols, self._term_rows
-            if rows >= self._region_height + 2 and (
-                rows != self._term_rows or cols != self._term_cols
-            ):
+            if new_effective is None:
+                self._exit_region()
+            elif rows != self._term_rows or cols != self._term_cols:
                 try:
                     self._stderr.write(_ANSI_DECSTBM_RESET)
                     self._stderr.write(
                         _ANSI_DECSTBM_FMT.format(
-                            top=1, bottom=rows - self._region_height
+                            top=1, bottom=rows - new_effective
                         )
                     )
                     self._stderr.flush()
                 except (OSError, ValueError):
                     pass
+                self._region_height = new_effective
                 self._term_rows = rows
                 self._term_cols = cols
                 self._render()
+        else:
+            if new_effective is not None:
+                if self._enter_region():
+                    self._render()
         prev = self._sigwinch_prev
         if callable(prev):
             try:
