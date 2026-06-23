@@ -1,0 +1,9 @@
+drain-cycle watch is extremely different to what i expected in comparison to the prototype we built (docs/prototypes/live-execution-swimlanes/demo.py)
+
+i want to close the gap, one thing at a time
+
+look through the codebase and the demo and plan this for me
+
+---
+
+i want all of these gaps to be addressed, each one should be planned as its own unique feature that i can execute

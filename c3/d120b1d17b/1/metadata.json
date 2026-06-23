@@ -1,0 +1,86 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "c3d120b1d17b",
+  "session_id": "5b4c1785-8cfc-4ecd-83c8-8f2ab4b1ad7d",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-23T06:14:16.971034Z",
+  "branch": "feat-auto-version",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "drain_cycle/_version.py",
+    "drain_cycle/cli.py",
+    "drain_cycle/telemetry.py",
+    "hatch_build.py",
+    "pyproject.toml",
+    "scripts/install-git-hooks.sh",
+    "uv.lock"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "34cf837936ac",
+  "token_usage": {
+    "input_tokens": 29566,
+    "cache_creation_tokens": 499748,
+    "cache_read_tokens": 7749679,
+    "output_tokens": 80989,
+    "api_call_count": 49
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01PpkbCa2tdZC1y9jasGYoS1",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "shape-delivery"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "34cf837936ac",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 148,
+        "end": 149,
+        "entry_ids": [
+          "5fb459d2-a396-4314-92dc-5538b69aaee0"
+        ],
+        "tool_use_id": "toolu_01PpkbCa2tdZC1y9jasGYoS1"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01PpkbCa2tdZC1y9jasGYoS1"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: shape-delivery",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-23T06:14:16.950128Z",
+    "agent_lines": 145,
+    "agent_removed": 2,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 145,
+    "total_lines_changed": 147,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
