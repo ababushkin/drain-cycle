@@ -32,6 +32,8 @@ from importlib.metadata import PackageNotFoundError, version
 from opentelemetry import trace
 from opentelemetry.trace import Span, Status, StatusCode
 
+from ._version import _FALLBACK, full_version
+
 _SERVICE_NAME = "drain-cycle"
 _DEFAULT_ENDPOINT = "https://api.honeycomb.io"
 
@@ -107,6 +109,12 @@ def mark_error(span: Span, slug: str, reason: str) -> None:
 
 
 def _package_version() -> str:
+    """Live version for telemetry. Derived from the checkout so an editable
+    install reports its true commit state without a reinstall; falls back to the
+    packaged metadata when the source tree is absent (a built wheel)."""
+    derived = full_version()
+    if derived != _FALLBACK:
+        return derived
     try:
         return version("drain-cycle")
     except PackageNotFoundError:
