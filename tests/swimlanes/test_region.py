@@ -1,8 +1,8 @@
-"""Owned-region invariants — N07.
+"""Owned-region invariants for the swimlanes renderer.
 
 The richer status view pins the bottom rows of the terminal with a DEC
 scroll region (DECSTBM). These tests pin the contracts the rest of the
-view (N08 queue rows, N09 footer, N11 persona depth) builds on:
+view builds on:
 
 * The region opens on the first paint with explicit numeric DECSTBM bounds
   and reserves space by pushing existing scrollback up.
@@ -16,6 +16,8 @@ view (N08 queue rows, N09 footer, N11 persona depth) builds on:
   the block in place.
 * A terminal too short to keep at least two scrolling rows above the region
   degrades to silence rather than rendering on top of itself.
+* A write fault mid-paint is swallowed — the renderer never propagates an
+  exception into the worker drain that feeds it.
 """
 from __future__ import annotations
 
@@ -246,9 +248,10 @@ def test_region_is_silent_when_terminal_too_small():
 
 
 def test_region_height_three_paints_a_three_row_block(tmp_path):
-    """N09 footer / N11 persona depth grow the region by raising
-    ``region_height``. Pinning the contract here means the downstream nodes
-    only have to fill the extra rows."""
+    """A larger ``region_height`` widens the pinned block — the surface a
+    future footer or persona drill-down fills. Pinning the contract here
+    means a downstream caller raising the height only has to fill the
+    extra rows."""
     err, renderer = _make_renderer(rows=24, region_height=3)
     renderer.set_queue([swimlanes.QueueItem("ABA-410", "running")])
     renderer.feed(_assistant_skill_event("m1", "exec:pickup"))
@@ -259,3 +262,67 @@ def test_region_height_three_paints_a_three_row_block(tmp_path):
     # The pinned block spans rows 22, 23, 24.
     for row in (22, 23, 24):
         assert f"\x1b[{row};1H" in out
+
+
+class _FaultyStderr:
+    """A TextIO that writes normally until the configured trigger fires,
+    then raises ``OSError`` from every subsequent write.
+
+    Drives the NFR-3 fault-injection contract for the multi-line region:
+    a partial paint (DECSTBM opened, absolute-positioning writes started)
+    must not propagate the fault into the worker drain that called
+    ``feed``."""
+
+    def __init__(self, fail_after: int) -> None:
+        self._buf: list[str] = []
+        self._writes = 0
+        self._fail_after = fail_after
+
+    def isatty(self) -> bool:
+        return True
+
+    def write(self, s: str) -> int:
+        self._writes += 1
+        if self._writes > self._fail_after:
+            raise OSError("simulated stderr failure")
+        self._buf.append(s)
+        return len(s)
+
+    def flush(self) -> None:
+        if self._writes > self._fail_after:
+            raise OSError("simulated stderr failure")
+
+    def getvalue(self) -> str:
+        return "".join(self._buf)
+
+
+def test_multi_line_region_swallows_write_fault_mid_paint():
+    """NFR-3 for the multi-line region: a write failure inside the
+    absolute-positioning paint must not raise out of ``feed`` — the
+    renderer is non-gating on the worker drain. The exit code that would
+    have come out of a clean run is therefore preserved."""
+    err = _FaultyStderr(fail_after=5)
+    renderer = swimlanes.StepRenderer(
+        err, tty=True, region_height=2, term_size_fn=lambda: (80, 24)
+    )
+    renderer.feed(_assistant_skill_event("m1", "exec:pickup"))
+    # A second emit lands further into the paint sequence — also swallowed.
+    renderer.feed(_assistant_skill_event("m2", "exec:breakdown"))
+    # And the finalize path tolerates the fault too.
+    renderer.finalize()
+
+
+def test_multi_line_region_swallows_fault_when_entering_region():
+    """A failure on the very first newline of region entry must keep the
+    region inactive — and never raise — so a tiny but TTY-claiming sink
+    degrades to the flat stream rather than half-opening a region the
+    teardown path cannot release."""
+    err = _FaultyStderr(fail_after=0)
+    renderer = swimlanes.StepRenderer(
+        err, tty=True, region_height=2, term_size_fn=lambda: (80, 24)
+    )
+    renderer.feed(_assistant_skill_event("m1", "exec:pickup"))
+    assert renderer._region_active is False, (
+        "a failure during region entry must leave the region inactive so "
+        "_exit_region does not emit a release for a region that never opened"
+    )
