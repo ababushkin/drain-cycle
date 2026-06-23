@@ -733,18 +733,86 @@ class StepRenderer:
             steps.append(active_step)
         active_glyph = self._STALE_GLYPH if self._marker_stale else self._ACTIVE_GLYPH
         parts = []
-        for step in steps:
+        active_idx = -1
+        for i, step in enumerate(steps):
             if step == active_step:
                 label = f"{active_glyph} {_safe_label(step)}"
                 if persona:
                     label = f"{label} / {_safe_label(persona)}"
+                active_idx = i
             else:
                 label = f"{self._PRIOR_GLYPH} {_safe_label(step)}"
             parts.append(label)
-        row = " ".join(parts)
+        sep = " "
+        row = sep.join(parts)
         if self._sub_status:
             row = f"{row} · {_safe_label(self._sub_status)}"
-        return row
+        cols = self._term_cols
+        if cols <= 0:
+            try:
+                cols, _rows = self._term_size_fn()
+            except Exception:
+                return row
+        if len(row) <= cols:
+            return row
+        return self._truncate_stepper_row(parts, active_idx, sep, int(cols))
+
+    def _truncate_stepper_row(
+        self,
+        parts: list[str],
+        active_idx: int,
+        sep: str,
+        cols: int,
+    ) -> str:
+        """Fit the stepper row inside ``cols`` while keeping the active step.
+
+        Overflow rule (N13): the active step is never dropped. Prior steps
+        are elided from the head (oldest first) with a ``+<elided> earlier``
+        marker, and the sub-status tail is included only if budget remains.
+        A row that cannot even fit the active part alone falls back to the
+        active part truncated to ``cols`` so the operator still sees the
+        live step name rather than an empty row.
+        """
+        total = len(parts)
+        if active_idx < 0 or active_idx >= total:
+            active_idx = total - 1
+        active_part = parts[active_idx]
+        tail = ""
+        if self._sub_status:
+            tail = f" · {_safe_label(self._sub_status)}"
+        if len(active_part) > cols:
+            return active_part[:cols]
+        # Walk outward from the active step, including neighbours while they
+        # fit. Prefer history (left) over future entries (right) so the
+        # operator sees the recent past behind the cursor; an active step at
+        # the tail (the common case) keeps the marker readable.
+        chosen = {active_idx}
+        used = len(active_part)
+        # Reserve space for the elision marker — sized to the upper bound.
+        marker_reserve = len(f"{sep}+{total} earlier{sep}")
+        budget = cols - marker_reserve
+        # Include the tail (sub-status) when it fits.
+        include_tail = bool(tail) and used + len(tail) <= cols
+        if include_tail:
+            used += len(tail)
+        for left in range(active_idx - 1, -1, -1):
+            cost = len(parts[left]) + len(sep)
+            if used + cost > budget:
+                break
+            chosen.add(left)
+            used += cost
+        for right in range(active_idx + 1, total):
+            cost = len(parts[right]) + len(sep)
+            if used + cost > budget:
+                break
+            chosen.add(right)
+            used += cost
+        ordered = sorted(chosen)
+        elided = total - len(ordered)
+        body = sep.join(parts[i] for i in ordered)
+        if elided > 0:
+            body = f"+{elided} earlier{sep}{body}"
+        return f"{body}{tail}" if include_tail else body
 
     def _render_queue_row(self) -> str | None:
         if not self._queue:
@@ -757,7 +825,68 @@ class StepRenderer:
             ident = _safe_label(item.identifier)
             label = f"[{ident}]" if item.identifier == focus else ident
             parts.append(f"{glyph} {label}")
-        return "  ".join(parts)
+        sep = "  "
+        full = sep.join(parts)
+        cols = self._term_cols
+        if cols <= 0:
+            try:
+                cols, _rows = self._term_size_fn()
+            except Exception:
+                return full
+        if len(full) <= cols:
+            return full
+        return self._truncate_queue_row(parts, sep, int(cols), focus)
+
+    def _truncate_queue_row(
+        self,
+        parts: list[str],
+        sep: str,
+        cols: int,
+        focus: str | None,
+    ) -> str:
+        """Fit the queue row inside ``cols`` while protecting the running and
+        focused items.
+
+        Overflow rule (N13): the running issue and the focused swimlane are
+        always shown; remaining items fill the row from the front until the
+        budget — reduced by a reservation for the ``+<dropped> more`` suffix
+        — exhausts; dropped items are named in the suffix count rather than
+        silently elided. The reservation uses the upper bound for the suffix
+        width so the chosen-set decision never has to be redone after the
+        actual dropped count is known.
+        """
+        total = len(parts)
+        protected: list[int] = []
+        for i, item in enumerate(self._queue):
+            if item.state == "running" and i not in protected:
+                protected.append(i)
+        if focus is not None:
+            for i, item in enumerate(self._queue):
+                if item.identifier == focus and i not in protected:
+                    protected.append(i)
+        suffix_budget = len(sep) + len(f"+{total} more")
+        budget = cols - suffix_budget
+        if budget <= 0:
+            chosen = protected[:1] if protected else [0]
+        else:
+            chosen = sorted(protected)
+            used = sum(len(parts[i]) for i in chosen)
+            if len(chosen) > 1:
+                used += (len(chosen) - 1) * len(sep)
+            for i in range(total):
+                if i in chosen:
+                    continue
+                cost = len(parts[i]) + (len(sep) if chosen else 0)
+                if used + cost > budget:
+                    continue
+                chosen.append(i)
+                used += cost
+            chosen.sort()
+        dropped = total - len(chosen)
+        row = sep.join(parts[i] for i in chosen)
+        if dropped > 0:
+            row = f"{row}{sep}+{dropped} more"
+        return row
 
     def _resolve_focus(self) -> str | None:
         """Effective focus: explicit selection wins; otherwise auto-follow the
