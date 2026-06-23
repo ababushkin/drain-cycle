@@ -23,8 +23,6 @@ import io
 import signal
 from typing import Any
 
-import pytest
-
 from drain_cycle import swimlanes
 
 

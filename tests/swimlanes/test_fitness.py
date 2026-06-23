@@ -150,9 +150,14 @@ def test_disable_switch_reverts_to_flat_stream_golden_output(
 def test_non_tty_pipe_emits_zero_ansi_and_zero_stdout_bytes(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """NFR-4: when stderr is a pipe (``isatty()`` False), the renderer emits
-    zero ANSI escapes — no carriage-return-clear, no cursor-up, no SGR —
-    and the swimlanes layer touches stdout zero times.
+    """NFR-4 for the multi-line region: when stderr is a pipe (``isatty()``
+    False), the renderer emits zero bytes — no DECSTBM, no absolute cursor
+    positioning, no DEC save/restore, no clear-line, no SGR — and the
+    swimlanes layer touches stdout zero times.
+
+    Drives both the queue row and the stepper row plus a finalize so every
+    code path that could write a control byte on a TTY is exercised on the
+    non-TTY pipe; any byte that escapes the TTY guard would show up here.
     """
     err = _FakeStderr(tty=False)
     renderer = swimlanes.StepRenderer(err)
@@ -165,6 +170,7 @@ def test_non_tty_pipe_emits_zero_ansi_and_zero_stdout_bytes(
     )
 
     acc, _sink = _drain(renderer.feed)
+    renderer.on_progress(turns=2, cumulative_tokens=1000, elapsed_seconds=5.0)
     renderer.finalize()
 
     err_text = err.getvalue()
@@ -173,6 +179,11 @@ def test_non_tty_pipe_emits_zero_ansi_and_zero_stdout_bytes(
     )
     assert not _ANSI_RE.search(err_text), (
         "non-TTY pipe must emit zero ANSI escapes"
+    )
+    # DECSTBM and save/restore use non-CSI escapes too — verify nothing
+    # slipped past the regex by checking for the raw bytes directly.
+    assert "\x1b" not in err_text, (
+        "non-TTY pipe must emit zero raw escape bytes (DECSTBM, save/restore)"
     )
     captured = capsys.readouterr()
     assert captured.out == "", (
