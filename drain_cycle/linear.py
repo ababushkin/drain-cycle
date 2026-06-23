@@ -8,6 +8,7 @@ Single-team scope: hardcoded to the ``Personal`` team per README §1.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,6 +20,10 @@ _DEFAULT_GRAPHQL_URL = "https://api.linear.app/graphql"
 _TEAM_NAME = "Personal"
 _PENDING_STATE_TYPES = ["backlog", "unstarted"]
 _RESOLVED_STATE_TYPES = {"completed", "canceled"}
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -205,44 +210,70 @@ def _label_name(node: dict[str, Any]) -> str:
     return node["name"]
 
 
-def pending_issues(cycle_id: str) -> ExecutionPlan:
-    """Return an ``ExecutionPlan`` for every Todo/Backlog issue in the cycle.
+def resolve_project_id(name_or_id: str) -> str:
+    """Return a project id from a name or a UUID.
 
-    No pagination: personal cycles fit comfortably in one page. If a cycle
-    ever exceeds 100 pending issues, that's a planning problem, not a tool
-    problem (see ``PRODUCT_RULES`` Rule A5 — focus is the multiplier).
-
-    Post-processing flattens two wire-shape fields:
-    - ``labels { nodes { name parent { name } } }`` → ``labels: list[str]``
-      (grouped labels rendered as ``"<group>:<name>"``)
-    - ``inverseRelations`` filtered to ``type == "blocks"``
-      → ``blockers: list[{id, identifier, state_type}]``; raw key removed.
+    A well-formed UUID is returned unchanged with no API call.  A plain name
+    is resolved via ``projects(filter:{name:{eq}})`` against the Linear API.
+    Raises ``RuntimeError`` when no project matches the name or more than one
+    does (listing the conflicting names in the latter case).
     """
+    if _UUID_RE.match(name_or_id):
+        return name_or_id
     data = _post(
         """
-        query CyclePending($cycleId: ID!, $stateTypes: [String!]!) {
+        query ProjectByName($name: String!) {
+          projects(filter: { name: { eq: $name } }) {
+            nodes { id name }
+          }
+        }
+        """,
+        {"name": name_or_id},
+        operation="resolve_project",
+    )
+    nodes = data["projects"]["nodes"]
+    if not nodes:
+        raise RuntimeError(f"Linear project {name_or_id!r} not found")
+    if len(nodes) > 1:
+        names = ", ".join(repr(n["name"]) for n in nodes)
+        raise RuntimeError(
+            f"Linear project name {name_or_id!r} is ambiguous: {names}"
+        )
+    return nodes[0]["id"]
+
+
+def _pending_issues(filter_field: str, target_id: str) -> ExecutionPlan:
+    """Fetch pending issues filtered by ``filter_field: {id: {eq: target_id}}``.
+
+    ``filter_field`` is either ``"cycle"`` or ``"project"`` — both accept the
+    same ``id: {eq}`` sub-filter in the Linear API.  Post-processing is
+    identical for both: label flattening and blocker extraction.
+    """
+    data = _post(
+        f"""
+        query Pending($targetId: ID!, $stateTypes: [String!]!) {{
           issues(
-            filter: {
-              cycle: { id: { eq: $cycleId } }
-              state: { type: { in: $stateTypes } }
-            }
+            filter: {{
+              {filter_field}: {{ id: {{ eq: $targetId }} }}
+              state: {{ type: {{ in: $stateTypes }} }}
+            }}
             first: 100
-          ) {
-            nodes {
+          ) {{
+            nodes {{
               id
               identifier
               title
               description
               sortOrder
-              state { type name }
-              labels { nodes { name parent { name } } }
-              inverseRelations { nodes { type issue { id identifier state { type } } } }
-            }
-          }
-        }
+              state {{ type name }}
+              labels {{ nodes {{ name parent {{ name }} }} }}
+              inverseRelations {{ nodes {{ type issue {{ id identifier state {{ type }} }} }} }}
+            }}
+          }}
+        }}
         """,
-        {"cycleId": cycle_id, "stateTypes": _PENDING_STATE_TYPES},
-        operation="pending_issues",
+        {"targetId": target_id, "stateTypes": _PENDING_STATE_TYPES},
+        operation=f"pending_{filter_field}",
     )
     issues = data["issues"]["nodes"]
     for issue in issues:
@@ -258,6 +289,19 @@ def pending_issues(cycle_id: str) -> ExecutionPlan:
         ]
         del issue["inverseRelations"]
     return _plan(issues)
+
+
+def pending_issues(cycle_id: str) -> ExecutionPlan:
+    """Return an ``ExecutionPlan`` for every Todo/Backlog issue in the cycle.
+
+    No pagination: personal cycles fit comfortably in one page.
+    """
+    return _pending_issues("cycle", cycle_id)
+
+
+def project_issues(project_id: str) -> ExecutionPlan:
+    """Return an ``ExecutionPlan`` for every Todo/Backlog issue in the project."""
+    return _pending_issues("project", project_id)
 
 
 def get_issue(issue_id: str) -> dict[str, Any]:

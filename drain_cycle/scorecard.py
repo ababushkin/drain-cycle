@@ -1,7 +1,8 @@
 """``drain-cycle scorecard``: per-run quality from the run log.
 
-Reads run-log JSON files and reports each run's duration, cost, tokens,
-and correctness without any manual confirmation step.
+Reads run-log JSON files and renders a dashboard: a headline pass-rate with a
+per-cycle trend sparkline, then a Rich table per cycle showing each run's
+duration, cost, tokens, and a status glyph — no manual confirmation step.
 
 Correctness rule (ADR 0031):
   correct = outcome_verdict.result == "pass" AND review_verdict.result == "go"
@@ -9,12 +10,33 @@ Correctness rule (ADR 0031):
   A Done entry with null outcome_verdict is a silent-Done violation (exit 1).
   prep_verdict.route is advisory — it appears in output but never affects
   the correctness rate or exit code.
+
+The output goes to stdout (it is a report, meant to be read and piped). Rich
+strips color in a non-TTY, so the sparkline and status glyphs still read as
+plain text when piped or captured.
 """
 from __future__ import annotations
 
 import json
+import sys
+from enum import Enum
 from pathlib import Path
 from typing import Any
+
+from rich.console import Console
+from rich.table import Table
+
+from .progress import fmt_tokens
+
+_SPARK_BLOCKS = "▁▂▃▄▅▆▇█"
+
+
+class Status(str, Enum):
+    """A run's three-way render state."""
+
+    CORRECT = "correct"
+    FAILED = "failed"
+    UNSCORED = "unscored"
 
 
 def runs_dir() -> Path:
@@ -39,10 +61,44 @@ def _is_silent_done(entry: dict[str, Any]) -> bool:
     )
 
 
+def _status(entry: dict[str, Any]) -> Status:
+    """Map an entry to its render status.
+
+    The renderer consults this single classifier for all three states. Today it
+    returns only CORRECT or FAILED — a never-evaluated run collapses into FAILED.
+    Distinguishing UNSCORED (no verdict recorded) from FAILED, and aggregating
+    per issue rather than per attempt, are tracked separately; both land by
+    growing this function (and the run() aggregation source), with no change to
+    the render code below.
+    """
+    if _is_correct(entry):
+        return Status.CORRECT
+    return Status.FAILED
+
+
+def _status_glyph(status: Status) -> str:
+    """Rich-markup glyph for a status; color is stripped in a non-TTY."""
+    if status is Status.CORRECT:
+        return "[green]✓[/green]"
+    if status is Status.UNSCORED:
+        return "[dim]—[/dim]"
+    return "[red]✗[/red]"
+
+
 def _prep_route(entry: dict[str, Any]) -> str:
     """Advisory prep-route label; empty string when not present."""
     prep = entry.get("prep_verdict") or {}
     return prep.get("route", "") or ""
+
+
+def _sparkline(values: list[float]) -> str:
+    """Render fractions in [0.0, 1.0] as unicode block characters."""
+    if not values:
+        return ""
+    top = len(_SPARK_BLOCKS) - 1
+    return "".join(
+        _SPARK_BLOCKS[min(top, max(0, round(v * top)))] for v in values
+    )
 
 
 def _load_run_files(runs_dir_path: Path) -> list[dict[str, Any]]:
@@ -58,12 +114,111 @@ def _load_run_files(runs_dir_path: Path) -> list[dict[str, Any]]:
     return payloads
 
 
+def _render(
+    console: Console, cycles: dict[str, list[dict[str, Any]]]
+) -> tuple[int, int, list[str]]:
+    """Render the dashboard and return (total_runs, total_correct, silent_done)."""
+    console.rule("[bold]drain-cycle scorecard[/bold]")
+
+    total_runs = 0
+    total_correct = 0
+    total_scored = 0
+    total_unscored = 0
+    total_cost = 0.0
+    silent_done_issues: list[str] = []
+    cycle_rates: list[float] = []  # chronological, for the headline sparkline
+    per_cycle: list[tuple[str, list[dict[str, Any]], int, int, float]] = []
+
+    for cid, entries in cycles.items():
+        runs = 0
+        correct = 0
+        for entry in entries:
+            runs += 1
+            status = _status(entry)
+            if status is Status.CORRECT:
+                correct += 1
+            if status is Status.UNSCORED:
+                total_unscored += 1
+            else:
+                total_scored += 1
+            cost = entry.get("cost_usd")
+            if cost is not None:
+                total_cost += cost
+            if _is_silent_done(entry):
+                silent_done_issues.append(entry.get("issue_identifier", "?"))
+        rate = correct / runs if runs else 0.0
+        per_cycle.append((cid, entries, runs, correct, rate))
+        if runs:
+            cycle_rates.append(rate)
+        total_runs += runs
+        total_correct += correct
+
+    # Headline KPI block.
+    if total_runs:
+        pct = round(total_correct * 100 / total_runs)
+        rate_str = f"{total_correct}/{total_runs} ({pct}%)"
+    else:
+        rate_str = "n/a"
+    spark = _sparkline(cycle_rates)
+    spark_str = f"   {spark}" if spark else ""
+    console.print(f"  [bold]Pass rate[/bold]  {rate_str}{spark_str}")
+    console.print(
+        f"  {total_scored} scored · {total_unscored} unscored · "
+        f"{len(silent_done_issues)} violations · ${total_cost:.2f}"
+    )
+
+    # Per-cycle detail.
+    for cid, entries, runs, correct, rate in per_cycle:
+        cpct = round(rate * 100)
+        console.print(
+            f"\n[bold]Cycle {cid}[/bold]   {correct}/{runs} ({cpct}%)  "
+            f"{_sparkline([rate])}"
+        )
+        table = Table(show_header=False, box=None, pad_edge=False)
+        table.add_column("issue", no_wrap=True)
+        table.add_column("duration", justify="right")
+        table.add_column("cost", justify="right")
+        table.add_column("tokens", justify="right")
+        table.add_column("status")
+        for entry in entries:
+            issue = entry.get("issue_identifier", "?")
+            duration = entry.get("duration_seconds")
+            cost = entry.get("cost_usd")
+            usage = entry.get("usage") or {}
+            tokens = usage.get("cumulative")
+
+            duration_str = f"{duration:.1f}s" if duration is not None else "-"
+            cost_str = f"${cost:.4f}" if cost is not None else "-"
+            tokens_str = fmt_tokens(tokens) if tokens is not None else "-"
+            route = _prep_route(entry)
+            status_cell = _status_glyph(_status(entry))
+            if route:
+                status_cell = f"{status_cell} {route}"
+
+            table.add_row(issue, duration_str, cost_str, tokens_str, status_cell)
+        console.print(table)
+
+    # Silent-Done violations.
+    console.print()
+    if silent_done_issues:
+        console.print("silent-Done violations:")
+        for issue in silent_done_issues:
+            console.print(f"  {issue}")
+    else:
+        console.print("silent-Done violations: none")
+
+    return total_runs, total_correct, silent_done_issues
+
+
 def run(runs_dir_path: Path) -> int:
-    """Read run logs, print per-run rows grouped by cycle, and return exit code.
+    """Read run logs, render the dashboard, and return an exit code.
 
     Exit 0 when no silent-Done violations; exit 1 when any Done entry has
     null outcome_verdict.
     """
+    # Built lazily against the live sys.stdout so pytest's capsys capture works.
+    console = Console(file=sys.stdout, highlight=False, soft_wrap=True)
+
     payloads = _load_run_files(runs_dir_path)
 
     # Group entries by cycle_id, preserving chronological file order.
@@ -74,63 +229,6 @@ def run(runs_dir_path: Path) -> int:
             cycles[cid] = []
         cycles[cid].extend(payload.get("entries", []))
 
-    total_runs = 0
-    total_correct = 0
-    silent_done_issues: list[str] = []
-
-    for cid, entries in cycles.items():
-        print(f"\ncycle: {cid}")
-        cycle_runs = 0
-        cycle_correct = 0
-
-        for entry in entries:
-            issue = entry.get("issue_identifier", "?")
-            duration = entry.get("duration_seconds")
-            cost = entry.get("cost_usd")
-            usage = entry.get("usage") or {}
-            tokens = usage.get("cumulative")
-            correct = _is_correct(entry)
-            route = _prep_route(entry)
-
-            duration_str = f"{duration:.1f}s" if duration is not None else "-"
-            cost_str = f"${cost:.4f}" if cost is not None else "-"
-            tokens_str = str(tokens) if tokens is not None else "-"
-            correct_str = "correct" if correct else "not-correct"
-            route_str = f"  [{route}]" if route else ""
-
-            print(
-                f"  {issue:<12} {duration_str:>8}  {cost_str:>10}  {tokens_str:>8}  "
-                f"{correct_str}{route_str}"
-            )
-
-            if _is_silent_done(entry):
-                silent_done_issues.append(issue)
-
-            cycle_runs += 1
-            if correct:
-                cycle_correct += 1
-
-        if cycle_runs > 0:
-            pct = round(cycle_correct * 100 / cycle_runs)
-            print(f"  cycle pass-rate: {cycle_correct}/{cycle_runs} ({pct}%)")
-        else:
-            print("  cycle pass-rate: n/a")
-
-        total_runs += cycle_runs
-        total_correct += cycle_correct
-
-    print()
-    if total_runs > 0:
-        pct = round(total_correct * 100 / total_runs)
-        print(f"overall pass-rate: {total_correct}/{total_runs} ({pct}%)")
-    else:
-        print("overall pass-rate: n/a")
-
-    if silent_done_issues:
-        print("silent-Done violations:")
-        for issue in silent_done_issues:
-            print(f"  {issue}")
-    else:
-        print("silent-Done violations: none")
+    _, _, silent_done_issues = _render(console, cycles)
 
     return 1 if silent_done_issues else 0
