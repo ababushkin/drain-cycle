@@ -1,0 +1,95 @@
+Work on Linear issue ABA-442:
+
+<issue identifier="ABA-442">
+<title>N10 — Amend ADR 0032 — per-persona display-only marker state</title>
+<description>
+🛑 Non-build node — adr. Produces a decision-record, not a PR. Run via the ADR discipline (Rule A3 + D3 living ADRs) — human-run.
+
+# N10 — Amend ADR 0032: per-persona display-only marker state
+
+**Type:** `adr`. ADR 0032 settled `_active.persona` as a single string, last-write-wins, and
+explicitly rejected richer persona state to avoid read-modify-write races. The persona fan-out (N11)
+needs per-persona state, which reverses that decision — a real architectural change, settled and
+plan-reviewed before any skill writes the new shape.
+
+> **▶ On pickup — before N11:** record the amendment through the ADR discipline. Run the plan-review
+> gate: this reverses a prior accepted decision on the shared supervisor↔pack boundary (ADR 0030 /
+> 0032).
+> **Blocks:** N11 — the persona drill-down must write against the settled shape, and the display-only
+> invariant must hold before any skill writes it.
+
+## What
+
+Amend ADR 0032 so the pack may author a display-only **per-persona roster and state** alongside the
+existing single `_active.persona`, while keeping every read non-gating (no advancement, halt, grade,
+retry, exit-code, or stop-guard path may read it). The amendment settles the **race-free write rule**:
+`exec:review` writes the full roster once on entry (all `queued`); the existing last-write-wins
+`_active.persona` marks the running one; the renderer derives `done` for any persona before it in the
+roster order — no per-member read-modify-write. Optional per-persona verdicts ride under separate keys
+(`review.persona_verdicts.<name>`) so concurrent writers never share a key.
+
+## Why
+
+The assumption being tested: per-persona state can be display-only and race-free at once — a
+write-once roster plus single-key verdicts avoids the read-modify-write contention that made ADR 0032
+choose a single string, without making the supervisor decide on any of it. The rejected alternative
+is a mutable shared `personas[]` array each sub-agent edits in place: that is exactly the race ADR
+0032 rejected. Accepting this is the prerequisite for N11; until it lands, the persona contract is
+unsettled and the single-string rule still forbids the fan-out.
+
+## Completion
+
+**Decision:** the pack may write a display-only per-persona roster (write-once, all `queued`) and
+per-persona verdicts under separate keys; the renderer derives queued/running/done from the roster
+order and the single `_active.persona`; no decision path may read any of it. Recorded as an amendment
+to ADR 0032 with context and consequences, citing ADR 0030 and architecture §5, and naming the
+enforcement: the import-guard (only the renderer module reads the new keys) and an NFR-3
+fault-injection test on a malformed roster. The amendment states backward-compatibility — `handoff`
+reads ignore unknown keys — and that an old pack writing no roster degrades to the single inline
+persona. The ADR template discipline is not re-authored here; it lives in the ADR skill.
+
+## Assumptions
+
+* `exec-state.json` reads ignore unknown keys, so an additive roster and per-persona verdict keys are backward-compatible with `handoff.read*`. *(verified)*
+* A write-once roster plus single-key per-persona verdicts avoids read-modify-write contention under a Claude-Code parallel persona fan-out. *(to-verify)*
+* The display-only invariant stays enforceable by the import-guard once the new keys exist (only the renderer module reads them). *(to-verify)*
+
+## Key Risks
+
+* **Risk:** the roster or verdict keys are written in a shape that still races under parallel
+  sub-agents, reintroducing the hazard ADR 0032 avoided. *Falsifier:* if any write needs to
+  read-modify-write a shared key, the shape is wrong — keep the roster write-once and verdicts on
+  per-name keys.
+* **Risk:** "display-only" is asserted but a later change reads a persona key in a decision path,
+  breaking the boundary. *Mitigation:* the amendment mandates the import-guard; N11 lands it, and
+  review treats any decision-path read of the persona keys as a boundary violation.
+
+## Tasks
+
+- [ ] Frame the amendment: a display-only per-persona roster and per-persona verdict keys extend `_active`, still non-gating, citing ADR 0030 / 0032 and architecture §5. Done when: the amendment states the new shape, the boundary citation, and that the display-only invariant and import-guard still hold. Model: Frontier · risk one-way · review elevated · axes RC·SC·HS·SR·OR = H·H·L·H·L · companions code-review-and-quality
+- [ ] Settle the race-free write rule: roster written once (all `queued`), `_active.persona` marks running, renderer derives done from roster order; per-persona verdicts under separate keys. Done when: the ADR names the write rule that avoids per-member read-modify-write and the backward-compat argument (handoff ignores unknown keys). Model: Frontier · risk one-way · review elevated · axes RC·SC·HS·SR·OR = H·M·L·H·L
+- [ ] Record enforcement and run the plan-review gate to acceptance. Done when: the ADR names the import-guard and the NFR-3 malformed-roster fault-injection as its fitness functions and a plan-review reference is filed with the decision accepted. Model: Frontier · risk one-way · review elevated · axes RC·SC·HS·SR·OR = H·M·L·H·L
+</description>
+<team name="Personal"/>
+<label>repo › drain-cycle</label>
+<label>model › opus</label>
+<label>review › high</label>
+<project name="Live execution swimlanes">Default (non-`-w`) drain-cycle output shows the live active exec:* step + review persona and the cycle queue at a glance — via a non-gating, display-only marker that never crosses the artifact boundary. One deliverable, two slices.</project>
+<issue-relations><blocking><issue-ref identifier="ABA-443" title="N11 — Vertical persona drill-down"/></blocking></issue-relations>
+</issue>
+
+<comment-thread comment-id="49fd8a7c-02d9-4adb-b1e3-cdb8fd138157">
+<comment author="Anton Babushkin" created-at="2026-06-23T09:43:15.029Z">
+**Halted at exec:pickup — non-build node gate.**
+
+Issue body opens with `🛑 Non-build node — adr. Produces a decision-record, not a PR. Run via the ADR discipline (Rule A3 + D3 living ADRs) — human-run.`
+
+* **Node type:** `adr`
+* **Delegate:** ADR discipline (Rule A3 + D3 living ADRs)
+* **Mode:** human-run
+
+`exec:pickup` does not run breakdown/build/review/verify/finish for `adr` nodes — they produce a decision-record, not a PR. Per the banner, this amendment to ADR 0032 is human-run: frame the amendment, settle the race-free write rule, record enforcement, and run the plan-review gate to acceptance. The three tasks in the body are the work; their `done when` clauses are the completion bar.
+
+Leaving status In Progress. No worktree changes made.
+</comment>
+</comment-thread>
