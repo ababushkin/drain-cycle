@@ -247,6 +247,80 @@ def test_region_is_silent_when_terminal_too_small():
     assert err.getvalue() == ""
 
 
+def test_minimum_viable_height_constant_is_documented_floor():
+    """The minimum viable terminal height for the swimlanes view is exposed
+    as a named constant — callers, tests, and the operator can read the
+    contract from one place instead of inferring it from inline arithmetic.
+
+    Below this floor the view degrades to the flat stream with NFR-4 byte
+    parity; at or above it the region opens with the requested height."""
+    assert hasattr(swimlanes, "_MIN_VIABLE_HEIGHT")
+    assert isinstance(swimlanes._MIN_VIABLE_HEIGHT, int)
+    # The floor must reserve enough rows for both the default pinned region
+    # and a useful passthrough area above it — a pinned region with only
+    # one or two scrolling rows above isn't a viable view.
+    assert swimlanes._MIN_VIABLE_HEIGHT >= swimlanes._DEFAULT_REGION_HEIGHT + 4
+
+
+def test_terminal_at_minimum_viable_height_opens_region():
+    """A terminal at exactly the minimum viable height opens the region —
+    the floor is inclusive, so the boundary case is a render, not a silence."""
+    err, renderer = _make_renderer(
+        rows=swimlanes._MIN_VIABLE_HEIGHT, region_height=2
+    )
+    renderer.feed(_assistant_skill_event("m1", "exec:pickup"))
+    assert "\x1b[" in err.getvalue(), (
+        "terminal at the minimum viable height must open the region, "
+        "not degrade to silence"
+    )
+
+
+def test_terminal_below_minimum_viable_height_emits_zero_bytes():
+    """A terminal one row below the minimum viable height degrades to the
+    flat stream — zero bytes from the renderer, matching the non-TTY
+    contract (NFR-4) for byte parity with a feature-off run."""
+    err, renderer = _make_renderer(
+        rows=swimlanes._MIN_VIABLE_HEIGHT - 1, region_height=2
+    )
+    renderer.set_queue([swimlanes.QueueItem("ABA-410", "running")])
+    renderer.feed(_assistant_skill_event("m1", "exec:pickup"))
+    renderer.on_progress(turns=2, cumulative_tokens=1000, elapsed_seconds=5.0)
+    renderer.finalize()
+    # NFR-4 byte parity: a sub-minimum terminal emits exactly what a non-TTY
+    # pipe does — zero bytes, no escapes, no raw control bytes.
+    assert err.getvalue() == "", (
+        "sub-minimum terminal must emit zero swimlanes bytes; "
+        f"got {err.getvalue()!r}"
+    )
+
+
+def test_region_height_clamps_when_terminal_cannot_fit_requested_height():
+    """A caller requesting a region taller than the terminal can spare gets
+    a region clamped to fit — the budget is `terminal_rows -
+    _MIN_VIABLE_HEIGHT + _DEFAULT_REGION_HEIGHT` so the view never starves
+    the passthrough below its floor.
+
+    At ``rows = _MIN_VIABLE_HEIGHT`` with the default 2-row region, the
+    passthrough gets ``_MIN_VIABLE_HEIGHT - 2`` scrolling rows; a caller
+    asking for a 5-row region on the same terminal still leaves the same
+    passthrough floor intact."""
+    rows = swimlanes._MIN_VIABLE_HEIGHT
+    err, renderer = _make_renderer(rows=rows, region_height=5)
+    renderer.feed(_assistant_skill_event("m1", "exec:pickup"))
+    out = err.getvalue()
+    # Region opens (rows ≥ floor) but the clamped pinned height keeps the
+    # passthrough at the floor's reserved size.
+    assert "\x1b[" in out, "region must open at the minimum viable height"
+    # The DECSTBM bottom margin equals the scrolling area's last row, which
+    # must be the same as on the default 2-row request — clamp preserves the
+    # passthrough floor.
+    expected_scroll_bottom = rows - swimlanes._DEFAULT_REGION_HEIGHT
+    assert f"\x1b[1;{expected_scroll_bottom}r" in out, (
+        "requested region height must clamp so the scrolling area never "
+        f"falls below {expected_scroll_bottom} rows; got {out!r}"
+    )
+
+
 def test_region_height_three_paints_a_three_row_block(tmp_path):
     """A larger ``region_height`` widens the pinned block — the surface a
     future footer or persona drill-down fills. Pinning the contract here
