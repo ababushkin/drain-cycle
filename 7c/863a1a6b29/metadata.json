@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "7c863a1a6b29",
+  "strategy": "manual-commit",
+  "branch": "feat-scorecard-dashboard",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/scorecard.py",
+    "tests/test_scorecard_exit.py",
+    "tests/test_scorecard_render.py",
+    "tests/test_scorecard_rows.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/7c/863a1a6b29/0/metadata.json",
+      "transcript": "/7c/863a1a6b29/0/full.jsonl",
+      "content_hash": "/7c/863a1a6b29/0/content_hash.txt",
+      "prompt": "/7c/863a1a6b29/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 37800,
+    "cache_creation_tokens": 233741,
+    "cache_read_tokens": 3503358,
+    "output_tokens": 56468,
+    "api_call_count": 48
+  }
+}

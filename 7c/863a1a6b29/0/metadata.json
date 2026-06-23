@@ -1,0 +1,57 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "7c863a1a6b29",
+  "session_id": "2b015bc9-f784-44bc-a1f6-65c1d66f41ec",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-23T06:22:30.180148Z",
+  "branch": "feat-scorecard-dashboard",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "drain_cycle/scorecard.py",
+    "tests/test_scorecard_exit.py",
+    "tests/test_scorecard_render.py",
+    "tests/test_scorecard_rows.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "b4aac8018a37",
+  "token_usage": {
+    "input_tokens": 37800,
+    "cache_creation_tokens": 233741,
+    "cache_read_tokens": 3503358,
+    "output_tokens": 56468,
+    "api_call_count": 48
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-23T06:22:30.164634Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 66,
+    "total_committed": 0,
+    "total_lines_changed": 66,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 237,
+      "user_lines_removed": 66,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "drain_cycle/scorecard.py": 151,
+        "tests/test_scorecard_exit.py": 4,
+        "tests/test_scorecard_render.py": 72,
+        "tests/test_scorecard_rows.py": 10
+      },
+      "user_removed_per_file": {
+        "drain_cycle/scorecard.py": 53,
+        "tests/test_scorecard_exit.py": 3,
+        "tests/test_scorecard_rows.py": 10
+      }
+    }
+  ]
+}
