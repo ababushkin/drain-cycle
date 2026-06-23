@@ -314,17 +314,25 @@ def run(
     *,
     watch: bool = False,
     no_stack: bool = False,
+    project: str | None = None,
 ) -> int:
     """Drain the current cycle inside the ``drain.cycle`` root span.
 
     The span wrapper is thin so the body keeps its shape; per-issue work nests
     under it via ``_drain_one_issue``'s ``drain.issue`` spans, and the Linear,
     worktree, and worker spans nest under those — yielding one trace per drain.
+
+    When ``project`` is set, the resolved project id overloads the ``cycle_id``
+    local so every downstream consumer (run-log filename, resume glob, progress
+    marker, telemetry) keys on it without branching. See ADR 0033.
     """
     if limits is None:
         limits = Limits()
     with telemetry.tracer.start_as_current_span("drain.cycle") as cycle_span:
-        return _run(repos, limits, cycle_span, watch=watch, no_stack=no_stack)
+        return _run(
+            repos, limits, cycle_span,
+            watch=watch, no_stack=no_stack, project=project,
+        )
 
 
 def _run(
@@ -334,13 +342,28 @@ def _run(
     *,
     watch: bool = False,
     no_stack: bool = False,
+    project: str | None = None,
 ) -> int:
     debug = _debug_enabled()
-    cycle_id = linear.current_cycle_id()
+    target_kind = "project" if project is not None else "cycle"
+    if project is not None:
+        try:
+            cycle_id = linear.resolve_project_id(project)
+        except RuntimeError as exc:
+            halt_reason = f"Halt: {exc}"
+            telemetry.mark_error(cycle_span, "err-project-resolution", halt_reason)
+            console.halt(halt_reason)
+            return 1
+    else:
+        cycle_id = linear.current_cycle_id()
+    cycle_span.set_attribute("drain.target_kind", target_kind)
     cycle_span.set_attribute("drain.cycle_id", cycle_id)
     log = runlog.RunLog(cycle_id=cycle_id)
     try:
-        plan = linear.pending_issues(cycle_id)
+        if project is not None:
+            plan = linear.project_issues(cycle_id)
+        else:
+            plan = linear.pending_issues(cycle_id)
     except DependencyCycleError as exc:
         halt_reason = f"Halt: {exc}"
         log.set_cycle_halt(halt_reason)
@@ -354,12 +377,16 @@ def _run(
 
     if not plan.order and not plan.deferred:
         cycle_span.set_attribute("drain.outcome", "nothing-to-do")
-        console.orch(f"Cycle {cycle_id} has no Todo/Backlog issues — nothing to do.")
+        label = "Project" if target_kind == "project" else "Cycle"
+        console.orch(
+            f"{label} {cycle_id} has no Todo/Backlog issues — nothing to do."
+        )
         return 0
 
     console.startup_plan(
         cycle_id,
         [(i["identifier"], i["title"], model.resolve(i)) for i in plan.order],
+        target_kind=target_kind,
     )
 
     for deferred in plan.deferred:
