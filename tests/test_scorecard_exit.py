@@ -277,7 +277,7 @@ def test_fail_verdict_not_counted_correct(
         [_done_entry("ABA-1", _FAIL_VERDICT)],
         "cycle-1-20260522T100000000000Z.json",
     )
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
     out = capsys.readouterr().out
     assert "0/1 (0%)" in out
     assert "✗" in out
@@ -312,7 +312,7 @@ def test_unscored_run_shows_dash_glyph(
         [_done_entry("ABA-1", None, review=None)],
         "cycle-1-20260522T100000000000Z.json",
     )
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
     out = capsys.readouterr().out
     assert "—" in out
     assert "✗" not in out

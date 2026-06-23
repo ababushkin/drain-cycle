@@ -83,7 +83,7 @@ def test_each_entry_gets_one_row(tmp_path: Path, capsys: pytest.CaptureFixture[s
         "cycle-1-20260522T100000000000Z.json",
     )
 
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
 
     out = capsys.readouterr().out
     assert "ABA-1" in out
@@ -99,7 +99,7 @@ def test_cycle_header_appears(tmp_path: Path, capsys: pytest.CaptureFixture[str]
         "cycle-abc-20260522T100000000000Z.json",
     )
 
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
 
     out = capsys.readouterr().out
     assert "cycle-abc" in out
@@ -114,7 +114,7 @@ def test_duration_shown_in_row(tmp_path: Path, capsys: pytest.CaptureFixture[str
         "cycle-1-20260522T100000000000Z.json",
     )
 
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
 
     out = capsys.readouterr().out
     assert "95.3" in out
@@ -129,7 +129,7 @@ def test_cost_shown_in_row(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
         "cycle-1-20260522T100000000000Z.json",
     )
 
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
 
     out = capsys.readouterr().out
     assert "0.0123" in out
@@ -144,7 +144,7 @@ def test_tokens_shown_in_row(tmp_path: Path, capsys: pytest.CaptureFixture[str])
         "cycle-1-20260522T100000000000Z.json",
     )
 
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
 
     out = capsys.readouterr().out
     assert "12k" in out
@@ -161,7 +161,7 @@ def test_correct_entry_shows_correct_glyph(
         "cycle-1-20260522T100000000000Z.json",
     )
 
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
 
     out = capsys.readouterr().out
     assert "✓" in out
@@ -179,7 +179,7 @@ def test_fail_outcome_shows_failed_glyph(
         "cycle-1-20260522T100000000000Z.json",
     )
 
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
 
     out = capsys.readouterr().out
     assert "✗" in out
@@ -196,7 +196,7 @@ def test_nogo_review_shows_failed_glyph(
         "cycle-1-20260522T100000000000Z.json",
     )
 
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
 
     out = capsys.readouterr().out
     assert "✗" in out
@@ -213,7 +213,7 @@ def test_missing_review_shows_failed_glyph(
         "cycle-1-20260522T100000000000Z.json",
     )
 
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
 
     out = capsys.readouterr().out
     assert "✗" in out
@@ -237,13 +237,13 @@ def test_entries_from_same_cycle_appear_together(
         "cycle-shared-20260522T110000000000Z.json",
     )
 
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
 
     out = capsys.readouterr().out
-    # Only one header for the cycle
-    assert out.count("cycle-shared") == 1
-    assert "ABA-1" in out
-    assert "ABA-2" in out
+    # Both files' entries group under a single cycle detail section.
+    detail = out.split("Cycle cycle-shared", 1)[1]
+    assert "ABA-1" in detail
+    assert "ABA-2" in detail
 
 
 def test_distinct_cycles_each_get_a_header(
@@ -263,7 +263,7 @@ def test_distinct_cycles_each_get_a_header(
         "cycle-B-20260522T110000000000Z.json",
     )
 
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
 
     out = capsys.readouterr().out
     assert "cycle-A" in out
