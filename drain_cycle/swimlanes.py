@@ -104,9 +104,10 @@ can paint at column 1 without first issuing a carriage return."""
 
 _DEFAULT_REGION_HEIGHT = 2
 """Rows reserved at the bottom of the terminal for the status block. Two is
-enough for slice 1's queue + stepper; N08/N09/N11 grow the region by raising
-this. The region collapses to the smaller of the requested height and what
-the terminal can give without leaving fewer than two scrolling rows."""
+enough for today's queue + stepper layout; constructor callers raise it to
+add rows above the stepper. The region collapses to the smaller of the
+requested height and what the terminal can give without leaving fewer than
+two scrolling rows."""
 
 _DEFAULT_FALLBACK_SIZE = (80, 24)
 """Fallback ``(columns, lines)`` when ``shutil.get_terminal_size`` cannot read
@@ -502,8 +503,8 @@ class StepRenderer:
                 )
                 self._stderr.write(stepper_row)
             else:
-                # Stepper alone — paint on the last reserved row so additional
-                # height (N09 footer, N11 persona depth) can land above it.
+                # Stepper alone — paint on the last reserved row so any
+                # extra rows added by a larger region_height land above it.
                 self._stderr.write(_ANSI_POSITION_FMT.format(row=rows, col=1))
                 self._stderr.write(stepper_row)
             self._stderr.write(_ANSI_RESTORE_CURSOR)
@@ -598,10 +599,7 @@ class StepRenderer:
         if not self._process_hooks_installed:
             return
         if self._atexit_fn is not None:
-            try:
-                atexit.unregister(self._atexit_fn)
-            except Exception:
-                pass
+            atexit.unregister(self._atexit_fn)
             self._atexit_fn = None
         for sig, prev in (
             (signal.SIGINT, self._sigint_prev),
@@ -658,7 +656,7 @@ class StepRenderer:
             try:
                 cols, rows = self._term_size_fn()
             except Exception:
-                rows, cols = self._term_rows, self._term_cols
+                cols, rows = self._term_cols, self._term_rows
             if rows >= self._region_height + 2 and (
                 rows != self._term_rows or cols != self._term_cols
             ):
