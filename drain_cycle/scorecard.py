@@ -62,15 +62,16 @@ def _is_silent_done(entry: dict[str, Any]) -> bool:
 
 
 def _status(entry: dict[str, Any]) -> Status:
-    """Map an entry to its render status.
+    """Map an entry to CORRECT, FAILED, or UNSCORED.
 
-    The renderer consults this single classifier for all three states. Today it
-    returns only CORRECT or FAILED — a never-evaluated run collapses into FAILED.
-    Distinguishing UNSCORED (no verdict recorded) from FAILED, and aggregating
-    per issue rather than per attempt, are tracked separately; both land by
-    growing this function (and the run() aggregation source), with no change to
-    the render code below.
+    UNSCORED: neither outcome_verdict nor review_verdict is present — the run
+    was never evaluated. CORRECT: both present and the correctness rule passes.
+    FAILED: at least one verdict present but the correctness rule fails.
     """
+    outcome = entry.get("outcome_verdict")
+    review = entry.get("review_verdict")
+    if outcome is None and review is None:
+        return Status.UNSCORED
     if _is_correct(entry):
         return Status.CORRECT
     return Status.FAILED

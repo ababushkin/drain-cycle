@@ -40,10 +40,18 @@ def test_status_glyph_maps_all_three_states() -> None:
     assert "—" in _status_glyph(Status.UNSCORED)
 
 
-def test_null_verdict_currently_classifies_as_failed() -> None:
-    """Interim behavior: with no verdict, a run renders FAILED, not UNSCORED."""
+def test_no_verdict_classifies_as_unscored() -> None:
+    """A run with no verdict is UNSCORED, not FAILED."""
     entry = {"outcome_verdict": None, "review_verdict": None}
-    assert _status(entry) is Status.FAILED
+    assert _status(entry) is Status.UNSCORED
+
+
+def test_one_verdict_present_classifies_as_failed() -> None:
+    """A run with only one verdict present is scored and FAILED, not UNSCORED."""
+    entry_outcome_only = {"outcome_verdict": _PASS_VERDICT, "review_verdict": None}
+    entry_review_only = {"outcome_verdict": None, "review_verdict": _GO_VERDICT}
+    assert _status(entry_outcome_only) is Status.FAILED
+    assert _status(entry_review_only) is Status.FAILED
 
 
 def test_kpi_header_renders(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
