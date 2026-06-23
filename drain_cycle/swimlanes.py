@@ -769,7 +769,7 @@ class StepRenderer:
                 cols, _rows = self._term_size_fn()
             except Exception:
                 return row
-        if len(row) <= cols:
+        if cols <= 0 or len(row) <= cols:
             return row
         return self._truncate_stepper_row(parts, active_idx, sep, int(cols))
 
@@ -849,7 +849,7 @@ class StepRenderer:
                 cols, _rows = self._term_size_fn()
             except Exception:
                 return full
-        if len(full) <= cols:
+        if cols <= 0 or len(full) <= cols:
             return full
         return self._truncate_queue_row(parts, sep, int(cols), focus)
 
