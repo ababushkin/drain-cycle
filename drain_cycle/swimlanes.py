@@ -109,6 +109,17 @@ add rows above the stepper. The region collapses to the smaller of the
 requested height and what the terminal can give without leaving fewer than
 two scrolling rows."""
 
+_MIN_VIABLE_HEIGHT = 8
+"""Minimum terminal row count below which the swimlanes view degrades to
+the flat stream. The floor reserves the default pinned region (2 rows)
+plus a useful passthrough above it (6 rows) — a view with only one or two
+scrolling rows is not viable: a single worker log line scrolls the rest
+out of sight before the operator can read it. At exactly this height the
+region still opens; at one row less it falls back to the flat stream with
+NFR-4 byte parity (zero swimlanes bytes, matching the non-TTY contract).
+Recorded in-node as the N13 floor; callers and tests read it from here
+instead of reproducing the arithmetic."""
+
 _DEFAULT_FALLBACK_SIZE = (80, 24)
 """Fallback ``(columns, lines)`` when ``shutil.get_terminal_size`` cannot read
 the controlling terminal — pipes, test fakes, detached sessions. Matches the
@@ -341,7 +352,8 @@ class StepRenderer:
         self._queue: list[QueueItem] = []
         self._focused: str | None = None
         self._sub_status: str = ""
-        self._region_height = max(1, int(region_height))
+        self._requested_region_height = max(1, int(region_height))
+        self._region_height = self._requested_region_height
         self._term_size_fn = term_size_fn or self._default_term_size
         self._region_active = False
         self._term_rows = 0
@@ -512,28 +524,46 @@ class StepRenderer:
         except (OSError, ValueError):
             pass
 
-    def _enter_region(self) -> bool:
-        """Pin the bottom ``region_height`` rows as the owned status block.
+    def _budget_region_height(self, rows: int) -> int | None:
+        """Resolve the effective pinned height for a terminal of ``rows`` rows.
 
-        Reserves the space by writing ``region_height`` newlines first so the
+        Returns ``None`` when the terminal is below ``_MIN_VIABLE_HEIGHT`` —
+        the view degrades to the flat stream. Otherwise returns the requested
+        region height clamped so the scrolling area never falls below the
+        passthrough floor (``_MIN_VIABLE_HEIGHT - _DEFAULT_REGION_HEIGHT``
+        rows), so a caller asking for a taller pinned block on a small
+        terminal still leaves a useful passthrough above it.
+        """
+        if rows < _MIN_VIABLE_HEIGHT:
+            return None
+        passthrough_floor = _MIN_VIABLE_HEIGHT - _DEFAULT_REGION_HEIGHT
+        max_pinned = rows - passthrough_floor
+        return min(self._requested_region_height, max(1, max_pinned))
+
+    def _enter_region(self) -> bool:
+        """Pin the bottom rows as the owned status block.
+
+        Reserves the space by writing region-height newlines first so the
         existing scrollback (the orchestrator's startup table and any
         worker_event lines already on screen) scrolls up rather than getting
         overwritten by the absolute-positioned paint. Then issues DECSTBM
         with the top of the scroll region at row 1 and the bottom one row
-        above the pinned block. Returns ``False`` — and stays silent — if the
-        terminal is too short to keep at least two scrolling rows above the
-        region, so a tiny window degrades to the flat stream rather than
-        rendering on top of itself.
+        above the pinned block. Returns ``False`` — and stays silent — when
+        the terminal is below ``_MIN_VIABLE_HEIGHT``, so a tiny window
+        degrades to the flat stream rather than rendering on top of itself.
+        The pinned height is the lesser of the requested height and the
+        terminal-derived cap so the passthrough never falls below its floor.
         """
         try:
             cols, rows = self._term_size_fn()
         except Exception:
             return False
-        if rows < self._region_height + 2:
+        effective = self._budget_region_height(rows)
+        if effective is None:
             return False
-        scroll_bottom = rows - self._region_height
+        scroll_bottom = rows - effective
         try:
-            self._stderr.write("\n" * self._region_height)
+            self._stderr.write("\n" * effective)
             self._stderr.write(
                 _ANSI_DECSTBM_FMT.format(top=1, bottom=scroll_bottom)
             )
@@ -544,6 +574,7 @@ class StepRenderer:
         except (OSError, ValueError):
             return False
         self._region_active = True
+        self._region_height = effective
         self._term_rows = rows
         self._term_cols = cols
         self._install_process_hooks()
