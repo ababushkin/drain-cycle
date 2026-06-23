@@ -224,6 +224,122 @@ def test_sigwinch_noop_when_terminal_size_unchanged():
     assert err.getvalue() == ""
 
 
+def test_sigwinch_to_sub_minimum_height_releases_region():
+    """A SIGWINCH dropping below ``_MIN_VIABLE_HEIGHT`` releases the scroll
+    region — the operator's shell returns to a normal scrolling layout
+    rather than staying pinned to bottom margins that have moved off the
+    visible terminal."""
+    rows = [24]
+
+    def term_size() -> tuple[int, int]:
+        return 80, rows[0]
+
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(
+        err, tty=True, region_height=2, term_size_fn=term_size
+    )
+    renderer.feed(_assistant_skill_event("m1", "exec:pickup"))
+    err.truncate(0)
+    err.seek(0)
+    rows[0] = swimlanes._MIN_VIABLE_HEIGHT - 1
+    renderer._on_winch(signal.SIGWINCH, None)
+    out = err.getvalue()
+    assert "\x1b[r" in out, (
+        f"sub-minimum resize must release the region; got {out!r}"
+    )
+    assert renderer._region_active is False, (
+        "after sub-minimum resize the region must be inactive so subsequent "
+        "events fall back to the flat stream rather than painting on stale "
+        "bottom margins"
+    )
+
+
+def test_sigwinch_to_smaller_but_viable_size_repins_within_new_budget():
+    """A resize that stays at or above ``_MIN_VIABLE_HEIGHT`` re-pins the
+    region at the new bottom — the pinned height clamps to the new
+    terminal so the passthrough floor is preserved at every viable size."""
+    rows = [30]
+
+    def term_size() -> tuple[int, int]:
+        return 80, rows[0]
+
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(
+        err, tty=True, region_height=2, term_size_fn=term_size
+    )
+    renderer.feed(_assistant_skill_event("m1", "exec:pickup"))
+    err.truncate(0)
+    err.seek(0)
+    rows[0] = swimlanes._MIN_VIABLE_HEIGHT
+    renderer._on_winch(signal.SIGWINCH, None)
+    out = err.getvalue()
+    expected_bottom = swimlanes._MIN_VIABLE_HEIGHT - swimlanes._DEFAULT_REGION_HEIGHT
+    assert f"\x1b[1;{expected_bottom}r" in out, (
+        f"resize to viable size must re-issue DECSTBM with the new bottom "
+        f"margin {expected_bottom}; got {out!r}"
+    )
+    assert renderer._region_active is True
+
+
+def test_sigwinch_to_a_taller_request_clamps_to_the_new_budget():
+    """A renderer constructed with a larger requested region height than the
+    new terminal can spare gets a clamped pinned height after SIGWINCH —
+    the runtime budget overrides the caller's request when the terminal
+    shrinks under it."""
+    rows = [24]
+
+    def term_size() -> tuple[int, int]:
+        return 80, rows[0]
+
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(
+        err, tty=True, region_height=10, term_size_fn=term_size
+    )
+    renderer.feed(_assistant_skill_event("m1", "exec:pickup"))
+    err.truncate(0)
+    err.seek(0)
+    rows[0] = swimlanes._MIN_VIABLE_HEIGHT
+    renderer._on_winch(signal.SIGWINCH, None)
+    # At the floor with the default 2-row pinned region, the budget clamps
+    # the runtime region_height down to _DEFAULT_REGION_HEIGHT so the
+    # passthrough floor (rows - _DEFAULT_REGION_HEIGHT) is preserved.
+    assert renderer._region_height == swimlanes._DEFAULT_REGION_HEIGHT, (
+        f"shrinking SIGWINCH must clamp the runtime region_height to fit "
+        f"the new budget; got {renderer._region_height}"
+    )
+
+
+def test_sigwinch_from_sub_minimum_back_to_viable_re_enters_region():
+    """A renderer that fell back to silence on a sub-minimum terminal must
+    re-enter the region when SIGWINCH grows it back above the floor — the
+    view comes back on without waiting for the next event."""
+    rows = [swimlanes._MIN_VIABLE_HEIGHT - 1]
+
+    def term_size() -> tuple[int, int]:
+        return 80, rows[0]
+
+    err = io.StringIO()
+    renderer = swimlanes.StepRenderer(
+        err, tty=True, region_height=2, term_size_fn=term_size
+    )
+    renderer.feed(_assistant_skill_event("m1", "exec:pickup"))
+    # Nothing emitted yet — sub-minimum terminal, no region.
+    assert renderer._region_active is False
+    err.truncate(0)
+    err.seek(0)
+    rows[0] = 24
+    renderer._on_winch(signal.SIGWINCH, None)
+    out = err.getvalue()
+    assert renderer._region_active is True, (
+        "SIGWINCH back to a viable size must open the region without "
+        "waiting for the next stream event"
+    )
+    # Region opens with the standard DECSTBM bounds for a 24-row terminal.
+    assert "\x1b[1;22r" in out, (
+        f"region must open at the new terminal's bounds; got {out!r}"
+    )
+
+
 def test_sigwinch_chains_to_previous_handler():
     err, renderer = _make_renderer(rows=24, region_height=2)
     renderer.feed(_assistant_skill_event("m1", "exec:pickup"))
