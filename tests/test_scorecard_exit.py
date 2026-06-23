@@ -183,9 +183,9 @@ def test_per_cycle_pass_rate_shown(
     )
     scorecard.run(runs_dir)
     out = capsys.readouterr().out
-    # per-cycle line appears before the overall line
+    # the cycle's own header line carries its pass-rate fraction
     lines = out.splitlines()
-    cycle_rate_line = next((l for l in lines if "cycle pass-rate" in l), None)
+    cycle_rate_line = next((l for l in lines if "cycle-X" in l), None)
     assert cycle_rate_line is not None
     assert "1/2 (50%)" in cycle_rate_line
 
@@ -229,4 +229,5 @@ def test_fail_verdict_not_counted_correct(
     )
     scorecard.run(runs_dir)
     out = capsys.readouterr().out
-    assert "overall pass-rate: 0/1" in out
+    assert "0/1 (0%)" in out
+    assert "✗" in out

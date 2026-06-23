@@ -147,10 +147,10 @@ def test_tokens_shown_in_row(tmp_path: Path, capsys: pytest.CaptureFixture[str])
     scorecard.run(runs_dir)
 
     out = capsys.readouterr().out
-    assert "12345" in out
+    assert "12k" in out
 
 
-def test_correct_entry_shows_correct_label(
+def test_correct_entry_shows_correct_glyph(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     runs_dir = tmp_path / "runs"
@@ -164,11 +164,11 @@ def test_correct_entry_shows_correct_label(
     scorecard.run(runs_dir)
 
     out = capsys.readouterr().out
-    assert "correct" in out
-    assert "not-correct" not in out
+    assert "✓" in out
+    assert "✗" not in out
 
 
-def test_fail_outcome_shows_not_correct(
+def test_fail_outcome_shows_failed_glyph(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     runs_dir = tmp_path / "runs"
@@ -182,10 +182,10 @@ def test_fail_outcome_shows_not_correct(
     scorecard.run(runs_dir)
 
     out = capsys.readouterr().out
-    assert "not-correct" in out
+    assert "✗" in out
 
 
-def test_nogo_review_shows_not_correct(
+def test_nogo_review_shows_failed_glyph(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     runs_dir = tmp_path / "runs"
@@ -199,10 +199,10 @@ def test_nogo_review_shows_not_correct(
     scorecard.run(runs_dir)
 
     out = capsys.readouterr().out
-    assert "not-correct" in out
+    assert "✗" in out
 
 
-def test_missing_review_shows_not_correct(
+def test_missing_review_shows_failed_glyph(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     runs_dir = tmp_path / "runs"
@@ -216,7 +216,7 @@ def test_missing_review_shows_not_correct(
     scorecard.run(runs_dir)
 
     out = capsys.readouterr().out
-    assert "not-correct" in out
+    assert "✗" in out
 
 
 def test_entries_from_same_cycle_appear_together(
