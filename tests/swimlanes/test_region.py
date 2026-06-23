@@ -400,3 +400,134 @@ def test_multi_line_region_swallows_fault_when_entering_region():
         "a failure during region entry must leave the region inactive so "
         "_exit_region does not emit a release for a region that never opened"
     )
+
+
+def _queue_row(renderer: swimlanes.StepRenderer) -> str:
+    """The rendered queue row, or empty string when the queue is unset."""
+    row = renderer._render_queue_row()
+    return row if row is not None else ""
+
+
+def test_queue_overflow_emits_plus_n_more_indicator():
+    """When the queue holds more issues than fit on the terminal row, the
+    overflow is named explicitly — `+N more` carries the count the operator
+    cannot see, so a long cycle never silently truncates."""
+    err, renderer = _make_renderer(rows=24, cols=40, region_height=2)
+    renderer.set_queue(
+        [swimlanes.QueueItem(f"ABA-{n:03d}", "queued") for n in range(20)]
+        + [swimlanes.QueueItem("ABA-RUN", "running")]
+    )
+    row = _queue_row(renderer)
+    assert "+" in row and "more" in row, (
+        f"overflow must surface a `+N more` indicator; got {row!r}"
+    )
+    assert len(row) <= 40, (
+        f"queue row must fit the terminal width (40 cols); got {len(row)} "
+        f"chars: {row!r}"
+    )
+
+
+def test_queue_overflow_preserves_running_issue():
+    """The overflow rule's first invariant: a cycle taller than the budget
+    keeps the running issue visible — the operator must always see which
+    issue the worker is actively draining."""
+    err, renderer = _make_renderer(rows=24, cols=40, region_height=2)
+    renderer.set_queue(
+        [swimlanes.QueueItem(f"ABA-{n:03d}", "queued") for n in range(20)]
+        + [swimlanes.QueueItem("ABA-RUN", "running")]
+    )
+    row = _queue_row(renderer)
+    assert "ABA-RUN" in row, (
+        f"running issue must survive queue overflow; got {row!r}"
+    )
+
+
+def test_queue_overflow_preserves_focused_swimlane():
+    """The overflow rule's second invariant: an explicitly-focused issue
+    stays visible even when it would otherwise be truncated past the row's
+    horizontal budget — the operator's selection sticks."""
+    err, renderer = _make_renderer(rows=24, cols=40, region_height=2)
+    queue = [swimlanes.QueueItem(f"ABA-{n:03d}", "queued") for n in range(20)]
+    queue.append(swimlanes.QueueItem("ABA-RUN", "running"))
+    renderer.set_queue(queue)
+    # Focus the very last queued item so it would be dropped by a naive
+    # left-to-right truncation.
+    renderer.focus_issue("ABA-019")
+    row = _queue_row(renderer)
+    assert "ABA-019" in row, (
+        f"focused issue must survive queue overflow even when it lies "
+        f"outside the leading window; got {row!r}"
+    )
+    assert "ABA-RUN" in row, "running issue must still be visible"
+
+
+def test_queue_overflow_count_matches_dropped_items():
+    """The `+N more` count names exactly the number of queue items the row
+    could not show — operator-visible accounting, not an opaque ellipsis."""
+    import re
+
+    err, renderer = _make_renderer(rows=24, cols=40, region_height=2)
+    queue = [swimlanes.QueueItem("ABA-RUN", "running")] + [
+        swimlanes.QueueItem(f"ABA-{n:03d}", "queued") for n in range(20)
+    ]
+    renderer.set_queue(queue)
+    row = _queue_row(renderer)
+    match = re.search(r"\+(\d+) more", row)
+    assert match is not None, f"row must carry `+N more`; got {row!r}"
+    dropped = int(match.group(1))
+    # Count the queue identifiers that did appear; the rest were dropped.
+    shown = sum(1 for item in queue if item.identifier in row)
+    assert dropped == len(queue) - shown, (
+        f"`+N more` count must equal the dropped items: queue size "
+        f"{len(queue)}, shown {shown}, indicator says +{dropped}; "
+        f"row was {row!r}"
+    )
+
+
+def test_stepper_row_keeps_active_step_when_history_overflows():
+    """When the stepper has more entries than the terminal width can show,
+    the active step survives the truncation — the operator's source of
+    truth for "what is the worker doing right now" is never elided.
+
+    A run that has cycled through many skills (pickup, breakdown, multiple
+    build slices, multiple review personas, verify, finish) easily blows
+    past 40 columns; the spine still has to point at the current step."""
+    err, renderer = _make_renderer(rows=24, cols=40, region_height=2)
+    history = [
+        "exec:pickup",
+        "exec:breakdown",
+        "exec:build",
+        "exec:review",
+        "exec:verify",
+        "exec:finish",
+        "shape:pr-prepare",
+        "exec:active-now",
+    ]
+    for i, step in enumerate(history):
+        renderer.feed(_assistant_skill_event(f"m{i}", step))
+    row = renderer._render_stepper_row()
+    assert "exec:active-now" in row, (
+        f"active step must survive stepper overflow; got {row!r}"
+    )
+    # The row must also fit the terminal — protection without truncation is
+    # just relabelling the overflow.
+    assert len(row) <= 40, (
+        f"stepper row must fit the terminal width when truncated; "
+        f"got {len(row)} chars: {row!r}"
+    )
+
+
+def test_queue_row_fits_when_no_overflow():
+    """Below the overflow threshold the row is unchanged — no spurious
+    `+0 more` annotation, no rewriting of a row that already fits."""
+    err, renderer = _make_renderer(rows=24, cols=80, region_height=2)
+    renderer.set_queue(
+        [
+            swimlanes.QueueItem("ABA-1", "running"),
+            swimlanes.QueueItem("ABA-2", "queued"),
+        ]
+    )
+    row = _queue_row(renderer)
+    assert "more" not in row, (
+        f"no overflow → no `+N more` indicator; got {row!r}"
+    )
