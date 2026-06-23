@@ -101,6 +101,15 @@ def _sparkline(values: list[float]) -> str:
     )
 
 
+def _latest_by_issue(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return one entry per issue_identifier — the last occurrence in the list."""
+    seen: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        issue = entry.get("issue_identifier") or "?"
+        seen[issue] = entry
+    return list(seen.values())
+
+
 def _load_run_files(runs_dir_path: Path) -> list[dict[str, Any]]:
     """Return all valid run-log payloads, sorted by filename (chronological)."""
     if not runs_dir_path.is_dir():
@@ -132,7 +141,15 @@ def _render(
     for cid, entries in cycles.items():
         runs = 0
         correct = 0
+        # Cost and silent-done accumulate across all attempts.
         for entry in entries:
+            cost = entry.get("cost_usd")
+            if cost is not None:
+                total_cost += cost
+            if _is_silent_done(entry):
+                silent_done_issues.append(entry.get("issue_identifier", "?"))
+        # Correctness counts once per issue, using the latest attempt.
+        for entry in _latest_by_issue(entries):
             runs += 1
             status = _status(entry)
             if status is Status.CORRECT:
@@ -141,11 +158,6 @@ def _render(
                 total_unscored += 1
             else:
                 total_scored += 1
-            cost = entry.get("cost_usd")
-            if cost is not None:
-                total_cost += cost
-            if _is_silent_done(entry):
-                silent_done_issues.append(entry.get("issue_identifier", "?"))
         rate = correct / runs if runs else 0.0
         per_cycle.append((cid, entries, runs, correct, rate))
         if runs:
