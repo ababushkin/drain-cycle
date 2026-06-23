@@ -202,8 +202,9 @@ def test_step_renderer_emits_current_step_on_stderr_when_tty():
     renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
     out = err.getvalue()
     assert "exec:pickup" in out
-    # First emission carries a carriage return so the line redraws in place.
-    assert "\r" in out
+    # First emission opens a DECSTBM scroll region so the bottom rows hold
+    # the status block while the worker passthrough scrolls above.
+    assert "\x1b[1;" in out and "r" in out
 
 
 def test_step_renderer_flips_in_place_on_each_transition():
@@ -219,8 +220,10 @@ def test_step_renderer_flips_in_place_on_each_transition():
     last_pickup = out.rfind("exec:pickup")
     last_breakdown = out.rfind("exec:breakdown")
     assert last_breakdown > last_pickup
-    # The row redraws (CR sequences > 1) rather than appending newlines.
-    assert out.count("\r") >= 2
+    # Each transition saves+restores the cursor around the absolute-position
+    # paint, so a brace pair appears per emit rather than appended newlines.
+    assert out.count("\x1b7") >= 2
+    assert out.count("\x1b8") >= 2
 
 
 def test_step_renderer_is_silent_when_not_tty():
@@ -534,7 +537,9 @@ def test_run_issue_passthrough_byte_identical_with_and_without_swimlanes(tmp_pat
     rendered = renderer_stderr.getvalue()
     assert "exec:pickup" in rendered
     assert "exec:breakdown" in rendered
-    assert "\r\x1b[2K" in rendered
+    # The renderer opened a DECSTBM scroll region — the mechanism that keeps
+    # the pinned status block visible while the passthrough scrolls above.
+    assert "\x1b[1;" in rendered and "r\x1b[" in rendered
 
 
 def test_step_renderer_renders_cycle_queue_above_stepper():
@@ -778,28 +783,35 @@ def test_keyboard_listener_routes_digit_key_to_focus_n_th_queue_item():
     assert renderer.focused_identifier is None
 
 
-def test_step_renderer_redraw_mechanism_is_hand_rolled_ansi():
-    """OQ-4 settled: hand-rolled CR + clear-to-EOL, not rich.Live.
+def test_step_renderer_redraw_mechanism_is_decstbm_pinned_region():
+    """OQ-4 re-settled for the multi-line view: DECSTBM, not rich.Live or the
+    alternate-screen buffer.
 
-    rich.Live would take over the cursor on a refresh loop, conflicting with
-    the worker thread's append-only writes to stderr (console.worker_event,
-    the AgentSink prefix lines). Hand-rolled ANSI writes one fixed escape
-    sequence per transition synchronously inside the reader thread — no
-    refresh loop, no cursor takeover, no thread coordination, and the line
-    stays bounded to "exactly one row at the current cursor position." The
-    renderer cohabits with append-only stderr writes by always leading with
-    CR + clear-EOL: an intervening newline-terminated log line just moves
-    the row to the next physical line on the next emit.
+    rich.Live would own the cursor on a refresh loop, suppressing the
+    append-only writes the operator relies on (``console.worker_event``, the
+    ``AgentSink`` ``│``-prefixed diagnostics). The alternate-screen buffer
+    would hide those writes entirely. DECSTBM is the only mechanism that
+    cohabits with append-only stderr: the bottom rows are pinned outside the
+    scroll region while the passthrough scrolls within it. The pinned block
+    repaints via absolute cursor positioning bracketed by save/restore so the
+    cursor returns to the scrolling area between repaints — the worker log
+    never lands inside the status block, and the status block never lands
+    inside the log.
     """
     err = io.StringIO()
     renderer = swimlanes.StepRenderer(err, tty=True)
     renderer.feed(_assistant_event("m1", _skill("exec:pickup")))
     out = err.getvalue()
-    # The chosen-mechanism contract: every emit starts with CR + CSI 2K
-    # (carriage return then "erase line").
-    assert out.startswith("\r\x1b[2K")
-    # No newline written — the row stays on the current line until finalize.
-    assert "\n" not in out
+    # Region was opened — top..bottom DECSTBM with explicit numeric bounds.
+    assert "\x1b[1;" in out
+    # The paint is bracketed by DEC save/restore cursor so subsequent
+    # passthrough writes land where the worker thread left the cursor.
+    assert "\x1b7" in out
+    assert "\x1b8" in out
+    # The stepper row was painted with absolute positioning into the
+    # pinned region — there is at least one ``CSI <row>;<col>H`` for the
+    # bottom row of the region (row 24 in the 80x24 fallback geometry).
+    assert "\x1b[24;1H" in out
 
 
 def test_drain_stream_does_not_call_on_step_with_non_dict_events():
