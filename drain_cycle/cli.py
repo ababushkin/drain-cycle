@@ -47,6 +47,7 @@ _USAGE = (
     "usage: drain-cycle [--watch|-w] [--no-stack] [--project <name|id>]  drain the current Linear cycle\n"
     "       drain-cycle scorecard                                         report per-run quality from run logs\n"
     "       drain-cycle status                                            show status of the active run\n"
+    "       drain-cycle --version\n"
     "       drain-cycle --help\n"
     "\n"
     "options:\n"
@@ -137,6 +138,10 @@ def main() -> None:
         sys.exit(stop_guard.run(sys.stdin, sys.stdout))
     if argv in (["-h"], ["--help"]):
         print(_USAGE)
+        sys.exit(0)
+    if argv in (["--version"], ["-V"]):
+        from ._version import full_version
+        print(f"drain-cycle {full_version()}")
         sys.exit(0)
     print(f"drain-cycle: unknown invocation: {' '.join(argv)}", file=sys.stderr)
     print(_USAGE, file=sys.stderr)
