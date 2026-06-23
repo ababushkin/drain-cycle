@@ -22,6 +22,7 @@ view builds on:
 from __future__ import annotations
 
 import io
+import re
 import signal
 from typing import Any
 
@@ -580,8 +581,6 @@ def test_queue_overflow_preserves_focused_swimlane():
 def test_queue_overflow_count_matches_dropped_items():
     """The `+N more` count names exactly the number of queue items the row
     could not show — operator-visible accounting, not an opaque ellipsis."""
-    import re
-
     err, renderer = _make_renderer(rows=24, cols=40, region_height=2)
     queue = [swimlanes.QueueItem("ABA-RUN", "running")] + [
         swimlanes.QueueItem(f"ABA-{n:03d}", "queued") for n in range(20)
@@ -631,6 +630,24 @@ def test_stepper_row_keeps_active_step_when_history_overflows():
         f"stepper row must fit the terminal width when truncated; "
         f"got {len(row)} chars: {row!r}"
     )
+
+
+def test_stepper_row_fallback_when_active_part_alone_exceeds_terminal_width():
+    """A pathologically narrow terminal that cannot even fit the active
+    part returns a clipped slice of the active part — the operator still
+    sees the step name's leading characters rather than an empty row.
+
+    Pinning the contract here means the truncation routine has a defined
+    behaviour for the failure mode (very narrow window, long step name)
+    rather than relying on a coincidental Python slice semantics."""
+    err, renderer = _make_renderer(rows=24, cols=10, region_height=2)
+    renderer.feed(_assistant_skill_event("m1", "exec:very-long-skill-name-here"))
+    row = renderer._render_stepper_row()
+    assert len(row) <= 10, (
+        f"narrow terminal must clip the active part to fit; got {len(row)}: "
+        f"{row!r}"
+    )
+    assert row, "the row must not be empty when there's an active step"
 
 
 def test_queue_row_fits_when_no_overflow():
