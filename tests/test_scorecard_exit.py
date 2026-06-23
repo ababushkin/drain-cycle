@@ -231,3 +231,38 @@ def test_fail_verdict_not_counted_correct(
     out = capsys.readouterr().out
     assert "0/1 (0%)" in out
     assert "✗" in out
+
+
+def test_unscored_run_excluded_from_pass_rate(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """1 scored-correct run + 1 unscored run → 1/1 (100%), not 1/2 (50%)."""
+    runs_dir = tmp_path / "runs"
+    _write_run(
+        runs_dir, "cycle-1",
+        [
+            _done_entry("ABA-1", _PASS_VERDICT),
+            _done_entry("ABA-2", None, review=None),
+        ],
+        "cycle-1-20260522T100000000000Z.json",
+    )
+    scorecard.run(runs_dir)
+    out = capsys.readouterr().out
+    assert "1/1 (100%)" in out
+    assert "1 unscored" in out
+
+
+def test_unscored_run_shows_dash_glyph(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A run with no verdicts renders — in the detail table."""
+    runs_dir = tmp_path / "runs"
+    _write_run(
+        runs_dir, "cycle-1",
+        [_done_entry("ABA-1", None, review=None)],
+        "cycle-1-20260522T100000000000Z.json",
+    )
+    scorecard.run(runs_dir)
+    out = capsys.readouterr().out
+    assert "—" in out
+    assert "✗" not in out
