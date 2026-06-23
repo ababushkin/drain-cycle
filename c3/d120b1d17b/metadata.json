@@ -3,7 +3,7 @@
   "checkpoint_id": "c3d120b1d17b",
   "strategy": "manual-commit",
   "branch": "feat-auto-version",
-  "checkpoints_count": 3,
+  "checkpoints_count": 4,
   "files_touched": [
     "AGENTS.md",
     "drain_cycle/_version.py",
@@ -26,13 +26,19 @@
       "transcript": "/c3/d120b1d17b/1/full.jsonl",
       "content_hash": "/c3/d120b1d17b/1/content_hash.txt",
       "prompt": "/c3/d120b1d17b/1/prompt.txt"
+    },
+    {
+      "metadata": "/c3/d120b1d17b/2/metadata.json",
+      "transcript": "/c3/d120b1d17b/2/full.jsonl",
+      "content_hash": "/c3/d120b1d17b/2/content_hash.txt",
+      "prompt": "/c3/d120b1d17b/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 66883,
-    "cache_creation_tokens": 718020,
-    "cache_read_tokens": 10338702,
-    "output_tokens": 127053,
-    "api_call_count": 89
+    "input_tokens": 91592,
+    "cache_creation_tokens": 871344,
+    "cache_read_tokens": 13899336,
+    "output_tokens": 176205,
+    "api_call_count": 140
   }
 }
