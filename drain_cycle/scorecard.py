@@ -7,7 +7,9 @@ duration, cost, tokens, and a status glyph — no manual confirmation step.
 Correctness rule (ADR 0031):
   correct = outcome_verdict.result == "pass" AND review_verdict.result == "go"
   A missing review verdict is not-correct but is not a violation.
-  A Done entry with null outcome_verdict is a silent-Done violation (exit 1).
+  An instrumented Done entry with null outcome_verdict is a silent-Done
+  violation (exit 1); a Done entry that omits the field predates verdict
+  capture and is not judged.
   prep_verdict.route is advisory — it appears in output but never affects
   the correctness rate or exit code.
 
@@ -54,9 +56,15 @@ def _is_correct(entry: dict[str, Any]) -> bool:
 
 
 def _is_silent_done(entry: dict[str, Any]) -> bool:
-    """True when the entry is Done in Linear but outcome_verdict was never set."""
+    """True when an instrumented entry is Done in Linear but carries no outcome verdict.
+
+    Only entries that use the verdict-carrying schema are judged: the
+    ``outcome_verdict`` key is present (a null value is the violation). Entries
+    that omit the key predate verdict capture and cannot be held to the gate.
+    """
     return (
-        entry.get("final_linear_state") == "Done"
+        "outcome_verdict" in entry
+        and entry.get("final_linear_state") == "Done"
         and entry.get("outcome_verdict") is None
     )
 

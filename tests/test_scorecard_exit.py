@@ -57,6 +57,23 @@ def _done_entry(issue: str, outcome: dict | None, review: dict | None = _GO_VERD
     }
 
 
+def _legacy_done_entry(issue: str) -> dict:
+    """A pre-instrumentation Done entry — written before verdict capture existed.
+
+    It omits the verdict keys entirely (not null), the marker that tells the
+    scorecard this run predates the gate and cannot be held to it.
+    """
+    return {
+        "issue_identifier": issue,
+        "started_at": "2026-05-22T10:00:00+00:00",
+        "finished_at": "2026-05-22T10:02:00+00:00",
+        "exit_code": 0,
+        "final_linear_state": "Done",
+        "worktree_path": f"/tmp/.worktrees/{issue}",
+        "halt_reason": None,
+    }
+
+
 # --- exit code ---
 
 def test_null_outcome_done_exits_nonzero(
@@ -69,6 +86,39 @@ def test_null_outcome_done_exits_nonzero(
         "cycle-1-20260522T100000000000Z.json",
     )
     assert scorecard.run(runs_dir) != 0
+
+
+def test_legacy_done_entry_not_a_violation_exits_zero(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A Done entry that omits outcome_verdict predates the gate — exit 0."""
+    runs_dir = tmp_path / "runs"
+    _write_run(
+        runs_dir, "cycle-1",
+        [_legacy_done_entry("ABA-1")],
+        "cycle-1-20260522T100000000000Z.json",
+    )
+    assert scorecard.run(runs_dir) == 0
+    out = capsys.readouterr().out
+    assert "silent-Done violations: none" in out
+
+
+def test_only_instrumented_null_outcome_is_flagged(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A legacy Done entry beside an instrumented null-outcome one: only the
+    instrumented issue is listed as a violation, and the run still exits 1."""
+    runs_dir = tmp_path / "runs"
+    _write_run(
+        runs_dir, "cycle-1",
+        [_legacy_done_entry("ABA-LEGACY"), _done_entry("ABA-NEW", None)],
+        "cycle-1-20260522T100000000000Z.json",
+    )
+    assert scorecard.run(runs_dir) != 0
+    out = capsys.readouterr().out
+    violations = out.split("silent-Done violations:", 1)[1]
+    assert "ABA-NEW" in violations
+    assert "ABA-LEGACY" not in violations
 
 
 def test_clean_run_exits_zero(
