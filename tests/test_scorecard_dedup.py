@@ -125,7 +125,7 @@ def test_all_attempt_rows_appear_in_detail_output(
         "cycle-1-20260522T100000000000Z.json",
     )
 
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
 
     out = capsys.readouterr().out
     # Both rows appear in the detail table, identified by their distinct durations.

@@ -298,13 +298,33 @@ def test_scorecard_subcommand_dispatches_to_scorecard_run(
 ) -> None:
     called: list[bool] = []
 
-    def fake_run(_runs_dir: object) -> int:
-        called.append(True)
+    def fake_run(_runs_dir: object, detail: bool = False) -> int:
+        called.append(detail)
         return 0
 
     monkeypatch.setattr(scorecard, "run", fake_run)
     monkeypatch.setattr(cli, "load_dotenv", lambda *_a, **_kw: False)
     monkeypatch.setattr("sys.argv", ["drain-cycle", "scorecard"])
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 0
+    assert called == [False]
+
+
+def test_scorecard_detail_flag_passes_detail_true(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called: list[bool] = []
+
+    def fake_run(_runs_dir: object, detail: bool = False) -> int:
+        called.append(detail)
+        return 0
+
+    monkeypatch.setattr(scorecard, "run", fake_run)
+    monkeypatch.setattr(cli, "load_dotenv", lambda *_a, **_kw: False)
+    monkeypatch.setattr("sys.argv", ["drain-cycle", "scorecard", "--detail"])
 
     with pytest.raises(SystemExit) as exc:
         cli.main()

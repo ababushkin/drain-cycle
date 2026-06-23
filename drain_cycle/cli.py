@@ -45,7 +45,7 @@ def _load_secrets() -> None:
 
 _USAGE = (
     "usage: drain-cycle [--watch|-w] [--no-stack] [--project <name|id>]  drain the current Linear cycle\n"
-    "       drain-cycle scorecard                                         report per-run quality from run logs\n"
+    "       drain-cycle scorecard [--detail]                              report run quality from run logs (--detail adds per-issue rows)\n"
     "       drain-cycle status                                            show status of the active run\n"
     "       drain-cycle --version\n"
     "       drain-cycle --help\n"
@@ -128,8 +128,8 @@ def main() -> None:
             sys.exit(1)
         sys.exit(orchestrator.run(loaded_repos, loaded_limits, watch=watch, no_stack=no_stack, project=project))
 
-    if remaining == ["scorecard"] and not watch:
-        sys.exit(scorecard.run(scorecard.runs_dir()))
+    if remaining and remaining[0] == "scorecard" and remaining[1:] in ([], ["--detail"]) and not watch:
+        sys.exit(scorecard.run(scorecard.runs_dir(), detail="--detail" in remaining))
     if remaining == ["status"] and not watch:
         from . import status
         sys.exit(status.run())

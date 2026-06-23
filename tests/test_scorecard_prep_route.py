@@ -71,7 +71,7 @@ def test_auto_merge_route_appears_in_output(
         [_entry("ABA-1", _AUTO_MERGE_PREP)],
         "cycle-1-20260522T100000000000Z.json",
     )
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
     out = capsys.readouterr().out
     assert "auto-merge" in out
 
@@ -85,7 +85,7 @@ def test_human_review_route_appears_in_output(
         [_entry("ABA-1", _HUMAN_REVIEW_PREP)],
         "cycle-1-20260522T100000000000Z.json",
     )
-    scorecard.run(runs_dir)
+    scorecard.run(runs_dir, detail=True)
     out = capsys.readouterr().out
     assert "human-review" in out
 
