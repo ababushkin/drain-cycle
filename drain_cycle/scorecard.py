@@ -62,15 +62,16 @@ def _is_silent_done(entry: dict[str, Any]) -> bool:
 
 
 def _status(entry: dict[str, Any]) -> Status:
-    """Map an entry to its render status.
+    """Map an entry to CORRECT, FAILED, or UNSCORED.
 
-    The renderer consults this single classifier for all three states. Today it
-    returns only CORRECT or FAILED — a never-evaluated run collapses into FAILED.
-    Distinguishing UNSCORED (no verdict recorded) from FAILED, and aggregating
-    per issue rather than per attempt, are tracked separately; both land by
-    growing this function (and the run() aggregation source), with no change to
-    the render code below.
+    UNSCORED: neither outcome_verdict nor review_verdict is present — the run
+    was never evaluated. CORRECT: both present and the correctness rule passes.
+    FAILED: at least one verdict present but the correctness rule fails.
     """
+    outcome = entry.get("outcome_verdict")
+    review = entry.get("review_verdict")
+    if outcome is None and review is None:
+        return Status.UNSCORED
     if _is_correct(entry):
         return Status.CORRECT
     return Status.FAILED
@@ -129,18 +130,18 @@ def _render(
     """Render the dashboard and return (total_runs, total_correct, silent_done)."""
     console.rule("[bold]drain-cycle scorecard[/bold]")
 
-    total_runs = 0
+    total_runs = 0  # scored only; unscored excluded from pass-rate denominator
     total_correct = 0
-    total_scored = 0
     total_unscored = 0
     total_cost = 0.0
     silent_done_issues: list[str] = []
     cycle_rates: list[float] = []  # chronological, for the headline sparkline
-    per_cycle: list[tuple[str, list[dict[str, Any]], int, int, float]] = []
+    per_cycle: list[tuple[str, list[dict[str, Any]], int, int, float, int]] = []
 
     for cid, entries in cycles.items():
         runs = 0
         correct = 0
+        cycle_unscored = 0
         # Cost and silent-done accumulate across all attempts.
         for entry in entries:
             cost = entry.get("cost_usd")
@@ -149,17 +150,19 @@ def _render(
             if _is_silent_done(entry):
                 silent_done_issues.append(entry.get("issue_identifier", "?"))
         # Correctness counts once per issue, using the latest attempt.
+        # UNSCORED runs are excluded from the denominator: they have no verdict
+        # and cannot be judged, so they don't drag down the pass rate.
         for entry in _latest_by_issue(entries):
-            runs += 1
             status = _status(entry)
+            if status is Status.UNSCORED:
+                cycle_unscored += 1
+                total_unscored += 1
+                continue
+            runs += 1
             if status is Status.CORRECT:
                 correct += 1
-            if status is Status.UNSCORED:
-                total_unscored += 1
-            else:
-                total_scored += 1
         rate = correct / runs if runs else 0.0
-        per_cycle.append((cid, entries, runs, correct, rate))
+        per_cycle.append((cid, entries, runs, correct, rate, cycle_unscored))
         if runs:
             cycle_rates.append(rate)
         total_runs += runs
@@ -175,16 +178,21 @@ def _render(
     spark_str = f"   {spark}" if spark else ""
     console.print(f"  [bold]Pass rate[/bold]  {rate_str}{spark_str}")
     console.print(
-        f"  {total_scored} scored · {total_unscored} unscored · "
+        f"  {total_runs} scored · {total_unscored} unscored · "
         f"{len(silent_done_issues)} violations · ${total_cost:.2f}"
     )
 
     # Per-cycle detail.
-    for cid, entries, runs, correct, rate in per_cycle:
-        cpct = round(rate * 100)
+    for cid, entries, runs, correct, rate, cycle_unscored in per_cycle:
+        if runs:
+            cpct = round(rate * 100)
+            rate_label = f"{correct}/{runs} ({cpct}%)"
+        else:
+            rate_label = "n/a"
+        unscored_str = f"  {cycle_unscored} unscored" if cycle_unscored else ""
         console.print(
-            f"\n[bold]Cycle {cid}[/bold]   {correct}/{runs} ({cpct}%)  "
-            f"{_sparkline([rate])}"
+            f"\n[bold]Cycle {cid}[/bold]   {rate_label}  "
+            f"{_sparkline([rate])}{unscored_str}"
         )
         table = Table(show_header=False, box=None, pad_edge=False)
         table.add_column("issue", no_wrap=True)
