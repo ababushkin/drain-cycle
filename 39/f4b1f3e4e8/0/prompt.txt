@@ -1,0 +1,5 @@
+review the issues that are open in this linear project Live execution swimlanes
+
+against the prototype in docs/prototypes
+
+are there any important product details missing? one thing that stands out is that there is no visual reference for what "done" should look like that a worker can validate against
