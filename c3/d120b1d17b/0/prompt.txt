@@ -1,0 +1,11 @@
+drain-cycle scorecard indicates that this project is not working well
+is this correct or are there gaps in the scorecard or the scorecard data
+
+---
+
+file them as linear tickets
+
+---
+
+i also want to plan a feature to improve how the scorecard renders
+research some best practices for how this sort of information should be displayed on screen and provide me with some options
